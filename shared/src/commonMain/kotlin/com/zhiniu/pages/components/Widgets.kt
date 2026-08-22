@@ -27,12 +27,10 @@ fun priceColor(quote: Quote): String = when {
     else -> Palette.FLAT
 }
 
-/** 格式化涨跌幅。 */
-fun pricePct(quote: Quote): String =
-    (if (quote.changePercent >= 0) "+" else "") +
-        String.format(java.util.Locale.US, "%.2f%%", quote.changePercent)
+/** 格式化涨跌幅（KMP 安全，见 domain/model/QuoteDisplay.kt）。 */
+fun pricePct(quote: Quote): String = com.zhiniu.domain.model.QuoteDisplay.pct(quote.changePercent)
 
-fun priceValue(quote: Quote): String = String.format(java.util.Locale.US, "%.2f", quote.price)
+fun priceValue(quote: Quote): String = com.zhiniu.domain.model.QuoteDisplay.price(quote.price)
 
 /**
  * 迷你 K 线（用 View 柱状近似蜡烛，避免依赖 Canvas 绘制 API 的未证实部分）。
