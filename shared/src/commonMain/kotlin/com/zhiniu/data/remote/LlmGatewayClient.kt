@@ -4,6 +4,7 @@
  */
 package com.zhiniu.data.remote
 
+import com.zhiniu.domain.model.AppError
 import com.zhiniu.domain.model.MessageRole
 import com.zhiniu.domain.model.StreamChunk
 import io.ktor.client.HttpClient
@@ -73,9 +74,15 @@ class LlmGatewayClient(
                 }.getOrNull() ?: return@forEach
                 when {
                     obj["error"] != null -> {
-                        val msg = obj["error"]?.let { it as? kotlinx.serialization.json.JsonObject }
-                            ?.get("message")?.toString()?.trim('"') ?: "上游异常"
-                        emit(StreamChunk.Error(msg))
+                        // 后端结构化 error：{ type, code, message } → 映射为统一 AppError 文案
+                        val err = obj["error"]?.let { it as? kotlinx.serialization.json.JsonObject }
+                        val code = err?.get("code")?.toString()?.trim('"')
+                        val backendMsg = err?.get("message")?.toString()?.trim('"')
+                        val appError = AppError.fromBackendCode(code)
+                        val shown =
+                            if (code == "unknown" && !backendMsg.isNullOrBlank()) "[${appError.code}] $backendMsg"
+                            else appError.display()
+                        emit(StreamChunk.Error(shown))
                         return@flow
                     }
                     else -> {

@@ -3,6 +3,7 @@ package com.zhiniu.viewmodel
 
 import com.tencent.kuikly.ref.observable.observable
 import com.zhiniu.domain.model.AiInsight
+import com.zhiniu.domain.model.AppError
 import com.zhiniu.domain.model.KLineBar
 import com.zhiniu.domain.model.Quote
 import com.zhiniu.domain.repository.ChatRepository
@@ -26,7 +27,7 @@ class StockDetailVM(
     val kline = observable<List<KLineBar>>(emptyList())
     val scale = observable(240)
     val loading = observable(true)
-    val errorMsg = observable<String?>(null)
+    val errorMsg = observable<String?>(null) // display = "[code] 中文分级文案"
 
     // AI 诊股
     val insight = observable<AiInsight?>(null)
@@ -43,7 +44,7 @@ class StockDetailVM(
                 q ?: error("无该标的数据")
                 quote.value = q; kline.value = k
             }.onSuccess { loading.value = false }
-                .onFailure { e -> loading.value = false; errorMsg.value = e.message ?: "加载失败" }
+                .onFailure { e -> loading.value = false; errorMsg.value = AppError.fromThrowable(e).display() }
         }
     }
 
@@ -54,7 +55,7 @@ class StockDetailVM(
         scope.launch {
             runCatching { diagnose.execute(symbol, name) }
                 .onSuccess { insight.value = it }
-                .onFailure { e -> aiError.value = e.message ?: "诊断失败" }
+                .onFailure { e -> aiError.value = AppError.fromThrowable(e).display() }
                 .also { diagnosing.value = false }
         }
     }

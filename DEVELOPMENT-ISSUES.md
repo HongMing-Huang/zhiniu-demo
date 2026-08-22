@@ -95,6 +95,15 @@
 - **谁提供/如何恢复**：需用户用 Android Studio（Gradle JDK 切 17）`New Project → Kuikly Project Template` 生成工程并给出路径合并，或提供本机 JDK17 路径。提供后方可接入 `shared/` 源码做前端编译，实现 T1-1/2/3/5。
 - 在此之前不写任何手写 Gradle/自绘壳工程/自写部署脚本的替代方案（遵循 §6.1）。
 
+### 本轮已完成（前端领域/逻辑层，纯逻辑可审阅）
+- **AppError 统一错误层**（提交见下）：`shared/.../domain/model/AppError.kt`（NO_NETWORK/RATE_LIMIT/AUTH_INVALID/UPSTREAM_5XX/JSON_SCHEMA_FAILED/UNKNOWN + 中文分级文案 + `fromBackendCode`/`fromThrowable`）+ `LlmGatewayClient` 错误分支映射后端 `error.code` + `MarketListVM`/`StockDetailVM` 裸 `e.message` 替换为 `AppError.display()` + `commonTest/AppErrorTest.kt` 9 用例。
+- 打通：与后端结构化 SSE `error.code`（invalid_key/rate_limited/timeout/upstream_5xx/no_key_configured）契约一致。
+
+### 暂缓记录（UI DSL 组件，依赖 Kuikly 官方工程壳，触发条件=壳可用）
+- **Canvas K 线 CandlestickChart / KuiklyMarkdown 流式 / SummaryCard·SignalPillGroup·RiskBadgeGroup·JumpCard·QuickChip·AppErrorCard / 内置 Tab·Button·Dialog·Carousel 替换 / KuiklyTableView 五档 / Page 路由 openPage / StockDetailPage.openDetail() 空函数实装**：
+- **暂缓原因**：这些 UI 组件须按 Kuikly SDK 真实 API 签名书写并经壳工程 + JDK17 编译验证，本机仅 Java 25、无 Kuikly 壳，写未验证 DSL 会堆屎山。
+- **下次推进触发条件**：用户提供 Kuikly 官方工程壳 + JDK17（见上方阻塞记录）后，即可按 docs/ui-design.md 实装这些组件并编译验证。
+
 ---
 
 ## ✅ 解除阻塞执行清单（当前唯一阻塞：前端真机编译）

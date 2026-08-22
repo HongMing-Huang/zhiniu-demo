@@ -7,6 +7,7 @@ package com.zhiniu.viewmodel
 
 import com.tencent.kuikly.ref.observable.observable
 import com.tencent.kuikly.ref.observable.observableList
+import com.zhiniu.domain.model.AppError
 import com.zhiniu.domain.model.Quote
 import com.zhiniu.domain.repository.MarketRepository
 import com.zhiniu.domain.usecase.GetStockList
@@ -23,7 +24,7 @@ class MarketListVM(
     val indices = observableList<Quote>()
     val quotes = observableList<Quote>()
     val loading = observable(true)
-    val errorMsg = observable<String?>(null)
+    val errorMsg = observable<String?>(null) // display = "[code] 中文分级文案"
     val mode = observable(MarketMode.ALL)
 
     init { refresh() }
@@ -48,7 +49,7 @@ class MarketListVM(
                 loading.value = false
             }.onFailure { e ->
                 loading.value = false
-                errorMsg.value = e.message ?: "加载失败"
+                errorMsg.value = AppError.fromThrowable(e).display()
             }
         }
     }
