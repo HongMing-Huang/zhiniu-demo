@@ -6,6 +6,7 @@ package com.zhiniu.data.remote
 
 import com.zhiniu.domain.model.AppError
 import com.zhiniu.domain.model.MessageRole
+import com.zhiniu.domain.model.SseParser
 import com.zhiniu.domain.model.StreamChunk
 import io.ktor.client.HttpClient
 import io.ktor.client.request.header
@@ -61,21 +62,37 @@ class LlmGatewayClient(
             }.bodyAsText()
 
             val acc = StringBuilder()
-            resp.lineSequence().forEach { line ->
-                val s = line.trim()
-                if (!s.startsWith("data:")) return@forEach
-                val payload = s.removePrefix("data:").trim()
-                if (payload == "[DONE]") return@forEach
-                val obj = runCatching {
-                    json.parseToJsonElement(payload).let { el ->
-                        if (el !is kotlinx.serialization.json.JsonObject) null
-                        else el
+            var pendingEvent: String? = null
+            resp.lineSequence().forEach { rawLine ->
+                val frame = SseParser.parseLine(rawLine) ?: run { pendingEvent = null; return@forEach }
+                // event 行只更新帧类型（与随后的 data 行同帧）
+                frame.event?.let { pendingEvent = it; return@forEach }
+                val payload = frame.data ?: return@forEach
+                when (SseParser.kind(pendingEvent, payload)) {
+                    SseParser.EventKind.DONE -> {
+                        emit(StreamChunk.Insight(acc.toString()))
+                        emit(StreamChunk.Done)
+                        pendingEvent = null
+                        return@forEach
                     }
-                }.getOrNull() ?: return@forEach
-                when {
-                    obj["error"] != null -> {
-                        // 后端结构化 error：{ type, code, message } → 映射为统一 AppError 文案
-                        val err = obj["error"]?.let { it as? kotlinx.serialization.json.JsonObject }
+                    SseParser.EventKind.STEP_PROGRESS -> {
+                        // agent_progress：{ "step": N, "label": "..." } → 点亮 Agent 时间线
+                        val step = runCatching {
+                            (json.parseToJsonElement(payload) as kotlinx.serialization.json.JsonObject)["step"]
+                                ?.toString()?.trim('"')?.toIntOrNull()
+                        }.getOrNull()
+                        val label = runCatching {
+                            (json.parseToJsonElement(payload) as kotlinx.serialization.json.JsonObject)["label"]
+                                ?.toString()?.trim('"')
+                        }.getOrNull()
+                        emit(StreamChunk.Progress(step ?: 0, label ?: "分析中"))
+                        pendingEvent = null
+                    }
+                    SseParser.EventKind.ERROR -> {
+                        val err = runCatching {
+                            val obj = json.parseToJsonElement(payload) as kotlinx.serialization.json.JsonObject
+                            obj["error"]?.let { it as kotlinx.serialization.json.JsonObject }
+                        }.getOrNull()
                         val code = err?.get("code")?.toString()?.trim('"')
                         val backendMsg = err?.get("message")?.toString()?.trim('"')
                         val appError = AppError.fromBackendCode(code)
@@ -85,7 +102,12 @@ class LlmGatewayClient(
                         emit(StreamChunk.Error(shown))
                         return@flow
                     }
-                    else -> {
+                    SseParser.EventKind.DATA -> {
+                        val obj = runCatching {
+                            json.parseToJsonElement(payload).let { el ->
+                                if (el is kotlinx.serialization.json.JsonObject) el else null
+                            }
+                        }.getOrNull() ?: return@forEach
                         val delta = obj["choices"]?.toString()?.let { parseDelta(it) } ?: ""
                         if (delta.isNotEmpty()) {
                             acc.append(delta)
@@ -93,9 +115,8 @@ class LlmGatewayClient(
                         }
                     }
                 }
+                pendingEvent = null // 一个完整帧结束：重置 event
             }
-            emit(StreamChunk.Insight(acc.toString()))
-            emit(StreamChunk.Done)
         }.flowOn(Dispatchers.IO)
 
     private fun parseDelta(choicesStr: String): String {

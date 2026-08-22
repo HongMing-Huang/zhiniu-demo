@@ -100,6 +100,7 @@
 - 打通：与后端结构化 SSE `error.code`（invalid_key/rate_limited/timeout/upstream_5xx/no_key_configured）契约一致。
 - **K 线纯逻辑层** `domain/model/KLineChart.kt`：MA5/10/20 均线、价格区间、蜡烛方向(A股红涨绿跌)、像素几何 `layout`/`buildBundle`（蜡烛与均线共享 y 缩放）；`commonTest/KLineChartTest.kt` 8 用例。T1-3 Canvas 绘制层后续只消费本层。提交见下。
 - **行情展示纯逻辑** `domain/model/QuoteDisplay.kt`：KMP 安全格式化（价格/涨跌幅/量-额单位）+ 五档盘口中文档位行；**修复 `pages/components/Widgets.kt` 的 `priceValue/pricePct` 误用 `java.util.Locale`（commonMain 无法在 WASM/iOS/鸿蒙 编译，T3-1 多端障碍）**；`commonTest/QuoteDisplayTest.kt` 7 用例。提交见下。
+- **SSE 解析纯逻辑** `domain/model/SseParser.kt`：行级 (event, data) 帧解析 + DONE/STEP_PROGRESS/ERROR/DATA 分类；`LlmGatewayClient` 接入并支持后端 `event: agent_progress`（T2-3 Stepper 点亮打底）与 `event: error` 帧；`commonTest/SseParserTest.kt` 8 用例。提交见下。
 
 ### 暂缓记录（UI DSL 组件，依赖 Kuikly 官方工程壳，触发条件=壳可用）
 - **Canvas K 线 CandlestickChart / KuiklyMarkdown 流式 / SummaryCard·SignalPillGroup·RiskBadgeGroup·JumpCard·QuickChip·AppErrorCard / 内置 Tab·Button·Dialog·Carousel 替换 / KuiklyTableView 五档 / Page 路由 openPage / StockDetailPage.openDetail() 空函数实装**：
