@@ -1,0 +1,39 @@
+# 知牛 ZhiNiu · .gitignore
+
+# === 密钥：绝不提交 ===
+.env
+.env.local
+*.pem
+
+# === LLM 网关（若选 Python/FastAPI）===
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# === Node（若选 Node 后端）===
+node_modules/
+dist/
+build/
+
+# === Kotlin / Gradle / Android ===
+.gradle/
+build/
+local.properties
+*.iml
+.idea/
+.kotlin/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# === iOS / Xcode ===
+Podfile.lock
+Pods/
+*.xcworkspace/xcuserdata/
+xcuserdata/
+DerivedData/
+
+# === 系统 / 编辑器 ===
+.DS_Store
+*.log
