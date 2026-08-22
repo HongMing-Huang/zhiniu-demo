@@ -107,6 +107,7 @@ zhiniu/
 ## 文档
 
 - [开发问题汇总（待决策 ⚠️）](DEVELOPMENT-ISSUES.md)
+- [技术栈定稿](docs/tech-stack.md)
 - [技术方案全文](docs/zhiniu-technical-design.md)
 - [LLM 多模型网关后端设计](docs/backend-llm-gateway-design.md)
 - [Kuikly 公共组件与图标公共资源选型](docs/kuikly-common-assets.md)
