@@ -14,7 +14,7 @@ from typing import Optional
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
@@ -25,6 +25,7 @@ from .config import (
     list_available_models,
 )
 from .gateway import gateway
+from .quote import quote_realtime, quote_kline
 
 load_dotenv(override=True)
 
@@ -58,10 +59,13 @@ class ChatCompletionRequest(BaseModel):
     tools: Optional[list] = None
     tool_choice: Optional[object] = None
     response_format: Optional[dict] = None
+    extra_body: Optional[dict] = None  # 透传厂商特有参数
 
 
-# ---------- SSE 工具 ----------
-def _sse(data: dict) -> str:
+# ---------- SSE 工具（支持 event+data 双行格式） ----------
+def _sse(data: dict, event: Optional[str] = None) -> str:
+    if event:
+        return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
@@ -79,12 +83,13 @@ async def chat_completions(
         return dict(
             model=body.model,
             messages=[m.model_dump(exclude_none=True) for m in body.messages],
-            stream=True,
+            stream=body.stream,  # 读请求体，不硬编码
             temperature=body.temperature,
             tools=body.tools,
             tool_choice=body.tool_choice,
             response_format=body.response_format,
             max_tokens=body.max_tokens,
+            extra_body=body.extra_body,
         )
 
     async def event_stream():
@@ -96,10 +101,21 @@ async def chat_completions(
             err = {
                 "error": {
                     "type": "gateway_upstream",
+                    "code": e.reason,
                     "message": str(e),
                 }
             }
-            yield _sse(err)
+            yield _sse(err, event="error")
+            yield _sse_done()
+        except Exception as e:  # 最外层兜底：任何异常都走 SSE 错误帧 + [DONE]，禁止 500 半条流
+            err = {
+                "error": {
+                    "type": "gateway_internal",
+                    "code": "unknown",
+                    "message": f"网关内部错误: {e}",
+                }
+            }
+            yield _sse(err, event="error")
             yield _sse_done()
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
@@ -122,3 +138,23 @@ async def healthz(_=Depends(require_gateway_key)):
             for name, conf in PROVIDERS.items()
         },
     }
+
+
+# ---------- 行情代理（多端统一走后端网关，规避新浪 Referer/GBK/CORS） ----------
+@app.get("/quote/realtime", dependencies=[Depends(require_gateway_key)])
+async def proxy_quote_realtime(codes: str):
+    """实时行情代理：GET /quote/realtime?codes=sh600519,sz000001"""
+    result, was_stale = await quote_realtime(
+        [c.strip() for c in codes.split(",") if c.strip()]
+    )
+    return JSONResponse(content=result, headers={"X-Gateway-Stale": "true"} if was_stale else None)
+
+
+@app.get("/quote/kline", dependencies=[Depends(require_gateway_key)])
+async def proxy_quote_kline(
+    symbol: str,
+    scale: int = 240,
+    datalen: int = 120,
+):
+    """K 线代理：GET /quote/kline?symbol=sh600519&scale=240&datalen=120"""
+    return await quote_kline(symbol, scale=scale, datalen=datalen)

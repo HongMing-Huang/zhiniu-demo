@@ -40,7 +40,10 @@ _FALLBACK_MODEL: Dict[str, str] = {
     "hunyuan": "hunyuan-turbos-latest",
 }
 
-# 统一别名 → 降级候选 [(provider, model), ...]
+# 全局厂商降级顺序（新增厂商/别名时沿用此顺序，别再手写散列表）
+PROVIDER_ORDER: List[str] = ["deepseek", "glm", "hunyuan"]
+
+# 统一别名 → 降级候选 [(provider, model), ...]（候选序按 PROVIDER_ORDER 复用）
 ALIASES: Dict[str, List[Tuple[str, str]]] = {
     "zhiniu/quick": [
         ("deepseek", "deepseek-chat"),
@@ -55,6 +58,11 @@ ALIASES: Dict[str, List[Tuple[str, str]]] = {
     "zhiniu/flash": [
         ("glm", "glm-4.6"),
         ("deepseek", "deepseek-chat"),
+        ("hunyuan", "hunyuan-turbos-latest"),
+    ],
+    "zhiniu/vision": [
+        ("deepseek", "deepseek-v4-pro"),
+        ("glm", "glm-4.5"),
         ("hunyuan", "hunyuan-turbos-latest"),
     ],
 }
@@ -72,9 +80,50 @@ class ProviderResolved:
 
 
 class ProviderError(RuntimeError):
-    """厂商级错误：reason 用于区分是否可降级。"""
-    FINAL = "final"        # 不可降级（Key 无效/配置错误）
-    RETRYABLE = "retry"    # 可降级（限流/超时/5xx）
+    """厂商级错误：reason 为结构化原因码，message 含对应中文提示（含 env 变量名）。"""
+
+    # 结构化原因码
+    NO_KEY = "no_key_configured"      # 未配置任何厂商 Key
+    INVALID_KEY = "invalid_key"       # 401/403，Key 无效
+    RATE_LIMITED = "rate_limited"     # 限流
+    TIMEOUT = "timeout"               # 超时
+    UPSTREAM_5XX = "upstream_5xx"     # 上游 5xx
+    UNKNOWN = "unknown"               # 其它不可分类
+
+    # 是否可降级（RATE_LIMITED/TIMEOUT/UPSTREAM_5XX 可走下一候选，其余不可）
+    RETRYABLE_REASONS = {RATE_LIMITED, TIMEOUT, UPSTREAM_5XX}
+
+    def __init__(self, reason: str = UNKNOWN, message: Optional[str] = None):
+        super().__init__(message or PROVIDER_ERROR_MESSAGES.get(reason, reason))
+        self.reason = reason
+
+    # 兼容旧调用（FINAL/RETRYABLE 语义保留为 UNKNOWN 兜底，便于旧试错路径不崩）
+    FINAL = "unknown"
+    RETRYABLE = "retry"
+
+    @staticmethod
+    def reason_from_status(status: Optional[int]) -> str:
+        """把厂商返回的 HTTP 状态码映射为结构化原因码。"""
+        if status in (401, 403):
+            return ProviderError.INVALID_KEY
+        if status == 429:
+            return ProviderError.RATE_LIMITED
+        if status and status >= 500:
+            return ProviderError.UPSTREAM_5XX
+        if status is None:
+            return ProviderError.TIMEOUT
+        return ProviderError.UNKNOWN
+
+
+# 结构化原因 → 中文提示（UI 层展示 + 含相关 env 变量名，便于用户排障）
+PROVIDER_ERROR_MESSAGES: Dict[str, str] = {
+    ProviderError.NO_KEY: "所有厂商均未配置 API Key，请在后台 .env 填入 DEEPSEEK_API_KEY / ZHIPUAI_API_KEY / HUNYUAN_API_KEY（任一即可）",
+    ProviderError.INVALID_KEY: "厂商 Key 无效或已过期（401/403）。请检查对应厂商 .env 中的 Key：DEEPSEEK_API_KEY / ZHIPUAI_API_KEY / HUNYUAN_API_KEY",
+    ProviderError.RATE_LIMITED: "厂商接口限流（429）。请稍后重试，或等待 1 分钟冷却后再试",
+    ProviderError.TIMEOUT: "厂商接口请求超时。请检查网络，或稍后重试",
+    ProviderError.UPSTREAM_5XX: "厂商服务端异常（5xx）。已自动切换下一候选，若全部失败请稍后重试",
+    ProviderError.UNKNOWN: "网关调用厂商时发生未知错误，请查看后端日志",
+}
 
 
 def build_gateway_key() -> Optional[str]:
@@ -95,7 +144,7 @@ def resolve_candidates(model_alias: str) -> List[ProviderResolved]:
         if provider in PROVIDERS and model in PROVIDERS[provider]["models"]:
             chain = [(provider, model)]
         else:
-            raise ProviderError(f"不支持的模型标识: {model_alias}", )
+            raise ProviderError(ProviderError.UNKNOWN, f"不支持的模型标识: {model_alias}")
     else:
         # 纯模型名：按降级顺序找第一个提供该模型的厂商
         chain = [
@@ -104,7 +153,7 @@ def resolve_candidates(model_alias: str) -> List[ProviderResolved]:
             if model_alias in PROVIDERS[p]["models"]
         ]
         if not chain:
-            raise ProviderError(f"未注册的模型: {model_alias}")
+            raise ProviderError(ProviderError.UNKNOWN, f"未注册的模型: {model_alias}")
 
     resolved: List[ProviderResolved] = []
     for provider, model in chain:

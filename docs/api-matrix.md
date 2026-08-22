@@ -74,9 +74,23 @@
 
 | 接口 | 说明 |
 |---|---|
-| `POST /v1/chat/completions` | 统一多模型对话（流式 SSE / JSON / 工具） |
+| `POST /v1/chat/completions` | 统一多模型对话（流式 SSE / JSON / 工具；缺 Key 时落地本地 Mock LLM 兜底，绝不弹 401） |
 | `GET /v1/models` | 可用模型/别名 |
 | `GET /healthz` | 存活 + 各厂商 Key 配置自检 |
+| `GET /quote/realtime` | 实时行情代理（新浪主源，Referer+GBK+CORS 在代理层处理） |
+| `GET /quote/kline` | K 线代理（新浪 getKLineData，scale/datalen） |
+
+### 3.1 网关内部接口契约（行情代理）
+
+- **GET /quote/realtime**
+  - 入参：`codes`（逗号分隔的带前缀代码，如 `sh600519,sz000001`）
+  - 出参：`{ code: {symbol,name,open,prevClose,price,high,low,buy1,sell1,volume(手),amount(万元),bids[[价,量]×5],asks[[价,量]×5],date,time} }`
+  - 缓存：实时 TTL=3s；新浪失败 → stale 近况 → Mock JSON 兜底；命中 stale 时响应头 `X-Gateway-Stale: true`
+  - 字段来源：新浪 `hq_str_<code>` 索引 0~31，GBK 解码转 UTF-8
+- **GET /quote/kline**
+  - 入参：`symbol`、`scale`(默认240日线)、`datalen`(默认120，≤1023)
+  - 出参：`{ symbol, name, scale, data:[{day,open,high,low,close,volume}] }`
+  - 缓存：日线(scale≥240)隔夜过期，分钟线 scale 秒级 TTL；失败 → stale → Mock 兜底
 
 ---
 

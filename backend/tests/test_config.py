@@ -7,6 +7,7 @@ import os
 import unittest
 
 from app.config import (
+    PROVIDER_ORDER,
     ProviderError,
     _FALLBACK_MODEL,  # noqa: F401  (仅用于断言可解析结构)
     resolve_candidates,
@@ -52,6 +53,31 @@ class TestResolveCandidates(unittest.TestCase):
         self.assertEqual(
             candidates[0].base_url, "https://api.hunyuan.cloud.tencent.com/v1"
         )
+
+    def test_vision_alias_registered(self):
+        candidates = resolve_candidates("zhiniu/vision")
+        self.assertEqual(candidates[0].provider, "deepseek")
+        self.assertEqual(candidates[0].model, "deepseek-v4-pro")
+
+    def test_provider_order_stable(self):
+        # 新增厂商/别名应复用全局顺序，首厂商恒为 deepseek
+        self.assertEqual(PROVIDER_ORDER, ["deepseek", "glm", "hunyuan"])
+        for alias in ("zhiniu/quick", "zhiniu/think", "zhiniu/flash", "zhiniu/vision"):
+            chain = [c.provider for c in resolve_candidates(alias)]
+            self.assertEqual(len(set(chain)), len(chain), f"{alias} 候选不应重复")
+
+    def test_provider_error_structured_reason(self):
+        # 401/403 → invalid_key；429 → rate_limited；5xx → upstream_5xx；无状态 → timeout
+        self.assertEqual(ProviderError.reason_from_status(401), ProviderError.INVALID_KEY)
+        self.assertEqual(ProviderError.reason_from_status(403), ProviderError.INVALID_KEY)
+        self.assertEqual(ProviderError.reason_from_status(429), ProviderError.RATE_LIMITED)
+        self.assertEqual(ProviderError.reason_from_status(502), ProviderError.UPSTREAM_5XX)
+        self.assertEqual(ProviderError.reason_from_status(None), ProviderError.TIMEOUT)
+        self.assertEqual(
+            ProviderError(ProviderError.INVALID_KEY).reason, ProviderError.INVALID_KEY
+        )
+        # 中文提示应包含对应环境变量名，便于排障
+        self.assertIn("DEEPSEEK_API_KEY", str(ProviderError(ProviderError.NO_KEY)))
 
 
 if __name__ == "__main__":
