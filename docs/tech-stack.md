@@ -34,7 +34,7 @@
 | **组件** | **Kuikly 内置组件**优先 | `List/Carousel/Tab/Dialog/Input/Button/Canvas/AI Chat`；社区 `KuiklyMarkdown`(流式)/`KuiklyTableView`(表格) | `docs/kuikly-common-assets.md` | ✅ 已选 |
 | **HTTP（客户端）** | **Ktor Client** | commonMain 用 Ktor 3（OkHttp/Darwin engine），ContentNegotiation + kotlinx-json；`ignoreUnknownKeys` | Ktor 3.4.0（JetBrains 2026-01） | ✅ 已选 |
 | **JSON** | **kotlinx.serialization** | `@Serializable` DTO 反序列化 | Kotlin 2.x 内置 | ✅ 已选 |
-| **状态管理** | **ViewModel + StateFlow（sealed UiState 四态）** | `collectAsState` 驱动；聊天页 `Flow<StreamChunk>` 处理 SSE | 技术方案 §4.4 | ✅ 已选 |
+| **状态管理** | **Kuikly 原生 `observable`/`observableList`** | 页面 `attr{}` 内用 `vfor/vif/vbind`；聊天流式 `Flow<StreamChunk>` | kuiklyDSL.mdc | ✅ 已选（2026-08-22 由 StateFlow 调整为框架原生） |
 | **DI** | **Koin（for KMP）** | 单入口 `App.kt` 注入；network/repository/viewModel 分模块 | Koin 官方 KMP 支持 | ✅ 已选 |
 | **本地存储** | **SQLDelight** | `.sq` 定义表 → 生成类型安全接口；AndroidSqliteDriver/NativeSqliteDriver | SQLDelight；ADR-005 | ✅ 已选 |
 | **K 线** | **Kuikly `Canvas` 自绘**（统一，不用 Vico） | 封装 `CandlestickChart` 组合组件；**Vico 为标准 Compose 库，与 Kuikly 非标准 Compose 集成未验证，弃用** | `docs/kuikly-common-assets.md` §2 | ✅ 定（替代原 Vico） |
