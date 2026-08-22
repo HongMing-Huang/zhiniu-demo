@@ -60,11 +60,10 @@
 - **影响**：图标方案究竟走「字体图标」（必稳）还是「ImageVector 库」（更现代）。
 - **建议**：**下一步我拉一个最小 Kuikly 工程在 PR-01 脚手架里实测**，用真机结果定案；在此之前代码默认走「Material Symbols 字体」。
 
-## D5. Vico K 线 / 鸿蒙降级（技术方案 §4.3 已定的历史决策）
+## D5. K 线渲染（✅ 已定：统一 Kuikly Canvas 自绘）
 
-- **现状**：方案定「Android/iOS 用 Vico、鸿蒙用 Canvas 自绘」。
-- **问题**：Vico 是否为 **Compose Multiplatform** 且对 **Kuikly（非原生 Compose）** 兼容，存在「渲染层冲突」风险（方案风险表也自认'低概率'）。是否允许我用 **Kuikly Canvas/Path 统一自绘 K 线**（省去 Vico 集成与多端不一致），换取更稳？还是严格按方案走 Vico+降级？
-- **待你决定**：Vico 优先 / 统一 Canvas 自绘。
+- **决策**：见 `docs/tech-stack.md` §4 —— 弃用 Vico，统一用 Kuikly `Canvas` 自绘 K 线（Vico 为标准 Compose 库，与 Kuikly 非标准 Compose 集成未验证，跨端一致性差）。
+- **遗留**：仅剩 Canvas 自绘的细节（坐标/缩放/十字游标）在真机验证。
 
 ## D6. 行情数据源：新浪 + 缓存过期策略
 
