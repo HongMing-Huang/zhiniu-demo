@@ -39,3 +39,15 @@ uvicorn app.main:app --port 8000
 | `zhiniu/flash` | glm-4.6 | 均衡 |
 
 > ⚠️ 技术栈按设计文档推荐 **D1=A（Python+FastAPI）** 落地，属**临时默认**，可在你确认后切换实现而不改接口契约。完整设计见 [`docs/backend-llm-gateway-design.md`](../docs/backend-llm-gateway-design.md)。
+
+## 运行验证（2026-08-22 实测）
+
+```bash
+# 环境：python3 venv + requirements.txt；无任何 API Key
+uvicorn app.main:app --host 127.0.0.1 --port 8010
+```
+- `GET /healthz` → `{"status":"ok",...3 providers, key_configured:false}` ✅
+- `GET /v1/models` → 返回 `zhiniu/quick·think·flash` 别名降级链 + 各厂商模型 ✅
+- `POST /v1/chat/completions`（无 Key）→ SSE 优雅返回「未配置任何厂商 API Key…」+ `[DONE]`，**非 401/异常** ✅（符合"演示绝不弹 401"）
+
+无 Key 时走"优雅报错/降级"，填入任一厂商 Key 即真跑。单测：`python3 -m unittest tests.test_config -v`（6 项通过）。
