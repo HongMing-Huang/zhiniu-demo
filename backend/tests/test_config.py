@@ -58,6 +58,10 @@ class TestResolveCandidates(unittest.TestCase):
         candidates = resolve_candidates("zhiniu/vision")
         self.assertEqual(candidates[0].provider, "deepseek")
         self.assertEqual(candidates[0].model, "deepseek-v4-pro")
+        # vision 别名同时注册进 glm.models，可经放显式 "glm/vision" 解析
+        glm_vision = resolve_candidates("glm/vision")
+        self.assertEqual(glm_vision[0].provider, "glm")
+        self.assertEqual(glm_vision[0].model, "vision")
 
     def test_provider_order_stable(self):
         # 新增厂商/别名应复用全局顺序，首厂商恒为 deepseek
