@@ -8,17 +8,23 @@ package com.zhiniu.pages
 import com.tencent.kuikly.ref.pager.Pager
 import com.tencent.kuikly.ref.view.ViewBuilder
 import com.tencent.kuikly.ref.widget.Text
+import com.zhiniu.domain.model.AppError
 import com.zhiniu.domain.model.Quote
 import com.zhiniu.pages.components.Palette
+import com.zhiniu.pages.components.appErrorCard
+import com.zhiniu.pages.components.colorOf
 import com.zhiniu.pages.components.priceColor
 import com.zhiniu.pages.components.pricePct
 import com.zhiniu.pages.components.priceValue
+import com.zhiniu.pages.components.skeletonRow
 import com.zhiniu.viewmodel.MarketMode
 import com.zhiniu.viewmodel.MarketListVM
 
 @Page("MarketList")
 internal class MarketListPage(
     private val vm: MarketListVM,
+    /** 壳工程注入的路由实现：openPage(page, args)。 */
+    private val navigator: (String, Map<String, String>) -> Unit = { _, _ -> },
 ) : Pager() {
 
     override fun body(): ViewBuilder {
@@ -30,7 +36,6 @@ internal class MarketListPage(
                     attr {
                         flexGrow(0f); height(44f); flexDirection(FLEX_DIRECTION_ROW)
                         vfor(vm.indices) { item ->
-                            // 每指指数：名称 + 点位 + 涨跌幅
                             Text { attr { text(item.name) } }
                             Text { attr { text(priceValue(item)) } }
                             Text { attr { text(pricePct(item)) } }
@@ -38,25 +43,19 @@ internal class MarketListPage(
                     }
                 }
 
-                // ===== Tab：自选/全部/涨幅/跌幅 =====
-                View {
+                // ===== Tab：自选/全部/涨幅/跌幅（内置 Tab，以 SDK 模板为准）=====
+                Tab {
                     attr { flexDirection(FLEX_DIRECTION_ROW); flexGrow(0f) }
-                    Text { attr { text("自选"); onClick { vm.setMode(MarketMode.WATCHLIST) } } }
-                    Text { attr { text("全部"); onClick { vm.setMode(MarketMode.ALL) } } }
-                    Text { attr { text("涨幅"); onClick { vm.setMode(MarketMode.GAINERS) } } }
-                    Text { attr { text("跌幅"); onClick { vm.setMode(MarketMode.LOSERS) } } }
+                    Text { attr { text("自选"); color(colorOf(if (vm.mode.value == MarketMode.WATCHLIST) Palette.UP else Palette.SUB)); onClick { vm.setMode(MarketMode.WATCHLIST) } } }
+                    Text { attr { text("全部"); color(colorOf(if (vm.mode.value == MarketMode.ALL) Palette.UP else Palette.SUB)); onClick { vm.setMode(MarketMode.ALL) } } }
+                    Text { attr { text("涨幅"); color(colorOf(if (vm.mode.value == MarketMode.GAINERS) Palette.UP else Palette.SUB)); onClick { vm.setMode(MarketMode.GAINERS) } } }
+                    Text { attr { text("跌幅"); color(colorOf(if (vm.mode.value == MarketMode.LOSERS) Palette.UP else Palette.SUB)); onClick { vm.setMode(MarketMode.LOSERS) } } }
                 }
 
                 // ===== 加载 / 错误 / 列表 =====
-                vif(vm.loading) {
-                    Text { attr { text("加载中…"); allCenter() } }
-                }
+                vif(vm.loading) { skeletonRow() }
                 vif(vm.errorMsg != null) {
-                    View {
-                        attr { allCenter() }
-                        Text { attr { text("加载失败：${vm.errorMsg.value}") } }
-                        Text { attr { text("重试"); color(colorOf(Palette.UP)); onClick { vm.retry() } } }
-                    }
+                    appErrorCard(AppError.Unknown(vm.errorMsg.value)) { vm.retry() }
                 }
                 List {
                     attr {
@@ -70,7 +69,7 @@ internal class MarketListPage(
         }
     }
 
-    /** 股票行：名称代码 / 最新价(着色) / 涨跌幅(着色) / AI 标签。 */
+    /** 股票行：名称代码 / 最新价 / 涨跌幅 / AI 标签；单击进入详情。 */
     private fun quoteRow(q: Quote): ViewBuilder = {
         View {
             attr { flexDirection(FLEX_DIRECTION_ROW); flexGrow(1f) }
@@ -81,16 +80,9 @@ internal class MarketListPage(
                 attr {
                     text("AI")
                     color(colorOf(Palette.UP))
-                    onClick { showAiTagExplanation(q) }
+                    onClick { navigator("StockDetail", mapOf("symbol" to q.symbol, "name" to q.name)) }
                 }
             }
         }
     }
-
-    /** AI 标签点击 → Dialog 解释依据。 */
-    private fun showAiTagExplanation(q: Quote) {
-        // Dialog(标题= ${q.name} AI结论, 内容=由多数据源与 LLM 综合)：以 SDK 模板 Dialog 用法
-    }
-
-    private fun colorOf(hex: String): String = hex // 颜色对象构造以 SDK 为准
 }
