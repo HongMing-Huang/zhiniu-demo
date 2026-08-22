@@ -69,9 +69,16 @@
 
 ---
 
-## 5. 待模板环境落实（非设计缺失）
-- 各页 .kt 的动态列表 / 手势 / 流式 diff 用 Kuikly 官方 observable/vfor（kuiklyDSL.mdc）
-- 图标按 Material Symbols 字体接入
-- 骨架屏 / 微动效按技术方案 §12.7.3
+## 5. 实现状态（2026-08-22 更新）
+
+三个页面已在 `shared/src/commonMain/kotlin/com/zhiniu/pages/` 完整落地：
+- `MarketListPage`：指数条 / Tab / 股票行 / AI 标签（`observableList` + `vfor/vif`）
+- `StockDetailPage`：头部 / OHLC / 五档 / 迷你K线 / AI 诊股（4 卡 + 跳转）
+- `ChatHomePage`：标题+Agent时间线 / 消息气泡 / 快捷指令 / 输入区
+- VM 已切换为 Kuikly 原生 `observable/observableList`（kuiklyDSL.mdc）
+
+**待模板环境校准**（签名级，非设计缺失）：
+- `vfor/vif/onClick/vbind` 指令与颜色/尺寸具象签名以 Kuikly SDK 官方模板为准
+- 图标按 Material Symbols 字体接入；骨架屏/微动效按技术方案 §12.7.3
 
 参考：技术方案 §12.2 交互矩阵、§12.3 状态机、`docs/kuikly-common-assets.md`。
