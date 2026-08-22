@@ -57,4 +57,13 @@ class AppErrorTest {
     @Test fun `display embeds badge and chinese text`() {
         assertEquals("[AUTH_INVALID] 认证失败（厂商 Key 无效或未配置），请在后台检查 DEEPSEEK/ZHIPUAI/HUNYUAN Key", AppError.AUTH_INVALID.display())
     }
+
+    @Test fun `http status maps to unified error`() {
+        assertEquals(AppError.AUTH_INVALID, AppError.fromHttpStatus(401))
+        assertEquals(AppError.AUTH_INVALID, AppError.fromHttpStatus(403))
+        assertEquals(AppError.RATE_LIMIT, AppError.fromHttpStatus(429))
+        assertEquals(AppError.UPSTREAM_5XX, AppError.fromHttpStatus(502))
+        assertEquals(AppError.NO_NETWORK, AppError.fromHttpStatus(503))
+        assertEquals(AppError.NIL, AppError.fromHttpStatus(200))
+    }
 }

@@ -104,6 +104,7 @@
 - **UI 组件地基 + 详情页接线**：`pages/components/` 新增 `CandlestickChart(paint)` / `SummaryCard` / `SignalPillGroup` / `RiskBadgeGroup` / `JumpCard` / `AppErrorCard` / `Skeleton` / `QuickChip`，`Widgets.kt` 顶部登记 + `colorOf`/`Palette.MA` 色；`StockDetailPage` 接入 OHLC 量/额(QuoteDisplay)、K 线骨架→paint、AI 四卡、AI 独立错误重试卡、跳转卡路由回调(navigator 注入)；`ComponentLogicTest` 6 用例。Canvas 绘制/五档 TableView 仍预留待壳校准确认（见暂缓记录）。提交见下。
 - **三页接线完成**：`ChatHomePage`（QuickChip 快捷指令 + Agent 时间线 Stepper 由 vm.agentDone 点亮 + Input/发送）& `ChatVM.agentDone`(0..4)；`MarketListPage`（内置 Tab 高亮 + skeletonRow 加载 + AppErrorCard 错误 + 行点击→StockDetail 路由 + 删除空函数 showAiTagExplanation）。提交见下。
 - **移除空函数记录（硬约束 §7）**：`MarketListPage.showAiTagExplanation()` 原为 TODO 空函数，已删除；其 Dialog 实装（标题"AI依据"+技术/舆情/近7日涨跌 3 行）列入阶段三 T3-6 加分项，触发条件=壳工程 + JDK17 可用（届时按 ui-design.md 实装）。
+- **T2-6 LlmGatewayClient 真流式**：`bodyAsText()` 一次性读 → `bodyAsChannel()`+`readUTF8Line()` 逐行订阅，逐 chunk 到达即 emit（不整包切）；新增 HTTP 状态映射（`AppError.fromHttpStatus`，401/403/429/5xx 分级）；reasoning_content 与 content 并行容错（reasoning 不污染正文）；SAI error 帧/agent_progress 复用 SseParser；`AppErrorTest` 增 fromHttpStatus 用例。提交见下。
 
 ### 暂缓记录（UI DSL 组件，依赖 Kuikly 官方工程壳，触发条件=壳可用）
 - **Canvas K 线 CandlestickChart / KuiklyMarkdown 流式 / SummaryCard·SignalPillGroup·RiskBadgeGroup·JumpCard·QuickChip·AppErrorCard / 内置 Tab·Button·Dialog·Carousel 替换 / KuiklyTableView 五档 / Page 路由 openPage / StockDetailPage.openDetail() 空函数实装**：

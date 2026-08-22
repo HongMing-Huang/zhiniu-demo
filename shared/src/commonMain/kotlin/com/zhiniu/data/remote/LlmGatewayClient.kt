@@ -12,9 +12,11 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import io.ktor.utils.io.readUTF8Line
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -42,7 +44,7 @@ class LlmGatewayClient(
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
-    /** 流式对话：逐块返回文本增量；以 [StreamChunk.Done] 收尾。 */
+    /** 流式对话：真流式订阅，逐 chunk 到达即 emit（T2-6）；以 [StreamChunk.Done] 收尾。 */
     fun chatStream(model: String, history: List<com.zhiniu.domain.model.ChatMessage>): Flow<StreamChunk> =
         flow {
             val body = ChatIn(
@@ -59,55 +61,47 @@ class LlmGatewayClient(
                 contentType(ContentType.Application.Json)
                 header("Accept", "text/event-stream")
                 setBody(json.encodeToString(body))
-            }.bodyAsText()
+            }
 
-            val acc = StringBuilder()
+            // ① HTTP 状态映射为统一错误（非 2xx 直接进入错误收尾）
+            if (resp.status.value !in 200..299) {
+                val appErr = AppError.fromHttpStatus(resp.status.value)
+                val reason = runCatching { resp.bodyAsText().take(200) }.getOrNull()
+                emit(StreamChunk.Error(if (appErr.code == "UNKNOWN") "[UNKNOWN] ${reason ?: "HTTP ${resp.status.value}"}" else appErr.display()))
+                emit(StreamChunk.Done)
+                return@flow
+            }
+
+            // ② 真流式：逐行读取 SSE（网络字节到达即解析，不整包读入）
+            val channel = resp.bodyAsChannel()
             var pendingEvent: String? = null
-            resp.lineSequence().forEach { rawLine ->
-                val frame = SseParser.parseLine(rawLine) ?: run { pendingEvent = null; return@forEach }
-                // event 行只更新帧类型（与随后的 data 行同帧）
-                frame.event?.let { pendingEvent = it; return@forEach }
-                val payload = frame.data ?: return@forEach
+            val acc = StringBuilder()
+            while (true) {
+                val rawLine = channel.readUTF8Line() ?: break
+                val frame = SseParser.parseLine(rawLine) ?: run { pendingEvent = null; continue }
+                frame.event?.let { pendingEvent = it; continue }
+                val payload = frame.data ?: continue
                 when (SseParser.kind(pendingEvent, payload)) {
                     SseParser.EventKind.DONE -> {
                         emit(StreamChunk.Insight(acc.toString()))
                         emit(StreamChunk.Done)
                         pendingEvent = null
-                        return@forEach
+                        return@flow
                     }
                     SseParser.EventKind.STEP_PROGRESS -> {
-                        // agent_progress：{ "step": N, "label": "..." } → 点亮 Agent 时间线
-                        val step = runCatching {
-                            (json.parseToJsonElement(payload) as kotlinx.serialization.json.JsonObject)["step"]
-                                ?.toString()?.trim('"')?.toIntOrNull()
-                        }.getOrNull()
-                        val label = runCatching {
-                            (json.parseToJsonElement(payload) as kotlinx.serialization.json.JsonObject)["label"]
-                                ?.toString()?.trim('"')
-                        }.getOrNull()
+                        val js = runCatching { json.parseToJsonElement(payload) as kotlinx.serialization.json.JsonObject }.getOrNull()
+                        val step = js?.get("step")?.toString()?.trim('"')?.toIntOrNull()
+                        val label = js?.get("label")?.toString()?.trim('"')
                         emit(StreamChunk.Progress(step ?: 0, label ?: "分析中"))
                         pendingEvent = null
                     }
                     SseParser.EventKind.ERROR -> {
-                        val err = runCatching {
-                            val obj = json.parseToJsonElement(payload) as kotlinx.serialization.json.JsonObject
-                            obj["error"]?.let { it as kotlinx.serialization.json.JsonObject }
-                        }.getOrNull()
-                        val code = err?.get("code")?.toString()?.trim('"')
-                        val backendMsg = err?.get("message")?.toString()?.trim('"')
-                        val appError = AppError.fromBackendCode(code)
-                        val shown =
-                            if (code == "unknown" && !backendMsg.isNullOrBlank()) "[${appError.code}] $backendMsg"
-                            else appError.display()
-                        emit(StreamChunk.Error(shown))
+                        emit(StreamChunk.Error(errorDisplay(payload)))
                         return@flow
                     }
                     SseParser.EventKind.DATA -> {
-                        val obj = runCatching {
-                            json.parseToJsonElement(payload).let { el ->
-                                if (el is kotlinx.serialization.json.JsonObject) el else null
-                            }
-                        }.getOrNull() ?: return@forEach
+                        val obj = runCatching { json.parseToJsonElement(payload) as? kotlinx.serialization.json.JsonObject }.getOrNull() ?: continue
+                        // reasoning_content 与 content 并行接收：content 正常累积，reasoning 不污染正文
                         val delta = obj["choices"]?.toString()?.let { parseDelta(it) } ?: ""
                         if (delta.isNotEmpty()) {
                             acc.append(delta)
@@ -115,19 +109,34 @@ class LlmGatewayClient(
                         }
                     }
                 }
-                pendingEvent = null // 一个完整帧结束：重置 event
+                pendingEvent = null
             }
         }.flowOn(Dispatchers.IO)
 
+    /** 错误帧 data → 统一错误文案（映射后端 error.code）。 */
+    private fun errorDisplay(payload: String): String {
+        val err = runCatching {
+            (json.parseToJsonElement(payload) as kotlinx.serialization.json.JsonObject)["error"]
+                ?.let { it as? kotlinx.serialization.json.JsonObject }
+        }.getOrNull()
+        val code = err?.get("code")?.toString()?.trim('"')
+        val backendMsg = err?.get("message")?.toString()?.trim('"')
+        val appError = AppError.fromBackendCode(code)
+        return if (code == "unknown" && !backendMsg.isNullOrBlank()) "[${appError.code}] $backendMsg"
+        else appError.display()
+    }
+
+    /**
+     * 从 choices JSON 抽取首项 delta：仅取 content（reasoning_content 不进入正文，
+     * 保证"reasoning 与 content 并行、先后不假设"的正确渲染语义）。
+     */
     private fun parseDelta(choicesStr: String): String {
-        // 从 choices JSON 中抽取首项的 delta.content
         return runCatching {
             val choices = json.parseToJsonElement(choicesStr) as kotlinx.serialization.json.JsonArray
             if (choices.isEmpty()) return@runCatching ""
             val first = choices[0] as kotlinx.serialization.json.JsonObject
             val delta = first["delta"] as? kotlinx.serialization.json.JsonObject ?: return@runCatching ""
-            val c = delta["content"]
-            return@runCatching c?.toString()?.trim('"') ?: ""
+            delta["content"]?.toString()?.trim('"') ?: ""
         }.getOrDefault("")
     }
 }

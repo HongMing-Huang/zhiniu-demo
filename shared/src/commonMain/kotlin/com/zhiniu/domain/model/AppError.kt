@@ -42,5 +42,14 @@ sealed class AppError(val code: String, val message: String) {
             is AppError -> t
             else -> Unknown(t?.message)
         }
+
+        /** HTTP 状态码 → 统一错误（客户端请求层映射）。 */
+        fun fromHttpStatus(status: Int): AppError = when (status) {
+            in 401..403 -> AUTH_INVALID
+            429 -> RATE_LIMIT
+            in 500..599 -> UPSTREAM_5XX
+            in 200..299 -> NIL
+            else -> NO_NETWORK
+        }
     }
 }
