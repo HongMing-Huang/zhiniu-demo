@@ -112,7 +112,7 @@ zhiniu/
 - [LLM 多模型网关后端设计](docs/backend-llm-gateway-design.md)
 - [Kuikly 公共组件与图标公共资源选型](docs/kuikly-common-assets.md)
 - [架构说明（C4 + ADR）](docs/architecture.md)（待建）
-- [API 接入与降级链](docs/api-matrix.md)（待建）
+- [API 接入与降级链](docs/api-matrix.md)
 - [快速开始](docs/getting-started.md)（待建）
 - [演示视频脚本](docs/demo-script.md)（待建）
 
