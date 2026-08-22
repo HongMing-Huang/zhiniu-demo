@@ -25,7 +25,9 @@
 
 ---
 
-## D1. 网关后端技术栈（对应 `docs/backend-llm-gateway-design.md` §3）
+## D1. 网关后端技术栈（✅ 已定：A，已并入 main）
+
+- **决策**：维持设计文档推荐 **A（Python + FastAPI + openai SDK）**，网关后端已合并进 main（提交 `8b71e1d`），单测通过。
 
 - **现状**：三厂商均 OpenAI 兼容，网关只需一份配置。技术栈本待定，但为推进开发已按推荐 **A** 落地了可运行骨架。
 - **已实现（临时默认，可随时换）**：`backend/` 分支 `feat/backend-llm-gateway` 已提交 FastAPI 网关骨架（统一 `/v1/chat/completions` 流式 SSE + 降级链 + `/v1/models` + `/healthz`），复用官方 openai SDK，接口契约与实现解耦（改 Node/Ktor 只需换实现不换契约）。
@@ -72,8 +74,8 @@
 
 ## D7. 范围与里程碑优先级
 
-- **现状**：方案有 3 周 12 个 PR。当前阶段我已完成调研 + 仓库初始化（`demo/zhiniu/`，已 git init，含 README + 本文档 + 网关设计）。
-- **待你决定**：上面问题处理完后，下一里程碑从哪个 PR 开始？（建议 **PR-01 工程脚手架** 或 **PR-02 网关骨架 + Sina API**）
+- **现状**：PR-01 前端脚手架已建立（分支 `feat/pr01-frontend`）：`shared/` 四层包结构 + 官方式最小 Hello 页 + `frontend/PR01-SCAFFOLD.md`（含官方脚手架路径与待验证清单）。
+- **待你决定**：是否维持「PR-01（脚手架）→ PR-02（网关+Sina）」节奏？下一步需要 IDE/网络生成官方 gradle 模板（我手写会乱写）并在真机验证 D8。
 
 ---
 
