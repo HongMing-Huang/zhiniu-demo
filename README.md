@@ -113,8 +113,8 @@ zhiniu/
 - [Kuikly 公共组件与图标公共资源选型](docs/kuikly-common-assets.md)
 - [架构说明（C4 + ADR）](docs/architecture.md)
 - [API 接入与降级链](docs/api-matrix.md)
-- [快速开始](docs/getting-started.md)（待建）
-- [演示视频脚本](docs/demo-script.md)（待建）
+- [快速开始](docs/getting-started.md)
+- [演示视频脚本](docs/demo-script.md)
 
 ## 致谢与参考
 
