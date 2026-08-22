@@ -111,6 +111,14 @@
 - **暂缓原因**：这些 UI 组件须按 Kuikly SDK 真实 API 签名书写并经壳工程 + JDK17 编译验证，本机仅 Java 25、无 Kuikly 壳，写未验证 DSL 会堆屎山。
 - **下次推进触发条件**：用户提供 Kuikly 官方工程壳 + JDK17（见上方阻塞记录）后，即可按 docs/ui-design.md 实装这些组件并编译验证。
 
+### Web(H5) 端专项推进（W1~W6）
+- **W2（后端 CORS）✅ 通过**（提交见下）：`backend/app/main.py` 加 `CORSMiddleware`（`allow_origins=["*"]` 演示期、`allow_credentials=False`）；curl 带 Origin 普通请求返回 `access-control-allow-origin: *`、预检 OPTIONS 返回 allow-methods/max-age → 浏览器 Fetch `/quote/realtime` 无 CORS 报错。
+- **W1（Kuikly H5 壳）阻塞记录**：
+  - **阻塞于**：Kuikly H5/JS 官方编译壳（settings.gradle + libs.versions.toml + h5App target）+ **JDK17**。本机经核实仍仅 Java 25.0.2、无任何 Kuikly 壳工程（settings.gradle/gradlew/h5App 均缺失）。
+  - **谁提供/如何恢复**：用户用 Kuikly 官方模板（`npx create-kuikly-app create --package com.zhiniu --dsl kuikly` → h5App target）生成工程给出路径合并，或安装 JDK17 并在 gradle 内设 `JAVA_HOME`。提供后执行 `./gradlew :h5App:run` 起 dev server 达成 W1 停止条件。
+  - **严格遵循**：不手写 HTML/Wasm 壳替代，不跳过 W1 直推 W5。
+- **W3/W4/W5/W6**：依赖 W1 壳达成后执行（W3 expect/actual 数据源路由按"Web 走网关 / Android-iOS 走新浪"注入；W4 WatchlistStore Web actual 用 IndexedDB/跨端存储；W5 浏览器全链路验证+截图 docs/img/web-*.png；W6 README/getting-started 补 Web 双起步骤）。
+
 ---
 
 ## ✅ 解除阻塞执行清单（当前唯一阻塞：前端真机编译）

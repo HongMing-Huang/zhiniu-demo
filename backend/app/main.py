@@ -14,6 +14,7 @@ from typing import Optional
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
@@ -30,6 +31,16 @@ from .quote import quote_realtime, quote_kline
 load_dotenv(override=True)
 
 app = FastAPI(title="知牛 ZhiNiu LLM Gateway", version="0.1.0")
+
+# Web(H5)/小程序 跨端调用网关需 CORS（Web 端硬约束#4）。
+# 演示期 allow_origins=["*"]；生产可收紧为白名单域名列表。
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,  # "*" 不能与 credentials=True 并存
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ---------- 鉴权（网关自身 Key；厂商 Key 只在服务端） ----------
