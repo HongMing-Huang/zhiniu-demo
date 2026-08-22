@@ -78,6 +78,25 @@
 
 ---
 
+## ✅ 进度记录（/goal 阶段一推进，2026-08-22）
+
+### 本轮已完成
+- **T1-4（后端 P0）全部通过**，提交 `df04a8b`：
+  - 行情代理 `GET /quote/realtime` + `GET /quote/kline`（新浪主源 + Referer + GBK→UTF-8 + 索引0~31解析 + bids/asks 五档 + volume手/amount万元 + 实时3s缓存 + stale/Mock 兜底 + `X-Gateway-Stale` 头）
+  - `vision` 别名注册 + `PROVIDER_ORDER` 全局降级顺序
+  - `stream=false` 支持（读请求体不硬编码）+ `extra_body` 透传
+  - `ProviderError` 结构化 reason（invalid_key/rate_limited/timeout/upstream_5xx/no_key）+ 中文提示含 env 名
+  - 全候选失败/缺 Key → 本地 Mock LLM 兜底（SSE 首 chunk 空 role + [DONE]，绝不弹 401/500）；`_sse(event=)` 双行格式
+  - 单测 6→9 项通过；curl 实测：`/healthz` 全 false 200、无 Key SSE 返回 Mock、`/quote/realtime` 返回 UTF-8 JSON 字段齐
+
+### 阻塞记录（阶段一其余子任务）
+- **T1-1 前端可编译 / T1-2 路由闭环 / T1-3 Canvas K 线 / T1-5 Web(H5) 端**：全部依赖「Kuikly 官方 Gradle 工程壳 + JDK17」这一外部状态。
+- **阻塞于：缺少 JDK17 与 Kuikly 官方工程壳（本机仅 Java 25.0.2，无 Android Studio 生成的 4 端壳 + settings.gradle + libs.versions.toml）**。
+- **谁提供/如何恢复**：需用户用 Android Studio（Gradle JDK 切 17）`New Project → Kuikly Project Template` 生成工程并给出路径合并，或提供本机 JDK17 路径。提供后方可接入 `shared/` 源码做前端编译，实现 T1-1/2/3/5。
+- 在此之前不写任何手写 Gradle/自绘壳工程/自写部署脚本的替代方案（遵循 §6.1）。
+
+---
+
 ## ✅ 解除阻塞执行清单（当前唯一阻塞：前端真机编译）
 
 **已就绪**：后端网关（运行时验证通过）、文档 8 份 + UI 设计、mock 数据、前端数据/LLM/分析/UI 最小页/测试工程（已并入 main）。
