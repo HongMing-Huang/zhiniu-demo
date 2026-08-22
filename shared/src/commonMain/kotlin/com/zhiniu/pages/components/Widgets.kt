@@ -1,14 +1,21 @@
 /* 知牛 · 公共组件库（多用 Kuikly 内置组件，不自绘 SVG）
  *
- * 说明：以下使用 Kuikly 已核实的内置组件 View/Text/ScrollView 组合。
- * 动态列表更新遵循 kuiklyDSL.mdc 的 observable/vfor 语义；此处以命令式构建示意，
- * 具体函数签名以 Kuikly SDK 官方模板为准（不臆造未证实 API）。
+ * 组件登记（硬约束 §3：每新增组件在此 +1 行）：
+ * - CandlestickChart.kt   K 线 Canvas 绘制（paint 数据；Canvas 签名待壳校准）
+ * - SummaryCard.kt        AI 总结卡（摘要 + 0-100 评分色条）
+ * - SignalPillGroup.kt    AI 信号标签组（≤6 Pill，红涨绿跌）
+ * - RiskBadgeGroup.kt     AI 风险徽章组（HIGH红/MEDIUM橙/LOW黄 + 左边框色条）
+ * - JumpCard.kt           AI 跳转卡（openPage 回调）
+ * - AppErrorCard.kt       统一错误卡（⚠+错误码徽章+分级文案+重试）
+ * - Skeleton.kt           骨架屏（SkeletonRow/Text/Kline）
+ * - QuickChip.kt          快捷指令芯片（GHOST+16 圆角）
  */
 package com.zhiniu.pages.components
 
 import com.zhiniu.domain.model.AiInsight
 import com.zhiniu.domain.model.KLineBar
 import com.zhiniu.domain.model.Quote
+import com.tencent.kuikly.ref.view.ViewBuilder
 
 /** 涨跌颜色：A 股红涨绿跌。 */
 object Palette {
@@ -18,7 +25,13 @@ object Palette {
     const val TEXT = "#2b2f36"
     const val SUB = "#8a919c"
     const val BG = "#ffffff"
+    const val MA5 = "#f5a623"   // 均线5
+    const val MA10 = "#4a90d9"  // 均线10
+    const val MA20 = "#9b59b6"  // 均线20
 }
+
+/** 色值字符串 → Kuikly 颜色（渲染色对象以 SDK 模板为准）。 */
+fun colorOf(hex: String): String = hex
 
 /** 涨跌色。 */
 fun priceColor(quote: Quote): String = when {
