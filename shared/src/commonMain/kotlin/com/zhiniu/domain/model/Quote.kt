@@ -25,7 +25,8 @@ data class Quote(
     val change: Double get() = price - prevClose
     val changePercent: Double
         get() = if (prevClose != 0.0) (change / prevClose) * 100 else 0.0
-    val isUp: Boolean get() = price >= prevClose
+    /** 红涨绿跌：严格大于为涨，等于为中性（flat）。 */
+    val isUp: Boolean get() = price > prevClose
 }
 
 /** 盘口一档。 */

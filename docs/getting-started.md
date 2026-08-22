@@ -56,6 +56,7 @@ uvicorn app.main:app --port 8000
 ## 4. 常见问题
 
 - **Gradle 依赖失败**：把工程 Gradle 版本切到 **7.5.1**（Kuikly 兼容），低版本需在 `settings.gradle.kts` 加 `enableFeaturePreview("VERSION_CATALOGS")`。
+- **前端编译必须 JDK17**：本机若为 Java 25，需在 Android Studio 把 Gradle JDK 切到 **17**（Kuikly 官方环境要求 JDK17 + Gradle 7.5.1），否则 Gradle sync 失败。
 - **iOS 不装环境**：注释 `shared/build.gradle.kts` 中 iOS 相关 target。
 - **新浪乱码**：接口 GBK，需按 GBK 解码。
 
