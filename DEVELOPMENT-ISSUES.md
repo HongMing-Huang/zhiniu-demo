@@ -27,12 +27,13 @@
 
 ## D1. 网关后端技术栈（对应 `docs/backend-llm-gateway-design.md` §3）
 
-- **现状**：三厂商均 OpenAI 兼容，网关只需一份配置。技术栈未定。
+- **现状**：三厂商均 OpenAI 兼容，网关只需一份配置。技术栈本待定，但为推进开发已按推荐 **A** 落地了可运行骨架。
+- **已实现（临时默认，可随时换）**：`backend/` 分支 `feat/backend-llm-gateway` 已提交 FastAPI 网关骨架（统一 `/v1/chat/completions` 流式 SSE + 降级链 + `/v1/models` + `/healthz`），复用官方 openai SDK，接口契约与实现解耦（改 Node/Ktor 只需换实现不换契约）。
 - **选项**
-  - A. **Python + FastAPI + openai SDK**（推荐）：与 TradingAgents/ai-hedge-fund 同生态，多 base_url + 流式支持最好，SSE 处理成熟。
+  - A. **Python + FastAPI + openai SDK**（已实现）：与 TradingAgents/ai-hedge-fund 同生态，多 base_url + 流式支持最好，SSE 处理成熟。
   - B. Node/TypeScript + Express + openai SDK：前端偏好的话更顺手。
   - C. Kotlin/JVM + Ktor：与前端同语言同栈，但多厂商 SDK 支持弱，需手写较多。
-- **待你选择** A / B / C。
+- **待你确认**：是否维持 A？若换 B/C，我改写实现即可。
 
 ## D2. 模型别名与默认路由（对应设计 §4.3 / §5.2）
 
