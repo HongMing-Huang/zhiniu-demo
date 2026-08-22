@@ -78,12 +78,18 @@
 
 ---
 
-## 处理建议顺序（一次给我答复即可推进）
+## ✅ 解除阻塞执行清单（当前唯一阻塞：前端真机编译）
 
-1. **D2**：给三厂商 Key（或告知暂无，那就最后通通路演 Mock）
-2. **D1**：选网关技术栈（推荐 A Python/FastAPI）
-3. **D4**：同意我现在去库 Kuikly 组件清单 → 定公共组件
-4. **D6 / D7**：行情源策略 + 下一 PR
-5. **红线项**：README 致谢是否去掉 star 数
+**已就绪**：后端网关（运行时验证通过）、文档 8 份 + UI 设计、mock 数据、前端数据/LLM/分析/UI 最小页/测试工程（已并入 main）。
 
-> 未答复前我不会乱写代码；收到决策继续。
+**唯一待办 = 前端 gradle 编译**，需你提供其一：
+
+- **选项 A（推荐）**：在 **Android Studio（Gradle JDK 切到 17）** 用 Kuikly 官方插件 `File→New→New Project→Kuikly Project Template` 生成工程（或 `npx create-kuikly-app create --package com.zhiniu --dsl kuikly`），发我路径/合并，我按 `docs/ui-design.md` 接入 `shared/` 源码、补全页面动态 `observable/vfor` 绑定并真机编译。
+- 选项 B：本机装 **JDK17**（或给 JDK17 路径），我设 `JAVA_HOME` 在本地继续（当前仅 Java25，与 Kuikly 要求 Gradle 7.5.1 不兼容）。
+
+**顺带可答（不阻塞上面）**：
+- **D2** 三厂 Key（有则后端真跑，无则全 Mock 演示）
+- **D6** 行情源策略（Android 真 + 小程序 Mock，或网关加行情代理）
+- **红线**：README 致谢是否去掉可疑 star 数（daily_stock_analysis 数据存疑）
+
+> 未提供上述环境/决策前无法真机编译（非"难/慢"，是确需你的 JDK17 + 官方模板等外部状态）。
