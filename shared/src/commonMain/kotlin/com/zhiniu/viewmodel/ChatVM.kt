@@ -19,6 +19,8 @@ class ChatVM(
 
     val messages = observableList<ChatMessage>()
     val streamingId = observable<String?>(null)
+    /** Agent 时间线完成步数（0..4）：由 StreamChunk.Progress 点亮，结束置 4。 */
+    val agentDone = observable(0)
     val quickCommands = observableList<String>().apply {
         add("看大盘"); add("诊个股"); add("解释指标"); add("对比两只")
     }
@@ -47,8 +49,8 @@ class ChatVM(
                     is StreamChunk.Error -> update(botId) {
                         it.copy(content = (it.content.ifBlank { "" } + "\n⚠ ${chunk.msg}").trim(), isStreaming = false)
                     }
-                    is StreamChunk.Done, is StreamChunk.Insight -> finish(botId)
-                    is StreamChunk.Progress -> Unit
+                    is StreamChunk.Progress -> agentDone.value = chunk.step.coerceIn(0, 4)
+                    is StreamChunk.Done, is StreamChunk.Insight -> { finish(botId); agentDone.value = 4 }
                 }
             }
         }
