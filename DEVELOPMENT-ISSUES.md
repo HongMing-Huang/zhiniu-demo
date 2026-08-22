@@ -98,6 +98,7 @@
 ### 本轮已完成（前端领域/逻辑层，纯逻辑可审阅）
 - **AppError 统一错误层**（提交见下）：`shared/.../domain/model/AppError.kt`（NO_NETWORK/RATE_LIMIT/AUTH_INVALID/UPSTREAM_5XX/JSON_SCHEMA_FAILED/UNKNOWN + 中文分级文案 + `fromBackendCode`/`fromThrowable`）+ `LlmGatewayClient` 错误分支映射后端 `error.code` + `MarketListVM`/`StockDetailVM` 裸 `e.message` 替换为 `AppError.display()` + `commonTest/AppErrorTest.kt` 9 用例。
 - 打通：与后端结构化 SSE `error.code`（invalid_key/rate_limited/timeout/upstream_5xx/no_key_configured）契约一致。
+- **K 线纯逻辑层** `domain/model/KLineChart.kt`：MA5/10/20 均线、价格区间、蜡烛方向(A股红涨绿跌)、像素几何 `layout`/`buildBundle`（蜡烛与均线共享 y 缩放）；`commonTest/KLineChartTest.kt` 8 用例。T1-3 Canvas 绘制层后续只消费本层。提交见下。
 
 ### 暂缓记录（UI DSL 组件，依赖 Kuikly 官方工程壳，触发条件=壳可用）
 - **Canvas K 线 CandlestickChart / KuiklyMarkdown 流式 / SummaryCard·SignalPillGroup·RiskBadgeGroup·JumpCard·QuickChip·AppErrorCard / 内置 Tab·Button·Dialog·Carousel 替换 / KuiklyTableView 五档 / Page 路由 openPage / StockDetailPage.openDetail() 空函数实装**：
