@@ -1,9 +1,5 @@
 # 知牛 ZhiNiu · 开发问题汇总（待你决策）
-
-> 本文档汇总从「技术方案」走向「真实开发」过程中**需要你拍板 / 信息不全**的所有问题。每一条都给出：现状 → 影响 → 可选方案 → 我的建议。你逐条处理后，我再据此继续开发，**绝不乱写**。
->
 > 更新：2026-08-22
-
 ---
 
 ## ⚠️ 最高优先级：设计文档中的数据异常（红线）
@@ -136,6 +132,12 @@
   - `export KONAN_DATA_DIR="$PWD/.konan"`（项目内隔离，绕开沙箱禁止写 `~/.konan`）+ 隔离 JDK17 → `./gradlew :shared:compileKotlinIosSimulatorArm64` **BUILD SUCCESSFUL (17m4s)**：Kotlin/Native 2.1.21 编 iOS simulator target 成功（确定性 domain/data/di + 官方 HelloWorld core.*）。`.konan/` 已 gitignore。
   - Web(H5)：shared 的 jstarget `compileKotlinJs` 已通过；**完整浏览器渲染需 h5App 模块入口**（settings include(":h5App") 但 create-kuikly-app 未落目录）——补官方 h5 target / 官方模板补齐（按 `core.*` 渲染入口，详见后续）。
   - **Web(H5) 权威核实**：`npm pack create-kuikly-app@0.2.7` 模板仅含 androidApp/iosApp/ohosApp/shared，**无 h5App 模块模板**（settings include(":h5App") 但 CLI 不产出）→ 浏览器渲染入口须从 **Kuikly 官方仓库/sample** 获取（外部权威源），此为 Web 渲染最后外部依赖；不臆造 H5 renderer。
+- **M 迁壳实证（UI 层迁壳 + 首次编译，2026-08-23）**：
+  - UI 层已从 zd 迁入壳同包（pages 4、components 9、viewmodel 4），M2-M4 完成；M5 首次 `:shared:compileKotlinJs` 得到大量 `Unresolved reference`（`Input/attr/flex/Text/onClick/value/placeholder/onValueChange` 等）。
+  - **官方 base 真实范本**（唯一可编译基准确认）：页面=`class X : BasePager()` + `override fun body(): ViewBuilder = { attr{} 子组件各自 attr{} }`，attr 属性为 **Float**（`fontSize(24f)/marginTop(10f)`），官方 DSL 组件 `Text{}`，`@Page("x", supportInLocal=true)`；`observable` 为 `by observable(x)` delegate（BasePager `companion` 用法）。
+  - 迁入页面为**开发期臆造 DSL**：`com.tencent.kuikly.ref.*`（ref.pager/widget/view 包不存在于官方）+ `View{}/vfor/vif/List/Tab/onClick/flex/FLEX_DIRECTION_*` + VM `observable(...).value` —— 与官方 base/HelloWorld **不匹配**。
+  - **权威核实限制**：`core-gradle-plugin/core-ksp-jvm/core-annotations-jvm` jar 可本地获取，但**运行时 DSL 库（core-android .aar / core klib）未下载**（需 Android SDK 才能拉取 android target 依赖），JS 使用 klib 无法 javap → 官方完整 DSL 组件清单（List/Tab/ScrollView/Input/Dialog/Canvas/Carousel/onClick/vfor/vif）在本环境无法权威反编译核实。
+  - **结论/阻塞**：UI 全量无臆造迁壳编译需官方 Kuikly DSL 权威源（官方文档/template 或 Android SDK 以 javap core-android）。两条解除路径：① 用户提供官方 Kuikly DSL 文档/h5App 模板；② 安装隔离 Android SDK（commandline-tools/platform/build-tools）拉取 core-android .aar 供 javap 清单。在此前不臆造重写页面（避免重蹈 `ref.*`）。
 
 ---
 
