@@ -6,3 +6,10 @@ local.properties
 **/build/
 .gradle/
 idea/
+# iOS/CocoaPods 本地缓存与产物（后续可整体删除）
+.home/
+.cocoapods-repos/
+iosApp/Pods/
+iosApp/*.xcworkspace
+iosApp/build/
+iosApp/DerivedData/

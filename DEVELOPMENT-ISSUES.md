@@ -143,6 +143,11 @@
   - 已修正的真实适配点：vfor 依赖 `{ ctx.mode; ctx.quotes }`（单个 deps lambda）；vfor lambda 内类成员需显式 receiver（`ctx.priceColor(q)/ctx.pct(q)/ctx.navigator(...)`）。
   - 其余 UI（StockDetail/Chat/Home + components + viewmodel）暂隔离到 `shared/src/_pending_ui`，待按相同真实 API 逐步迁移（K线 Canvas/Tab/Input/Dialog/Markdown 需另据官方 demo 核实签名）。
 - **阻塞记录（2026-08-23）模拟器运行**：iOS shared 已编译通过，但**启动模拟器需 iOS 模拟器运行时**（`xcrun simctl list runtimes` 为空；deviceTypes 有 iPhone17/Pro/Air 等）。运行时下载写 `~/Library/Developer/CoreSimulator`（沙箱已禁写系统目录）。解除：用户在本机执行 `xcodebuild -downloadPlatform iOS`（约数 GB）或 `xcrun simctl runtime add <runtime.dmg>`；依赖：需要 xcodegen（project.yml → .xcodeproj，brew install xcodegen）+ `pod install`（拉 OpenKuiklyIOSRender 官方 tag）。
+- **iOS 运行链路已备（2026-08-23）**：
+  - `brew install xcodegen`（2.46.0）→ `xcodegen generate` 生成 `iosApp.xcodeproj`。
+  - `./gradlew :shared:generateDummyFramework` 通过 → `pod install` 成功（HOME 隔离到 `iosApp/.home`、`COCOAPODS_REPOS_DIR` 隔离，沙箱禁写 `~/.cocoapods`；装 OpenKuiklyIOSRender 2.0.0 / SDWebImage / shared）→ `iosApp.xcworkspace`。
+  - gitignore 增 `.home/`、`.cocoapods-repos/`、`iosApp/Pods/`、`*.xcworkspace`、`build/`（可整体删除）。
+  - **新阻塞点**：xcodebuild 报 `iOS 26.4 is not installed`（Xcode 未注册任何 simulator platform / 无 runtime image）→ 无法 generic sim 编译、也无设备可 boot。`xcodebuild -downloadPlatform iOS` 在沙箱内下载卡住（写 Xcode 系统 Components 目录受限）。解除：**用户在 Xcode > Settings > Components 下载 iOS Simulator Runtime**（或沙箱外 `xcodebuild -downloadPlatform iOS`）；之后续跑 `xcodebuild -workspace iosApp.xcworkspace -scheme iosApp -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build` + `xcrun simctl boot/install/launch` 出效果。
 
 ---
 
