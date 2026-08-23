@@ -137,7 +137,11 @@
   - **官方 base 真实范本**（唯一可编译基准确认）：页面=`class X : BasePager()` + `override fun body(): ViewBuilder = { attr{} 子组件各自 attr{} }`，attr 属性为 **Float**（`fontSize(24f)/marginTop(10f)`），官方 DSL 组件 `Text{}`，`@Page("x", supportInLocal=true)`；`observable` 为 `by observable(x)` delegate（BasePager `companion` 用法）。
   - 迁入页面为**开发期臆造 DSL**：`com.tencent.kuikly.ref.*`（ref.pager/widget/view 包不存在于官方）+ `View{}/vfor/vif/List/Tab/onClick/flex/FLEX_DIRECTION_*` + VM `observable(...).value` —— 与官方 base/HelloWorld **不匹配**。
   - **权威核实限制**：`core-gradle-plugin/core-ksp-jvm/core-annotations-jvm` jar 可本地获取，但**运行时 DSL 库（core-android .aar / core klib）未下载**（需 Android SDK 才能拉取 android target 依赖），JS 使用 klib 无法 javap → 官方完整 DSL 组件清单（List/Tab/ScrollView/Input/Dialog/Canvas/Carousel/onClick/vfor/vif）在本环境无法权威反编译核实。
-  - **结论/阻塞**：UI 全量无臆造迁壳编译需官方 Kuikly DSL 权威源（官方文档/template 或 Android SDK 以 javap core-android）。两条解除路径：① 用户提供官方 Kuikly DSL 文档/h5App 模板；② 安装隔离 Android SDK（commandline-tools/platform/build-tools）拉取 core-android .aar 供 javap 清单。在此前不臆造重写页面（避免重蹈 `ref.*`）。
+  - **M7 迁壳实证达成（2026-08-23）**：
+  - 用 GitHub 插件核实 **Tencent-TDS/KuiklyUI** 官方 demo 真实 DSL 范本（VforModify.kt 等）确认真实 API：`com.tencent.kuikly.core.*`、`observable/observableList` delegate（`by observable(x)`）、`body(){ attr{} 子组件 attr{} }`、事件 `event{ click{ } }`、`List{ vforLazy({deps}){ item,index,_-> } }`、`willInit()`、attr 属性为 Float。
+  - **MarketListPage 已用真实 core DSL 重写**并入官方壳，`:shared:compileKotlinIosSimulatorArm64` **BUILD SUCCESSFUL** → 本项目 UI 页面（非 HelloWorld）用真实 API 在 iOS 编译通过。
+  - 已修正的真实适配点：vfor 依赖 `{ ctx.mode; ctx.quotes }`（单个 deps lambda）；vfor lambda 内类成员需显式 receiver（`ctx.priceColor(q)/ctx.pct(q)/ctx.navigator(...)`）。
+  - 其余 UI（StockDetail/Chat/Home + components + viewmodel）暂隔离到 `shared/src/_pending_ui`，待按相同真实 API 逐步迁移（K线 Canvas/Tab/Input/Dialog/Markdown 需另据官方 demo 核实签名）。
 
 ---
 
