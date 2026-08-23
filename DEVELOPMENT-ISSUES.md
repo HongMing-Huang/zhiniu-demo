@@ -118,6 +118,14 @@
   - **谁提供/如何恢复**：用户用 Kuikly 官方模板（`npx create-kuikly-app create --package com.zhiniu --dsl kuikly` → h5App target）生成工程给出路径合并，或安装 JDK17 并在 gradle 内设 `JAVA_HOME`。提供后执行 `./gradlew :h5App:run` 起 dev server 达成 W1 停止条件。
   - **严格遵循**：不手写 HTML/Wasm 壳替代，不跳过 W1 直推 W5。
 - **W3/W4/W5/W6**：依赖 W1 壳达成后执行（W3 expect/actual 数据源路由按"Web 走网关 / Android-iOS 走新浪"注入；W4 WatchlistStore Web actual 用 IndexedDB/跨端存储；W5 浏览器全链路验证+截图 docs/img/web-*.png；W6 README/getting-started 补 Web 双起步骤）。
+- **隔离工具链就绪（选 B 分诊链路验证）**：
+  - 后端：`.venv`（Py3.14）依赖齐、9 单测通过。
+  - **JDK17 隔离下载**：`zhiniu/.toolchains/jdk-17.0.20.1+1`（Adoptium arm64，176MB），项目内隔离、系统默认 Java(25) 不受影响；`.toolchains/` 已 gitignore。
+  - **Kuikly 官方壳生成**：`kuikly-shell/`（`create-kuikly-app` @0.2.7，`--dsl kuikly +H5`，package=com.zhiniu），含 `settings.gradle.kts`(androidApp/shared/h5App)，`gradlew`(Gradle 8.5)，`buildSrc` 版本管理，`androidApp/iosApp/ohosApp/shared`。
+  - **shared 并源**：现有 `com.zhiniu` 源码（pages/viewmodel/domain/data/di）+ commonTest 并入 `kuikly-shell/shared`；补依赖（coroutines/serialization-json/ktor2.3.12/koin-core）+ serialization plugin(Kotlin 2.1.21)。
+  - **/gradlew 验证**：`JAVA_HOME`=隔离JDK17 + `GRADLE_USER_HOME`=`.gradle-home` → `./gradlew :shared:tasks` **BUILD SUCCESSFUL (Gradle 8.5 + JVM 17.0.20.1)**，插件/依赖解析通过。
+  - **实证发现（D8/签名校准依据）**：壳模板真实 Kuikly API 为 `com.tencent.kuikly.core.*`（`core.base.ViewBuilder` / `core.views.Text` / `core.pager.Pager` / `core.reactive.handler.observable`，body() 内顶层 `attr{}`+子组件）。现有三页/组件/VM 用的 `com.tencent.kuikly.ref.*` + `View{attr{}}/vfor/vif` **为臆造、与真实 API 不符** → 后续 UI/VM 须按 `core.*` 校准（见下）。
+  - 提交见下。
 
 ---
 

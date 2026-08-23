@@ -1,0 +1,8 @@
+# 知牛 ZhiNiu · Kuikly 前端壳工程重点忽略（其余继承仓库 zhiniu/.gitignore）
+# 隔离构建缓存 / 本地下载
+.gradle-home/
+local.properties
+# 各类构建产物（仓库级 build/ 已忽略，此处兜底模块构建目录）
+**/build/
+.gradle/
+idea/
