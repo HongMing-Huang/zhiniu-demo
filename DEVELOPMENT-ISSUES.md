@@ -146,8 +146,11 @@
 - **iOS 运行链路已备（2026-08-23）**：
   - `brew install xcodegen`（2.46.0）→ `xcodegen generate` 生成 `iosApp.xcodeproj`。
   - `./gradlew :shared:generateDummyFramework` 通过 → `pod install` 成功（HOME 隔离到 `iosApp/.home`、`COCOAPODS_REPOS_DIR` 隔离，沙箱禁写 `~/.cocoapods`；装 OpenKuiklyIOSRender 2.0.0 / SDWebImage / shared）→ `iosApp.xcworkspace`。
-  - gitignore 增 `.home/`、`.cocoapods-repos/`、`iosApp/Pods/`、`*.xcworkspace`、`build/`（可整体删除）。
-  - **新阻塞点**：xcodebuild 报 `iOS 26.4 is not installed`（Xcode 未注册任何 simulator platform / 无 runtime image）→ 无法 generic sim 编译、也无设备可 boot。`xcodebuild -downloadPlatform iOS` 在沙箱内下载卡住（写 Xcode 系统 Components 目录受限）。解除：**用户在 Xcode > Settings > Components 下载 iOS Simulator Runtime**（或沙箱外 `xcodebuild -downloadPlatform iOS`）；之后续跑 `xcodebuild -workspace iosApp.xcworkspace -scheme iosApp -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build` + `xcrun simctl boot/install/launch` 出效果。
+  - gitignore 增 `.home/`、`.cocoapods-repos/`、`iosApp/Pods/`、`*.  **新阻塞点**：xcodebuild 报 `iOS 26.4 is not installed`（Xcode 未注册任何 simulator platform / 无 runtime image）→ 无法 generic sim 编译、也无设备可 boot。`xcodebuild -downloadPlatform iOS` 在沙箱内下载卡住（写 Xcode 系统 Components 目录受限）。解除：**用户在 Xcode > Settings > Components 下载 iOS Simulator Runtime**（或沙箱外 `xcodebuild -downloadPlatform iOS`）；之后续跑 `xcodebuild -workspace iosApp.xcworkspace -scheme iosApp -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build` + `xcrun simctl boot/install/launch` 出效果。
+- **Web dev server 启动成功（2026-08-23）**：
+  - `./gradlew :shared:jsBrowserDevelopmentWebpack` **BUILD SUCCESSFUL**（bundle `nativevue2.js` 4.87MiB；Web target 无 IR 报错——此前 `jsNodeTest` 的 `callKotlinMethod already bound` 为 node 测试目标特有，browser dev bundle 正常）。
+  - `./gradlew :shared:jsBrowserDevelopmentRun` 起 dev server：`node *:8080 (LISTEN)`、HTTP 200；Kotlin JS dev server serve 编译产物。
+  - **仍缺 H5 渲染入口**：当前 URL 为静态产物/目录非渲染 app；页面渲染需 `h5App` 模块入口（index.html 引入 nativevue2.js + Kuikly H5 renderer 启动），官方 CLI 不产出 h5App 模板（已核实），待官方 repo/模板补齐。
 
 ---
 
