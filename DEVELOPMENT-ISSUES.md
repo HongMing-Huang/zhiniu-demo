@@ -135,6 +135,7 @@
 - **B3 iOS 端编译跑通**（Web 并行目标）：
   - `export KONAN_DATA_DIR="$PWD/.konan"`（项目内隔离，绕开沙箱禁止写 `~/.konan`）+ 隔离 JDK17 → `./gradlew :shared:compileKotlinIosSimulatorArm64` **BUILD SUCCESSFUL (17m4s)**：Kotlin/Native 2.1.21 编 iOS simulator target 成功（确定性 domain/data/di + 官方 HelloWorld core.*）。`.konan/` 已 gitignore。
   - Web(H5)：shared 的 jstarget `compileKotlinJs` 已通过；**完整浏览器渲染需 h5App 模块入口**（settings include(":h5App") 但 create-kuikly-app 未落目录）——补官方 h5 target / 官方模板补齐（按 `core.*` 渲染入口，详见后续）。
+  - **Web(H5) 权威核实**：`npm pack create-kuikly-app@0.2.7` 模板仅含 androidApp/iosApp/ohosApp/shared，**无 h5App 模块模板**（settings include(":h5App") 但 CLI 不产出）→ 浏览器渲染入口须从 **Kuikly 官方仓库/sample** 获取（外部权威源），此为 Web 渲染最后外部依赖；不臆造 H5 renderer。
 
 ---
 
