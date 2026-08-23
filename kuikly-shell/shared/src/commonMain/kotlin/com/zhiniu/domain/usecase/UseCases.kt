@@ -8,6 +8,7 @@ import com.zhiniu.domain.model.Quote
 import com.zhiniu.domain.repository.ChatRepository
 import com.zhiniu.domain.repository.MarketRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import com.zhiniu.domain.model.StreamChunk
 
 /** 获取行情列表（指数 + 个股 + 自选）。 */
@@ -15,7 +16,7 @@ class GetStockList(private val repo: MarketRepository) {
     suspend fun indices(): List<Quote> = repo.quotes(listOf("sh000001", "sz399001", "sz399006"))
     suspend fun all(): List<Quote> = repo.quotes(WatchDefaults.ALL)
     suspend fun watchlist(): List<Quote> {
-        val symbols = kotlinx.coroutines.flow.first(repo.watchlist.observe())
+        val symbols = repo.watchlist.observe().first()
         return if (symbols.isEmpty()) emptyList() else repo.quotes(symbols.toList())
     }
 }

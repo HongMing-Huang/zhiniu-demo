@@ -1,7 +1,5 @@
-/* 知牛 · Mock 兜底数据源
- * 断网/无 Token 时渲染，与 data/mock/*.json 语义一致。
- * 直接构造对象（无资源加载/无外部依赖），保证跨端可编译。
- */
+// 知牛 · Mock 兜底数据源（仅 // 注释，避免 KMP/JS 词法对 /* 的未闭合误判）
+// 断网/无 Token 时渲染，与 data/mock/*.json 语义一致；直接构造对象、跨端可编译。
 package com.zhiniu.data.mock
 
 import com.zhiniu.domain.model.BidAsk
@@ -23,7 +21,7 @@ class MockDataSource {
         stock("sh601398", "工商银行", 5.64, 5.58, 5.60, 5.65, 5.57),
     )
 
-    /** 20 根日 K（sh600519 演示序列）。 */
+    // 20 根日 K（sh600519 演示序列）
     fun kline(symbol: String): List<KLineBar> {
         val opens = doubleArrayOf(
             1290.0, 1305.0, 1300.0, 1295.0, 1292.0, 1285.0, 1290.0, 1288.0, 1280.0, 1276.0,
@@ -51,7 +49,7 @@ class MockDataSource {
     }
 
     private fun index(symbol: String, name: String, price: Double, prev: Double, chg: Double) =
-        stock(symbol, name, price, prev, price - chg, price + Math.abs(chg) * 2, price - Math.abs(chg) * 2)
+        stock(symbol, name, price, prev, price - chg, price + kotlin.math.abs(chg) * 2, price - kotlin.math.abs(chg) * 2)
 
     private fun stock(
         symbol: String, name: String, price: Double, prev: Double,

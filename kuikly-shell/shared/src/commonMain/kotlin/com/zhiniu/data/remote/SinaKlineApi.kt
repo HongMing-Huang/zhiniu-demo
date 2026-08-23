@@ -19,7 +19,7 @@ import kotlinx.serialization.json.JsonNull
 class SinaKlineApi(private val client: HttpClient) {
 
     suspend fun fetch(symbol: String, scale: Int = 240, datalen: Int = 180): List<KLineBar> =
-        withContext(Dispatchers.IO) {
+        withContext(Dispatchers.Default) {
             val url = "https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/" +
                 "CN_MarketData.getKLineData?symbol=$symbol&scale=$scale&ma=no&datalen=$datalen"
             val text = client.get(url) {
@@ -29,23 +29,17 @@ class SinaKlineApi(private val client: HttpClient) {
         }
 
     private fun parse(text: String): List<KLineBar> {
-        val root: JsonArray? = runCatching {
-            Json.parseToJsonElement(text) as? JsonArray
-        }.getOrNull() ?: return emptyList()
-        return root.mapNotNull(::toBar)
+        val arr = runCatching { Json.parseToJsonElement(text) }.getOrNull() as? JsonArray
+            ?: return emptyList()
+        return arr.mapNotNull(::toBar)
     }
 
     private fun toBar(el: JsonElement): KLineBar? {
         val obj = el as? kotlinx.serialization.json.JsonObject ?: return null
-        fun d(key: String) = (obj[key] ?: return@toBar null).let {
-            if (it is JsonNull) return@toBar null else it
-        }
-        val open = obj["open"]?.toString()?.toDoubleOrNull() ?: 0.0
-        val high = obj["high"]?.toString()?.toDoubleOrNull() ?: 0.0
-        val low = obj["low"]?.toString()?.toDoubleOrNull() ?: 0.0
-        val close = obj["close"]?.toString()?.toDoubleOrNull() ?: 0.0
-        val volume = obj["volume"]?.toString()?.toDoubleOrNull()?.toLong() ?: 0L
+        fun d(key: String): Double = (obj[key]?.let {
+            if (it is JsonNull) null else it.toString().toDoubleOrNull()
+        }) ?: 0.0
         val day = obj["day"]?.toString()?.trim('"') ?: ""
-        return KLineBar(day, open, high, low, close, volume)
+        return KLineBar(day, d("open"), d("high"), d("low"), d("close"), d("volume").toLong())
     }
 }

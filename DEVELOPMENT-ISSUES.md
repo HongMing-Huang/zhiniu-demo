@@ -126,6 +126,12 @@
   - **/gradlew 验证**：`JAVA_HOME`=隔离JDK17 + `GRADLE_USER_HOME`=`.gradle-home` → `./gradlew :shared:tasks` **BUILD SUCCESSFUL (Gradle 8.5 + JVM 17.0.20.1)**，插件/依赖解析通过。
   - **实证发现（D8/签名校准依据）**：壳模板真实 Kuikly API 为 `com.tencent.kuikly.core.*`（`core.base.ViewBuilder` / `core.views.Text` / `core.pager.Pager` / `core.reactive.handler.observable`，body() 内顶层 `attr{}`+子组件）。现有三页/组件/VM 用的 `com.tencent.kuikly.ref.*` + `View{attr{}}/vfor/vif` **为臆造、与真实 API 不符** → 后续 UI/VM 须按 `core.*` 校准（见下）。
   - 提交见下。
+- **B2 隔离壳内确定性层编译通过**（选 B 分诊落地）：
+  - `JAVA_HOME`=隔离JDK17 + `GRADLE_USER_HOME`=`.gradle-home` → `./gradlew :shared:compileKotlinJs` **BUILD SUCCESSFUL**：commonMain 的 domain(纯逻辑)/data/di 在真实 Kuikly 壳内编译通过（Kotlin 2.1.21 + serialization/Ktor2.3.12/coroutines/koin）。
+  - 修复的真实编译错误：`MockDataSource` 未闭合 `/*`（改仅 `//` 注释）；`Dispatchers.IO`(JVM-only)→`Default`（JS 目标无 IO）；`AppError` 继承 `Exception`(override message, 作为统一可抛类型)；`KLineChart.buildBundle` yOf `Double/Float`；`LlmGatewayClient` 的 `continue`-in-lambda(改 if)；`UseCases.flow.first` 用接收者形式。
+  - 臆造 UI（`pages`/`viewmodel`/`components` 的 `ref.*` + View{}/vfor/vif）已隔离到 `shared/src/_pending_ui`、对应测试到 `src/_pending_tests`，不参与编译，待按真实 `core.*` API 重写校准（D8 实证）。
+  - `:shared:jsNodeTest` 受阻于 **Kotlin/JS IR 内部错误** `IrSimpleFunctionSymbolImpl is already bound / callKotlinMethod`（工具链 bug，非代码缺陷；与 nodejs()+KSP/Kuikly 插件组合有关）→ 壳内单测暂缓，待工具链/环境修复，或改用 Android SDK 环境跑 `testDebugUnitTest`。
+  - 提交见下。
 
 ---
 

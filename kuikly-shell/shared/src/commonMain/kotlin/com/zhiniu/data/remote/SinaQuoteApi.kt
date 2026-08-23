@@ -18,7 +18,7 @@ import kotlinx.coroutines.withContext
 
 class SinaQuoteApi(private val client: HttpClient) {
 
-    suspend fun fetch(vararg symbols: String): List<Quote> = withContext(Dispatchers.IO) {
+    suspend fun fetch(vararg symbols: String): List<Quote> = withContext(Dispatchers.Default) {
         if (symbols.isEmpty()) return@withContext emptyList()
         val resp = client.get("https://hq.sinajs.cn/list=${symbols.joinToString(",")}") {
             header("Referer", "https://finance.sina.com.cn")

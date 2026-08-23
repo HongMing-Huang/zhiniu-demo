@@ -92,7 +92,7 @@ object KLineChart {
         val usable = (width - padL - padR).coerceAtLeast(0f)
         val slot = if (n > 1) usable / n else usable
         val bodyW = (slot * bodyWidthFactor).coerceAtMost(slot * 0.9f)
-        val yOf = { v: Double -> height - ((v - lo) / span) * height }
+        val yOf = { v: Double -> (height - ((v - lo) / span) * height).toFloat() }
 
         return bars.mapIndexed { i, b ->
             val x = padL + slot * i + slot / 2f
@@ -113,7 +113,7 @@ object KLineChart {
     fun buildBundle(bars: List<KLineBar>, width: Float, height: Float): CandleGeometryBundle {
         val (lo, hi) = priceBounds(bars)
         val closes = bars.map { it.close }
-        val yOf = { v: Double -> height - ((v - lo) / (hi - lo).toFloat().coerceAtLeast(1e-9f)) * height }
+        val yOf = { v: Double -> (height - ((v - lo) / (hi - lo).toFloat().coerceAtLeast(1e-9f)) * height).toFloat() }
         return CandleGeometryBundle(
             candles = layoutWithBounds(bars, width, height, lo to hi, 12f, 12f, 0.72f),
             ma5 = toY(movingAverage(closes, 5), yOf),

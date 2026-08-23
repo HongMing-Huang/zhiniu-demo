@@ -11,7 +11,7 @@
 package com.zhiniu.domain.model
 
 /** 统一错误：code 为稳定徽章码，message 为面向用户的分级中文文案。 */
-sealed class AppError(val code: String, val message: String) {
+sealed class AppError(val code: String, override val message: String) : Exception(message) {
     /** UI 展示串：错误码徽章 + 文案。 */
     fun display(): String = "[$code] $message"
 

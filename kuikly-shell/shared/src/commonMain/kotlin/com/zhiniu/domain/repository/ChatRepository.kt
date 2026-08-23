@@ -8,6 +8,7 @@ import com.zhiniu.domain.model.AiRisk
 import com.zhiniu.domain.model.AiSignal
 import com.zhiniu.domain.model.ChatMessage
 import com.zhiniu.domain.model.StreamChunk
+import com.zhiniu.domain.model.Trend
 import kotlinx.coroutines.flow.Flow
 
 interface ChatRepository {

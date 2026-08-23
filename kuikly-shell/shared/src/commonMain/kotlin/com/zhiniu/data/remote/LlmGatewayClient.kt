@@ -78,9 +78,10 @@ class LlmGatewayClient(
             val acc = StringBuilder()
             while (true) {
                 val rawLine = channel.readUTF8Line() ?: break
-                val frame = SseParser.parseLine(rawLine) ?: run { pendingEvent = null; continue }
-                frame.event?.let { pendingEvent = it; continue }
-                val payload = frame.data ?: continue
+                val parsed = SseParser.parseLine(rawLine)
+                if (parsed == null) { pendingEvent = null; continue }
+                if (parsed.event != null) { pendingEvent = parsed.event; continue }
+                val payload = parsed.data ?: continue
                 when (SseParser.kind(pendingEvent, payload)) {
                     SseParser.EventKind.DONE -> {
                         emit(StreamChunk.Insight(acc.toString()))
@@ -111,7 +112,7 @@ class LlmGatewayClient(
                 }
                 pendingEvent = null
             }
-        }.flowOn(Dispatchers.IO)
+        }.flowOn(Dispatchers.Default)
 
     /** 错误帧 data → 统一错误文案（映射后端 error.code）。 */
     private fun errorDisplay(payload: String): String {

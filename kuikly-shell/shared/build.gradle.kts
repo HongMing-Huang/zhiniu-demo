@@ -22,6 +22,7 @@ kotlin {
     }
 
     js(IR) {
+        nodejs() // 用于 :shared:jsNodeTest 跑 commonMain/commonTest 纯逻辑测试（无需 Android SDK）
         browser {
             webpackTask {
                 outputFileName = "nativevue2.js"
