@@ -37,3 +37,7 @@ DerivedData/
 # === 系统 / 编辑器 ===
 .DS_Store
 *.log
+
+# === 隔离工具链（JDK/Gradle 本地下载，不入库）===
+.toolchains/
+.sdkman/
