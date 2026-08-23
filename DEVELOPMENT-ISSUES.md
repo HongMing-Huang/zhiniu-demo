@@ -132,6 +132,9 @@
   - 臆造 UI（`pages`/`viewmodel`/`components` 的 `ref.*` + View{}/vfor/vif）已隔离到 `shared/src/_pending_ui`、对应测试到 `src/_pending_tests`，不参与编译，待按真实 `core.*` API 重写校准（D8 实证）。
   - `:shared:jsNodeTest` 受阻于 **Kotlin/JS IR 内部错误** `IrSimpleFunctionSymbolImpl is already bound / callKotlinMethod`（工具链 bug，非代码缺陷；与 nodejs()+KSP/Kuikly 插件组合有关）→ 壳内单测暂缓，待工具链/环境修复，或改用 Android SDK 环境跑 `testDebugUnitTest`。
   - 提交见下。
+- **B3 iOS 端编译跑通**（Web 并行目标）：
+  - `export KONAN_DATA_DIR="$PWD/.konan"`（项目内隔离，绕开沙箱禁止写 `~/.konan`）+ 隔离 JDK17 → `./gradlew :shared:compileKotlinIosSimulatorArm64` **BUILD SUCCESSFUL (17m4s)**：Kotlin/Native 2.1.21 编 iOS simulator target 成功（确定性 domain/data/di + 官方 HelloWorld core.*）。`.konan/` 已 gitignore。
+  - Web(H5)：shared 的 jstarget `compileKotlinJs` 已通过；**完整浏览器渲染需 h5App 模块入口**（settings include(":h5App") 但 create-kuikly-app 未落目录）——补官方 h5 target / 官方模板补齐（按 `core.*` 渲染入口，详见后续）。
 
 ---
 

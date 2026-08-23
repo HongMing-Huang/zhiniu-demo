@@ -41,3 +41,4 @@ DerivedData/
 # === 隔离工具链（JDK/Gradle 本地下载，不入库）===
 .toolchains/
 .sdkman/
+.konan/
