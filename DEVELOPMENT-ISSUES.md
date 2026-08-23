@@ -142,6 +142,7 @@
   - **MarketListPage 已用真实 core DSL 重写**并入官方壳，`:shared:compileKotlinIosSimulatorArm64` **BUILD SUCCESSFUL** → 本项目 UI 页面（非 HelloWorld）用真实 API 在 iOS 编译通过。
   - 已修正的真实适配点：vfor 依赖 `{ ctx.mode; ctx.quotes }`（单个 deps lambda）；vfor lambda 内类成员需显式 receiver（`ctx.priceColor(q)/ctx.pct(q)/ctx.navigator(...)`）。
   - 其余 UI（StockDetail/Chat/Home + components + viewmodel）暂隔离到 `shared/src/_pending_ui`，待按相同真实 API 逐步迁移（K线 Canvas/Tab/Input/Dialog/Markdown 需另据官方 demo 核实签名）。
+- **阻塞记录（2026-08-23）模拟器运行**：iOS shared 已编译通过，但**启动模拟器需 iOS 模拟器运行时**（`xcrun simctl list runtimes` 为空；deviceTypes 有 iPhone17/Pro/Air 等）。运行时下载写 `~/Library/Developer/CoreSimulator`（沙箱已禁写系统目录）。解除：用户在本机执行 `xcodebuild -downloadPlatform iOS`（约数 GB）或 `xcrun simctl runtime add <runtime.dmg>`；依赖：需要 xcodegen（project.yml → .xcodeproj，brew install xcodegen）+ `pod install`（拉 OpenKuiklyIOSRender 官方 tag）。
 
 ---
 
