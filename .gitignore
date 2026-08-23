@@ -42,3 +42,5 @@ DerivedData/
 .toolchains/
 .sdkman/
 .konan/
+# 官方上游基座（临时克隆，可整体删除）
+/upstream-kuiklyui/

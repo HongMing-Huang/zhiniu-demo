@@ -150,7 +150,12 @@
 - **Web dev server 启动成功（2026-08-23）**：
   - `./gradlew :shared:jsBrowserDevelopmentWebpack` **BUILD SUCCESSFUL**（bundle `nativevue2.js` 4.87MiB；Web target 无 IR 报错——此前 `jsNodeTest` 的 `callKotlinMethod already bound` 为 node 测试目标特有，browser dev bundle 正常）。
   - `./gradlew :shared:jsBrowserDevelopmentRun` 起 dev server：`node *:8080 (LISTEN)`、HTTP 200；Kotlin JS dev server serve 编译产物。
-  - **仍缺 H5 渲染入口**：当前 URL 为静态产物/目录非渲染 app；页面渲染需 `h5App` 模块入口（index.html 引入 nativevue2.js + Kuikly H5 renderer 启动），官方 CLI 不产出 h5App 模板（已核实），待官方 repo/模板补齐。
+  - **仍缺 H5 渲染入口**：当前 URL 为静态产物/目录非渲染 app；页面渲染需 `h5App` 模块入口（index.html 引入 nativevue2.js + Kuikly H5 renderer 启动）。
+- **官方完整基座（路 2）实证（2026-08-23）**：
+  - 浅克隆 `Tencent-TDS/KuiklyUI` 到 `upstream-kuiklyui/`（隔离，gitignore，可删除），含 `core-render-web`/`h5App`/`demo`。
+  - 链已映射：`:demo` 产出 business bundle（`nativevue2.js`）→ `:h5App`（KuiklyRouter.createDelegator(url)）在 8083 加载渲染 + 宿主 dev server。
+  - 已解：官方 Gradle7.6.3 下载 zip 损坏（重下）+ buildSrc(Kotlin1.7) TLS `protocol_version`（gradle.properties 放开 TLS：`systemProp.jdk.tls.disabledAlgorithms=SSLv3,RC4` + `https.protocols=TLSv1~TLSv1.3`）。
+  - **官方仓库自身 JS 编译缺陷（阻塞，非臆造可修）**：`:demo:compileKotlinJs` FAILED——KSP 生成 `KuiklyCoreEntry.kt` 的 `nativeBridge.delegate`/`callNative`/`triggerRegisterPages` unresolved（KSP 生成与 core 的 `NativeBridge` API 版本不匹配，`kuikly.useLocalKsp=true` 组合下 demo JS 目标）。17m55s 构建失败。此属官方仓库兼容性问题，需官方修复/固定 KSP-核心版本组合，非业务代码可解。
 
 ---
 
