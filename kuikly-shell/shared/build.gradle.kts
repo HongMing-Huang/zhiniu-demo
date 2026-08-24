@@ -68,6 +68,11 @@ kotlin {
                 implementation("io.insert-koin:koin-core:3.5.6")
             }
         }
+        val jsMain by getting {
+            dependencies {
+                implementation("io.ktor:ktor-client-js:2.3.12")
+            }
+        }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
