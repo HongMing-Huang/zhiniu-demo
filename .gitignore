@@ -44,3 +44,6 @@ DerivedData/
 .konan/
 # 官方上游基座（临时克隆，可整体删除）
 /upstream-kuiklyui/
+# Web renderer 拼装静态服务产物（可整体删除）
+/web-8083/
+/web-host/

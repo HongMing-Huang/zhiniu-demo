@@ -157,6 +157,12 @@
   - 已解：官方 Gradle7.6.3 下载 zip 损坏（重下）+ buildSrc(Kotlin1.7) TLS `protocol_version`（gradle.properties 放开 TLS：`systemProp.jdk.tls.disabledAlgorithms=SSLv3,RC4` + `https.protocols=TLSv1~TLSv1.3`）。
   - **官方仓库自身 JS 编译缺陷（阻塞，非臆造可修）**：`:demo:compileKotlinJs` FAILED——KSP 生成 `KuiklyCoreEntry.kt` 的 `nativeBridge.delegate`/`callNative`/`triggerRegisterPages` unresolved（KSP 生成与 core 的 `NativeBridge` API 版本不匹配，`kuikly.useLocalKsp=true` 组合下 demo JS 目标）。17m55s 构建失败。此属官方仓库兼容性问题，需官方修复/固定 KSP-核心版本组合，非业务代码可解。
   - **Web 渲染器已可编译（推进）**：`:core-render-web:h5:compileKotlinJs` **BUILD SUCCESSFUL（13s）** —— 官方 Web 渲染器 core-render-web:h5 可独立编译（demo 的 KSP `NativeBridge` 缺陷为 demo 业务模块特有，不影响 renderer）。**下一步高杠杆**：把已验证的 business bundle（shared 产出的 `nativevue2.js`，含 KSP 页注册，compileKotlinJs 通过）接入官方 h5App renderer（KuiklyRouter 从 URL 解析 page 渲染 MarketList）→ 即可浏览器渲染；需跨工程拼装 dev server（8083 bundle + 宿主）。
+- **Web renderer 拼装成功 → MarketList 真实渲染（2026-08-23）✅**：
+  - 官方 `:h5App:jsBrowserDevelopmentWebpack` BUILD SUCCESSFUL → `h5App.js`（renderer host，4.07MiB，含 core-render-web base+h5 + KuiklyRouter）。
+  - 拼装：`web-8083/nativevue2.js`（我们的业务 bundle，`:shared:jsBrowserDevelopmentWebpack`，4.9MiB）+ `web-host/{index.html,h5App.js}`；两个静态 server：**8083**（业务 bundle，index.html 引 `http://127.0.0.1:8083/nativevue2.js`）、**8090**（renderer 宿主）。
+  - **URL 约定**：`KuiklyRouter.createDelegator(href)` 读 **`page_name`** 参数渲染对应 `@Page`（非 SPA）。
+  - **实测**：browser_use 打开 `http://localhost:8090/?page_name=MarketList` → 渲染完整行情列表（知牛·行情 标题、分类 Tab 自选/全部/涨幅/跌幅、上证/深证/创业板指数、贵州茅台/平安/招商/宁德/中国平安/五粮液/工商个股行 + 价格/涨跌幅），console 无 error，firstPaint=32ms。**Web 端 MarketList 界面正常渲出**。
+  - `pct()` 精度优化为 2 位小数（`:shared:jsBrowserDevelopmentWebpack` 重新打包 + 拷 bundle，刷新生效）。
 
 ---
 

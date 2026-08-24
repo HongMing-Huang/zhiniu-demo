@@ -12,6 +12,7 @@ import com.tencent.kuikly.core.views.View
 import com.zhiniu.base.BasePager
 import com.zhiniu.data.mock.MockDataSource
 import com.zhiniu.domain.model.Quote
+import kotlin.math.roundToInt
 
 // 行情分类
 private enum class MarketMode(val label: String) {
@@ -85,7 +86,8 @@ internal class MarketListPage(
         if (q.price >= q.prevClose) Color(0xFFE53935) else Color(0xFF2E7D32)
 
     private fun pct(q: Quote): String {
-        val p = ((q.price - q.prevClose) / q.prevClose * 100).toFloat()
-        return (if (p >= 0) "+" else "") + p.toString() + "%"
+        val p = (q.price - q.prevClose) / q.prevClose * 100
+        val rounded = (p * 100).roundToInt() / 100.0
+        return (if (rounded >= 0) "+" else "") + rounded.toString() + "%"
     }
 }
