@@ -5,6 +5,8 @@ import com.tencent.kuikly.core.base.Color
 import com.tencent.kuikly.core.base.ViewBuilder
 import com.tencent.kuikly.core.directives.vforLazy
 import com.tencent.kuikly.core.reactive.handler.observable
+import com.tencent.kuikly.core.views.Canvas
+import com.tencent.kuikly.core.views.CanvasContext
 import com.tencent.kuikly.core.views.List
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
@@ -13,6 +15,8 @@ import com.zhiniu.base.openZhiniuPage
 import com.zhiniu.data.mock.MockDataSource
 import com.zhiniu.domain.model.KLineBar
 import com.zhiniu.domain.model.Quote
+import com.zhiniu.pages.components.Tokens
+import com.zhiniu.pages.components.hexInt
 import kotlin.math.roundToInt
 
 /** 个股详情页：头部 + OHLC + 五档 + K 线 + AI 诊股（Kuikly 官方 core DSL）。 */
@@ -25,7 +29,7 @@ internal class StockDetailPage : BasePager() {
 
     // vforLazy 数据源必须是 ObservableList，故用 val 持有普通列表 + 转换
     private val depthRows = buildDepthRows()
-    private val klineRows = buildKlineRows()
+    private val klineBars: List<KLineBar> = mock.kline("sh600519")
 
     override fun willInit() {
         super.willInit()
@@ -75,10 +79,12 @@ internal class StockDetailPage : BasePager() {
                 }
             }
 
-            // K 线摘要（同用手工 forEach）
-            Text { attr { marginLeft(10f); marginTop(10f); fontSize(15f); color(Color(0xFF333333)); text("近 5 日走势") } }
-            ctx.klineRows.forEach { r ->
-                Text { attr { marginLeft(12f); fontSize(13f); color(Color(0xFF444444)); text(r) } }
+            // K 线蜡烛图（真实 Canvas 绘制，红涨绿跌 + MA 均线）
+            Text { attr { marginLeft(Tokens.space3); marginTop(Tokens.space2); fontSize(Tokens.fsH3); color(Color(hexInt(Tokens.textPrimary))); text("日 K 线") } }
+            Canvas({
+                attr { height(200f); marginLeft(Tokens.space2); marginRight(Tokens.space2) }
+            }) { context, width, height ->
+                ctx.drawKline(context, width, height)
             }
 
             // AI 诊股入口
@@ -102,11 +108,47 @@ internal class StockDetailPage : BasePager() {
         }
     }
 
-    private fun buildKlineRows(): List<String> =
-        mock.kline("sh600519").takeLast(5).map { b: KLineBar ->
-            val dir = if (b.close >= b.open) "↗ 阳线" else "↘ 阴线"
-            "收 ${two("${b.close}")}  开 ${two("${b.open}")}  $dir"
+    // 用 CanvasContext 画蜡烛（实心矩形用 moveTo+lineTo 围边近似，影线用垂直线）
+    private fun drawKline(context: CanvasContext, width: Float, height: Float) {
+        val bars = klineBars
+        if (bars.isEmpty()) return
+        val minLow = bars.minOf { it.low }
+        val maxHigh = bars.maxOf { it.high }
+        val span = (maxHigh - minLow).takeIf { it > 0 } ?: 1.0
+        val padTop = 8f
+        val plotH = height - padTop * 2
+        val step = width / bars.size
+        val bodyW = step * 0.5f
+
+        fun y(price: Double): Float = padTop + (((maxHigh - price) / span) * plotH).toFloat()
+
+        bars.forEachIndexed { i, b ->
+            val x = step * i + step / 2f
+            val up = b.close >= b.open
+            val color = if (up) Color(hexInt(Tokens.up)) else Color(hexInt(Tokens.down))
+            val top = y(maxOf(b.open, b.close))
+            val bottom = y(minOf(b.open, b.close))
+            val highY = y(b.high)
+            val lowY = y(b.low)
+
+            context.strokeStyle(color)
+            context.lineWidth(1f)
+            // 影线（上下极值垂直线）
+            context.beginPath()
+            context.moveTo(x, highY)
+            context.lineTo(x, lowY)
+            context.stroke()
+            // 实体（矩形：4 条线围边 + 填充）
+            context.fillStyle(color)
+            context.beginPath()
+            context.moveTo(x - bodyW, top)
+            context.lineTo(x + bodyW, top)
+            context.lineTo(x + bodyW, bottom)
+            context.lineTo(x - bodyW, bottom)
+            context.closePath()
+            context.fill()
         }
+    }
 
     private fun two(s: String): String {
         // 保留两位小数的简易实现（避免依赖 java 格式化）
