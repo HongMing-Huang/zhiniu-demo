@@ -314,3 +314,13 @@ def get_routes() -> Dict[str, dict]:
 def get_default_model(provider_id: str) -> Optional[str]:
     """A2 模型发现聚合 后用于 fallback。"""
     return _fallback_model().get(provider_id)
+
+
+def infer_capabilities(model_id: str) -> List[str]:
+    """A2：按模型名启发式推断能力标签（无需显式声明）。"""
+    return _capabilities_of("", model_id).copy()
+
+
+def providers_by_key() -> List[ProviderDef]:
+    """只返回已配置了 Key 的厂商（供模型自动发现拉取真实模型清单）。"""
+    return [p for p in PROVIDERS.values() if os.getenv(p.api_key_env)]

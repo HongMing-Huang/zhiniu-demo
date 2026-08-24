@@ -25,6 +25,7 @@ from .config import (
     build_gateway_key,
     list_available_models,
 )
+from .discovery import merged_models_for_provider, refresh_models
 from .gateway import gateway
 from .quote import quote_realtime, quote_kline
 
@@ -49,6 +50,18 @@ def require_gateway_key(authorization: str = Header(None)) -> None:
     if not gw_key or gw_key == "changeme":
         # 未设置：演示期放行，但生产必须配置
         return
+    if authorization != f"Bearer {gw_key}":
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "网关 Key 无效")
+
+
+def require_admin_key(authorization: str = Header(None)) -> None:
+    """A2：管理端点强制要求 GATEWAY_API_KEY（未配置则拒绝写操作）。"""
+    gw_key = build_gateway_key()
+    if not gw_key or gw_key == "changeme":
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "管理端点在未配置 GATEWAY_API_KEY 时不可用（演示期仅只读）",
+        )
     if authorization != f"Bearer {gw_key}":
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "网关 Key 无效")
 
@@ -134,7 +147,27 @@ async def chat_completions(
 
 @app.get("/v1/models", dependencies=[Depends(require_gateway_key)])
 async def models():
-    return {"object": "list", "data": list_available_models()}
+    # 别名 + 厂商目录；每个厂商带静态+动态模型合并（含能力/available/reason）
+    data = list_available_models()
+    for item in data:
+        if item.get("object") == "provider":
+            conf = PROVIDERS.get(item["id"])
+            if conf:
+                item["models_detail"] = merged_models_for_provider(conf)
+    return {"object": "list", "data": data}
+
+
+@app.post("/admin/refresh-models", dependencies=[Depends(require_admin_key)])
+async def admin_refresh_models():
+    """A2：对已配 Key 厂商真实调 GET {baseUrl}/models 聚合模型清单（GATEWAY_API_KEY 保护）。"""
+    result = await refresh_models()
+    if not result:
+        return {
+            "status": "no_keyed_provider",
+            "message": "无已配置 Key 的厂商，无法发现；返回 Mock/静态目录",
+            "providers": {},
+        }
+    return {"status": "ok", "providers": result}
 
 
 @app.get("/healthz")

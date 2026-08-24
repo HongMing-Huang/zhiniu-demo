@@ -12,9 +12,11 @@ from app.config import (
     ProviderError,
     _FALLBACK_MODEL,  # noqa: F401  (仅用于断言可解析结构)
     get_routes,
+    infer_capabilities,
     list_available_models,
     resolve_candidates,
 )
+from app.discovery import merged_models_for_provider
 
 
 class TestResolveCandidates(unittest.TestCase):
@@ -133,6 +135,40 @@ class TestProvidersJson(unittest.TestCase):
         deepseek_entry = next(m for m in data if m["id"] == "deepseek")
         self.assertIn("base_url", deepseek_entry)
         self.assertIn("key_configured", deepseek_entry)
+
+
+class TestModelDiscovery(unittest.TestCase):
+    """A2: 模型自动发现的能力推断 + 合并目录。"""
+
+    def setUp(self):
+        for k in ("DEEPSEEK_API_KEY", "ZHIPUAI_API_KEY", "HUNYUAN_API_KEY"):
+            os.environ.pop(k, None)
+
+    def test_capability_heuristic(self):
+        # 模型名启发式能力打标（A2）：reasoning / fast / vision / chat 兜底
+        self.assertIn("reasoning", infer_capabilities("deepseek-reasoner"))
+        self.assertIn("fast", infer_capabilities("glm-4-flash"))
+        self.assertIn("vision", infer_capabilities("qwen-vl-max"))
+        self.assertIn("chat", infer_capabilities("some-chat-model"))
+
+    def test_merged_models_declared_source(self):
+        # 静态声明模型 → source=declared，无 Key → available=false + reason
+        conf = PROVIDERS["deepseek"]
+        merged = merged_models_for_provider(conf)
+        ids = [m["id"] for m in merged]
+        self.assertIn("deepseek-chat", ids)
+        for m in merged:
+            if m["id"] == "deepseek-chat":
+                self.assertEqual(m["source"], "declared")
+                self.assertFalse(m["available"])
+                self.assertIn("未配置", m["reason"])
+                self.assertIn("chat", m["capabilities"])  # 启发式对显式 fast 名未命中 → chat 兜底
+
+    def test_v1_models_includes_models_detail(self):
+        # /v1/models 的厂商项带 models_detail（A2 对外形态）
+        data = list_available_models()
+        provider_items = [m for m in data if m["object"] == "provider"]
+        self.assertEqual(len(provider_items), len(PROVIDERS))
 
 
 if __name__ == "__main__":
