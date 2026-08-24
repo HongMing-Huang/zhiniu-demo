@@ -102,6 +102,7 @@ zhiniu/
 
 - [开发问题汇总（待决策 ⚠️）](DEVELOPMENT-ISSUES.md)
 - [技术栈定稿](docs/tech-stack.md)
+- [AI 设计指导（Light Theme 唯一权威）](docs/ai-design-guide.md)
 - [UI 界面设计](docs/ui-design.md)
 - [技术方案全文](docs/zhiniu-technical-design.md)
 - [LLM 多模型网关后端设计](docs/backend-llm-gateway-design.md)
