@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import time
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -26,7 +28,9 @@ from .config import (
     list_available_models,
 )
 from .discovery import merged_models_for_provider, refresh_models
+from .analytics import record_usage, usage_summary
 from .gateway import gateway
+from .news import news_detail, news_list
 from .quote import quote_indices, quote_kline, quote_realtime, quote_screener, quote_sectors
 
 load_dotenv(override=True)
@@ -52,6 +56,11 @@ def require_gateway_key(authorization: str = Header(None)) -> None:
         return
     if authorization != f"Bearer {gw_key}":
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "网关 Key 无效")
+
+
+def _any_key_configured() -> bool:
+    """是否任一厂商已配置 Key（A6 判定是否走降级/Mock）。"""
+    return any(os.getenv(p.api_key_env) for p in PROVIDERS.values())
 
 
 def require_admin_key(authorization: str = Header(None)) -> None:
@@ -118,6 +127,9 @@ async def chat_completions(
 
     async def event_stream():
         payload = _build_payload()
+        _t0 = time.perf_counter()
+        _error_code: Optional[str] = None
+        _degraded = _any_key_configured() is False
         try:
             if payload.get("tools"):
                 # A3：带工具 → 走 Function Calling 编排（内部多轮，对外发 progress/delta 帧）
@@ -160,6 +172,7 @@ async def chat_completions(
                     yield _sse(chunk)
             yield _sse_done()
         except ProviderError as e:
+            _error_code = e.reason
             err = {
                 "error": {
                     "type": "gateway_upstream",
@@ -170,6 +183,7 @@ async def chat_completions(
             yield _sse(err, event="error")
             yield _sse_done()
         except Exception as e:  # 最外层兜底：任何异常都走 SSE 错误帧 + [DONE]，禁止 500 半条流
+            _error_code = "unknown"
             err = {
                 "error": {
                     "type": "gateway_internal",
@@ -179,6 +193,17 @@ async def chat_completions(
             }
             yield _sse(err, event="error")
             yield _sse_done()
+        finally:
+            # A6：记录用量（模型/延迟/降级/错误）供 /analytics/usage 聚合
+            try:
+                record_usage(
+                    model=payload.get("model", "unknown"),
+                    latency_ms=(time.perf_counter() - _t0) * 1000,
+                    degraded=_degraded,
+                    error=_error_code,
+                )
+            except Exception:
+                pass
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
@@ -258,3 +283,21 @@ async def proxy_quote_sectors():
 async def proxy_quote_screener(industry: str = "", min_pct: float = 0.0):
     """A4：条件选股。GET /quote/screener?industry=&min_pct="""
     return await quote_screener(industry=industry, min_pct=min_pct)
+
+
+@app.get("/news/list", dependencies=[Depends(require_gateway_key)])
+async def proxy_news_list(keyword: str = "", symbol: str = ""):
+    """A5：资讯列表（7×24 快讯 + 个股新闻）。GET /news/list?keyword=&symbol="""
+    return await news_list(keyword=keyword, symbol=symbol)
+
+
+@app.get("/news/detail", dependencies=[Depends(require_gateway_key)])
+async def proxy_news_detail(news_id: str):
+    """A5：资讯详情。GET /news/detail?news_id="""
+    return await news_detail(news_id)
+
+
+@app.get("/analytics/usage", dependencies=[Depends(require_gateway_key)])
+async def proxy_usage(hours: int = 1):
+    """A6：用量统计（按模型/时段的请求/延迟/降级/错误分布）。GET /analytics/usage?hours="""
+    return usage_summary(hours=hours)
