@@ -156,6 +156,7 @@
   - 链已映射：`:demo` 产出 business bundle（`nativevue2.js`）→ `:h5App`（KuiklyRouter.createDelegator(url)）在 8083 加载渲染 + 宿主 dev server。
   - 已解：官方 Gradle7.6.3 下载 zip 损坏（重下）+ buildSrc(Kotlin1.7) TLS `protocol_version`（gradle.properties 放开 TLS：`systemProp.jdk.tls.disabledAlgorithms=SSLv3,RC4` + `https.protocols=TLSv1~TLSv1.3`）。
   - **官方仓库自身 JS 编译缺陷（阻塞，非臆造可修）**：`:demo:compileKotlinJs` FAILED——KSP 生成 `KuiklyCoreEntry.kt` 的 `nativeBridge.delegate`/`callNative`/`triggerRegisterPages` unresolved（KSP 生成与 core 的 `NativeBridge` API 版本不匹配，`kuikly.useLocalKsp=true` 组合下 demo JS 目标）。17m55s 构建失败。此属官方仓库兼容性问题，需官方修复/固定 KSP-核心版本组合，非业务代码可解。
+  - **Web 渲染器已可编译（推进）**：`:core-render-web:h5:compileKotlinJs` **BUILD SUCCESSFUL（13s）** —— 官方 Web 渲染器 core-render-web:h5 可独立编译（demo 的 KSP `NativeBridge` 缺陷为 demo 业务模块特有，不影响 renderer）。**下一步高杠杆**：把已验证的 business bundle（shared 产出的 `nativevue2.js`，含 KSP 页注册，compileKotlinJs 通过）接入官方 h5App renderer（KuiklyRouter 从 URL 解析 page 渲染 MarketList）→ 即可浏览器渲染；需跨工程拼装 dev server（8083 bundle + 宿主）。
 
 ---
 
