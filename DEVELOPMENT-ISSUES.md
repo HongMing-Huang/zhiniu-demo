@@ -1,6 +1,14 @@
 # 知牛 ZhiNiu · 开发问题汇总（待你决策）
-> 更新：2026-08-22
+> 更新：2026-08-24
 ---
+
+## 🎯 最新指令（2026-08-24 用户决策，覆盖下方部分待定项）
+
+1. **Web 端优先**：iOS / Android / 鸿蒙 / macOS 全部暂停（编译产物保留），全部精力聚焦 Web(H5) 打穿。冲刺清单见 `docs/llm-router-design.md` §5（W-A1~A8）。
+2. **多 LLM 统一路由管理**：参考 CherryHQ/cherry-studio 的 provider 声明式管理 + 模型自动发现 + 三层路由解析，不做"简单接一个 LLM"。完整设计见 `docs/llm-router-design.md`（调研结论 + 差距对照 + providers.json 设计 + Web 模型设置页）。
+3. D6 行情源策略随 Web 优先自然解决：Web 端统一走网关代理（真实数据 + Mock 兜底），无小程序 Referer 问题。
+4. 仍待用户输入：三厂 LLM Key（D2）、iOS 模拟器运行时与 Android SDK（多端恢复条件）、README 致谢 star 数清理（红线）。
+
 
 ## ⚠️ 最高优先级：设计文档中的数据异常（红线）
 

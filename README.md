@@ -1,9 +1,3 @@
-# 知牛 ZhiNiu — 仓库 README 模板
-
-> 使用说明：本文件是 `zhiniu` 仓库根目录 `README.md` 的即用模板。`〔〕` 为待填占位；GIF/截图存放于 `docs/img/`。建议中英双语双轨维护（`README.md` + `README-en_US.md`），与 Kuikly 官方仓库风格对齐。
-
----
-
 <div align="center">
 
 <img src="docs/img/logo.png" width="120" alt="知牛 ZhiNiu logo"/>
@@ -111,6 +105,7 @@ zhiniu/
 - [UI 界面设计](docs/ui-design.md)
 - [技术方案全文](docs/zhiniu-technical-design.md)
 - [LLM 多模型网关后端设计](docs/backend-llm-gateway-design.md)
+- [多 LLM 统一路由管理设计（Cherry Studio 借鉴）](docs/llm-router-design.md)
 - [Kuikly 公共组件与图标公共资源选型](docs/kuikly-common-assets.md)
 - [架构说明（C4 + ADR）](docs/architecture.md)
 - [API 接入与降级链](docs/api-matrix.md)
