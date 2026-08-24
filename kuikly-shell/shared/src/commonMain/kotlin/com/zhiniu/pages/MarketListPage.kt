@@ -26,11 +26,24 @@ internal class MarketListPage : BasePager() {
 
     private var mode by observable(MarketMode.ALL)
 
+    private val all by observableList<Quote>()
     private val quotes by observableList<Quote>()
 
     override fun willInit() {
         super.willInit()
-        MockDataSource().quotes().forEach { quotes.add(it) }
+        MockDataSource().quotes().forEach { all.add(it) }
+        refreshed()
+    }
+
+    // 当前 Tab 变化时按涨幅/跌幅排序 / 自选占位
+    private fun refreshed() {
+        quotes.clear()
+        when (mode) {
+            MarketMode.WATCHLIST -> all.take(3).forEach { quotes.add(it) }
+            MarketMode.ALL -> all.forEach { quotes.add(it) }
+            MarketMode.GAINERS -> all.sortedByDescending { it.changePercent }.forEach { quotes.add(it) }
+            MarketMode.LOSERS -> all.sortedBy { it.changePercent }.forEach { quotes.add(it) }
+        }
     }
 
     override fun body(): ViewBuilder {
@@ -56,7 +69,7 @@ internal class MarketListPage : BasePager() {
                             text(m.label)
                             color(if (ctx.mode == m) Color(0xFFE53935) else Color(0xFF999999))
                         }
-                        event { click { ctx.mode = m } }
+                        event { click { ctx.mode = m; ctx.refreshed() } }
                     }
                 }
             }
@@ -70,12 +83,14 @@ internal class MarketListPage : BasePager() {
                             padding(8f)
                             backgroundColor(Color.WHITE)
                         }
-                        Text { attr { flex(1f); text("${q.name} ${q.symbol}") } }
+                        // 点击事件绑定在文本元素内部（与 ChatHome 已验证生效的写法一致）
+                        Text {
+                            attr { flex(1f); text("${q.name} ${q.symbol}") }
+                            event { click { ctx.openZhiniuPage("StockDetail", mapOf("symbol" to q.symbol, "name" to q.name)) } }
+                        }
                         Text { attr { text(q.price.toString()); color(ctx.priceColor(q)) } }
                         Text { attr { marginLeft(6f); text(ctx.pct(q)); color(ctx.priceColor(q)) } }
                     }
-                    // 行点击 → 详情
-                    event { click { ctx.openZhiniuPage("StockDetail", mapOf("symbol" to q.symbol, "name" to q.name)) } }
                 }
             }
         }
