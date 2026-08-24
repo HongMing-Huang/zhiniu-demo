@@ -13,6 +13,8 @@ import com.zhiniu.base.BasePager
 import com.zhiniu.base.openZhiniuPage
 import com.zhiniu.data.mock.MockDataSource
 import com.zhiniu.domain.model.Quote
+import com.zhiniu.pages.components.Tokens
+import com.zhiniu.pages.components.hexInt
 import kotlin.math.roundToInt
 
 // 行情分类
@@ -20,7 +22,7 @@ private enum class MarketMode(val label: String) {
     WATCHLIST("自选"), ALL("全部"), GAINERS("涨幅"), LOSERS("跌幅");
 }
 
-/** 行情列表页：指数条 + 分类 Tab + 股票行列表（Kuikly 官方 core DSL）。 */
+/** 行情列表页：指数条 + 分类 Tab + 股票行列表（Kuikly 官方 core DSL + Light Token 皮肤）。 */
 @Page("MarketList", supportInLocal = true)
 internal class MarketListPage : BasePager() {
 
@@ -35,7 +37,6 @@ internal class MarketListPage : BasePager() {
         refreshed()
     }
 
-    // 当前 Tab 变化时按涨幅/跌幅排序 / 自选占位
     private fun refreshed() {
         quotes.clear()
         when (mode) {
@@ -49,25 +50,25 @@ internal class MarketListPage : BasePager() {
     override fun body(): ViewBuilder {
         val ctx = this
         return {
-            // 指数条
+            // 标题
             Text {
                 attr {
-                    marginTop(10f); marginLeft(10f)
-                    fontSize(13f)
-                    color(Color(0xFF888888))
+                    marginTop(Tokens.space3); marginLeft(Tokens.space3)
+                    fontSize(Tokens.fsBody)
+                    color(Color(hexInt(Tokens.textTertiary)))
                     text("知牛 · 行情")
                 }
             }
-            // 分类 Tab
+            // 分类 Tab（选中=品牌绿强读或主文字；未选中=次要文字）
             View {
-                attr { flexDirectionRow(); marginTop(10f) }
+                attr { flexDirectionRow(); marginTop(Tokens.space2) }
                 MarketMode.entries.forEach { m ->
                     Text {
                         attr {
-                            marginLeft(12f)
-                            fontSize(15f)
+                            marginLeft(Tokens.space3)
+                            fontSize(Tokens.fsH3)
                             text(m.label)
-                            color(if (ctx.mode == m) Color(0xFFE53935) else Color(0xFF999999))
+                            color(if (ctx.mode == m) Color(hexInt(Tokens.textPrimary)) else Color(hexInt(Tokens.textTertiary)))
                         }
                         event { click { ctx.mode = m; ctx.refreshed() } }
                     }
@@ -75,33 +76,38 @@ internal class MarketListPage : BasePager() {
             }
             // 股票行列表（Lazy）
             List {
-                attr { height(500f); marginTop(6f) }
+                attr { height(500f); marginTop(Tokens.space2); backgroundColor(Color(hexInt(Tokens.bgCard))) }
                 vforLazy({ ctx.mode; ctx.quotes }) { q, _, _ ->
                     View {
                         attr {
                             flexDirectionRow()
-                            padding(8f)
-                            backgroundColor(Color.WHITE)
+                            padding(Tokens.space2)
+                            backgroundColor(Color(hexInt(Tokens.bgCard)))
                         }
-                        // 点击事件绑定在文本元素内部（与 ChatHome 已验证生效的写法一致）
                         Text {
-                            attr { flex(1f); text("${q.name} ${q.symbol}") }
+                            attr { flex(1f); fontSize(Tokens.fsH3); color(Color(hexInt(Tokens.textPrimary))); text("${q.name}") }
                             event { click { ctx.openZhiniuPage("StockDetail", mapOf("symbol" to q.symbol, "name" to q.name)) } }
                         }
-                        Text { attr { text(q.price.toString()); color(ctx.priceColor(q)) } }
-                        Text { attr { marginLeft(6f); text(ctx.pct(q)); color(ctx.priceColor(q)) } }
+                        Text { attr { fontSize(Tokens.fsBody); color(ctx.qColor(q)); text(ctx.mono(q.price)) } }
+                        Text { attr { marginLeft(Tokens.space2); fontSize(Tokens.fsBody); color(ctx.qColor(q)); text(ctx.pct(q)) } }
                     }
                 }
             }
         }
     }
 
-    private fun priceColor(q: Quote): Color =
-        if (q.price >= q.prevClose) Color(0xFFE53935) else Color(0xFF2E7D32)
+    private fun qColor(q: Quote): Color =
+        if (q.price >= q.prevClose) Color(hexInt(Tokens.up)) else Color(hexInt(Tokens.down))
+
+    private fun mono(v: Double): String {
+        val r = (kotlin.math.round(v * 100)) / 100
+        return r.toString()
+    }
 
     private fun pct(q: Quote): String {
         val p = (q.price - q.prevClose) / q.prevClose * 100
-        val rounded = (p * 100).roundToInt() / 100.0
-        return (if (rounded >= 0) "+" else "") + rounded.toString() + "%"
+        val r = (p * 100).roundToInt() / 100.0
+        return (if (r >= 0) "+" else "") + r.toString() + "%"
     }
 }
+
