@@ -1,0 +1,134 @@
+{
+  "defaultModel": {
+    "deepseek": "deepseek-chat",
+    "glm": "glm-4.6",
+    "hunyuan": "hunyuan-turbos-latest"
+  },
+  "order": ["deepseek", "glm", "hunyuan"],
+  "routes": {
+    "zhiniu/quick":  { "want": ["fast"],      "fallbackOrder": ["deepseek", "glm", "hunyuan"] },
+    "zhiniu/think":  { "want": ["reasoning"], "fallbackOrder": ["deepseek", "glm", "hunyuan"] },
+    "zhiniu/flash":  { "want": ["fast"],      "fallbackOrder": ["glm", "deepseek", "hunyuan"] },
+    "zhiniu/vision": { "want": ["vision"],    "fallbackOrder": ["deepseek", "glm", "hunyuan"] }
+  },
+  "providers": [
+    {
+      "id": "openai", "name": "OpenAI", "baseUrl": "https://api.openai.com/v1",
+      "apiKeyEnv": "OPENAI_API_KEY", "protocol": "openai", "supportsDiscover": true,
+      "tier": "international", "keyHint": "sk-...",
+      "models": [
+        {"id": "gpt-4o", "capabilities": ["vision", "chat"]},
+        {"id": "gpt-4o-mini", "capabilities": ["fast", "vision", "chat"]},
+        {"id": "o3-mini", "capabilities": ["reasoning", "fast"]}
+      ]
+    },
+    {
+      "id": "azure", "name": "Azure OpenAI", "baseUrl": "",
+      "apiKeyEnv": "AZURE_OPENAI_API_KEY", "protocol": "openai", "supportsDiscover": false,
+      "tier": "international", "requiresEndpoint": true, "keyHint": "azure deployment",
+      "models": []
+    },
+    {
+      "id": "deepseek", "name": "DeepSeek", "baseUrl": "https://api.deepseek.com",
+      "apiKeyEnv": "DEEPSEEK_API_KEY", "protocol": "openai", "supportsDiscover": true,
+      "tier": "domestic", "keyHint": "sk-",
+      "models": [
+        {"id": "deepseek-chat", "capabilities": ["fast", "chat"]},
+        {"id": "deepseek-reasoner", "capabilities": ["reasoning"]},
+        {"id": "deepseek-v4-pro", "capabilities": ["vision", "chat"]}
+      ]
+    },
+    {
+      "id": "glm", "name": "智谱 GLM", "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
+      "apiKeyEnv": "ZHIPUAI_API_KEY", "protocol": "openai", "supportsDiscover": true,
+      "tier": "domestic", "keyHint": "{id}.{secret}",
+      "models": [
+        {"id": "glm-4", "capabilities": ["chat"]},
+        {"id": "glm-4.5", "capabilities": ["vision"]},
+        {"id": "glm-4.6", "capabilities": ["fast", "chat"]},
+        {"id": "glm-5", "capabilities": ["fast", "chat"]},
+        {"id": "vision", "capabilities": ["vision"]}
+      ]
+    },
+    {
+      "id": "siliconflow", "name": "硅基流动", "baseUrl": "https://api.siliconflow.cn/v1",
+      "apiKeyEnv": "SILICONFLOW_API_KEY", "protocol": "openai", "supportsDiscover": true,
+      "tier": "domestic", "keyHint": "sk-",
+      "models": []
+    },
+    {
+      "id": "qwen", "name": "阿里通义千问", "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "apiKeyEnv": "DASHSCOPE_API_KEY", "protocol": "openai", "supportsDiscover": true,
+      "tier": "domestic", "keyHint": "sk-",
+      "models": [
+        {"id": "qwen-plus", "capabilities": ["fast", "chat"]},
+        {"id": "qwen-max", "capabilities": ["chat"]},
+        {"id": "qwen-vl-max", "capabilities": ["vision"]}
+      ]
+    },
+    {
+      "id": "kimi", "name": "月之暗面 Kimi", "baseUrl": "https://api.moonshot.cn/v1",
+      "apiKeyEnv": "MOONSHOT_API_KEY", "protocol": "openai", "supportsDiscover": true,
+      "tier": "domestic", "keyHint": "sk-",
+      "models": [
+        {"id": "moonshot-v1-8k", "capabilities": ["chat"]},
+        {"id": "moonshot-v1-32k", "capabilities": ["long_context", "chat"]}
+      ]
+    },
+    {
+      "id": "doubao", "name": "字节豆包", "baseUrl": "",
+      "apiKeyEnv": "VOLCENGINE_API_KEY", "protocol": "openai", "supportsDiscover": false,
+      "tier": "domestic", "requiresEndpoint": true, "keyHint": "volcengine endpoint",
+      "models": []
+    },
+    {
+      "id": "qianfan", "name": "百度千帆", "baseUrl": "https://qianfan.baidubce.com/v2",
+      "apiKeyEnv": "QIANFAN_API_KEY", "protocol": "openai", "supportsDiscover": true,
+      "tier": "domestic", "keyHint": "sk-",
+      "models": [
+        {"id": "ernie-4.0-turbo-8k", "capabilities": ["fast", "chat"]},
+        {"id": "ernie-4.0-8k", "capabilities": ["chat"]}
+      ]
+    },
+    {
+      "id": "hunyuan", "name": "腾讯混元", "baseUrl": "https://api.hunyuan.cloud.tencent.com/v1",
+      "apiKeyEnv": "HUNYUAN_API_KEY", "protocol": "openai", "supportsDiscover": true,
+      "tier": "domestic", "keyHint": "sk-",
+      "models": [
+        {"id": "hunyuan-turbos-latest", "capabilities": ["fast", "chat"]},
+        {"id": "hunyuan-2.0-thinking-250515", "capabilities": ["reasoning"]},
+        {"id": "hunyuan-2.0-instruct-250515", "capabilities": ["chat"]}
+      ]
+    },
+    {
+      "id": "openrouter", "name": "OpenRouter", "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKeyEnv": "OPENROUTER_API_KEY", "protocol": "openai", "supportsDiscover": true,
+      "tier": "international", "keyHint": "sk-or-",
+      "models": []
+    },
+    {
+      "id": "cherryin", "name": "CherryIN", "baseUrl": "https://api.cherryin.ai/v1",
+      "apiKeyEnv": "CHERRYIN_API_KEY", "protocol": "openai", "supportsDiscover": true,
+      "tier": "domestic", "keyHint": "sk-",
+      "models": []
+    },
+    {
+      "id": "aihubmix", "name": "AiHubMix", "baseUrl": "https://aihubmix.com/v1",
+      "apiKeyEnv": "AIHUBMIX_API_KEY", "protocol": "openai", "supportsDiscover": true,
+      "tier": "international", "keyHint": "sk-",
+      "models": []
+    },
+    {
+      "id": "dmxapi", "name": "DMXAPI", "baseUrl": "https://www.dmxapi.com/v1",
+      "apiKeyEnv": "DMXAPI_API_KEY", "protocol": "openai", "supportsDiscover": true,
+      "tier": "domestic", "keyHint": "sk-",
+      "models": []
+    },
+    {
+      "id": "custom", "name": "自定义", "baseUrl": "",
+      "apiKeyEnv": "CUSTOM_API_KEY", "protocol": "openai", "supportsDiscover": false,
+      "tier": "custom", "requiresEndpoint": true, "keyHint": "自托管/代理 baseUrl + key",
+      "models": []
+    }
+  ]
+}

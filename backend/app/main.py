@@ -143,8 +143,8 @@ async def healthz(_=Depends(require_gateway_key)):
         "status": "ok",
         "providers": {
             name: {
-                "base_url": conf["base_url"],
-                "key_configured": bool(__import__("os").getenv(conf["api_key_env"])),
+                "base_url": conf.base_url,
+                "key_configured": bool(__import__("os").getenv(conf.api_key_env)),
             }
             for name, conf in PROVIDERS.items()
         },
