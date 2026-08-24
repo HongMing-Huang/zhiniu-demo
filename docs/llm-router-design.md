@@ -189,9 +189,392 @@ GET /v1/models
 
 > 策略结论：**Web 打穿 = 40+25+25+6 ≈ 96 分的上限路径**，多端 4 分作为时间富余后的回补项，不阻塞主线。
 
+
+### 5.4 业务深度冲刺清单（W-B，借鉴 Cherry Studio 真实使用形态）
+
+> §5.1 是工程冲刺，本节是**业务深度冲刺**——把"日常会用"的体验补齐。
+
+| # | 任务 | 验收标准 | 评分映射 |
+|---|---|---|---|
+| W-B1 | **14 家预置服务商**集成到 providers.json | 配置生效，UI 列出全部 | 10% 真实 API |
+| W-B2 | **ModelSettingsPage** 服务商卡片 + 弹窗填 Key + 一键探活 | 浏览器端可演示填 Key → 看到模型列表 | 25% AI 场景 + 体验 |
+| W-B3 | **StockSearchPage** 实时搜索 + 联想 + 历史 | 输入 ticker/拼音/汉字联想可点 | 40% 功能 |
+| W-B4 | **NewsListPage / NewsDetailPage** 资讯流（7×24 + 个股） | 至少 2 种 tab + AI 摘要 | 40% 功能 |
+| W-B5 | **IndexListPage / IndexDetailPage** 指数完整闭环 | 主流指数列表 + 点击进详情 | 40% 功能 |
+| W-B6 | **SectorBoardPage** 申万行业板块 | 列表 + 涨跌幅排行 | 40% 功能 |
+| W-B7 | **ChatSessionListPage / ChatDetailPage** 会话管理 + 流式 | 多会话管理 + 流式渲染 | 25% AI |
+| W-B8 | **WatchlistPage / AlertSettingsPage** 自选 + 预警 | CRUD 完整 + 拖拽排序 | 40% 功能 |
+| W-B9 | **Function Calling 7 工具** 后端实现 + 工具调用可视化 | 聊天页能跑通"看茅台 PE" → 工具调 → 返回 | 25% AI 创新 |
+| W-B10 | **多空辩论 DebateViewPage**（PR-09 闭环） | 多/空轮播 + 分歧高亮 | 25% AI 创新 |
+| W-B11 | **AgentProgressOverlay** 全屏执行进度 | 4 Agent 逐个点亮 | 25% AI 体验 |
+| W-B12 | **Analytics 用量面板**（v1 轻量版） | 3 张卡 + 调用分布图 | 10% 体验 + 加分 |
+
+
 ---
 
-## 6. 参考来源（2026-08-24 实测）
+## 6. UI/UX 完整页面矩阵（17+ 页面，对齐评图「功能完整性 40%」）
+
+> 当前 Web 只有 4 页（Home / MarketList / StockDetail / ChatHome），离真实可用的股票 App 差距巨大。本节把"全功能 Web 端"所需的页面铺开，按 5 大类组织，每个页面给出最小可用规格。
+
+### 6.1 页面总览（5 大类，19 页）
+
+| 大类 | 页面 | 状态 | 主要职责 |
+|---|---|:---:|---|
+| **启动 / 导航** | SplashPage | 🆕 | 品牌闪屏 300ms → 进 Home |
+| | HomePage（Tab 容器） | ✅ 已有 | 承载底部 4 Tab 切换 |
+| | MainTabBar | 🆕 | 底部导航（行情 / 资讯 / AI / 我的） |
+| **行情** | MarketListPage | ✅ 已有 | 自选/全部/涨幅/跌幅 Tab + 个股行 |
+| | IndexListPage | 🆕 | 指数列表（上证/深证/创业板/北证 50/恒生/纳指/道指） |
+| | StockSearchPage | 🆕 | 顶部搜索 + 联想 + 历史 + 热门 |
+| | StockDetailPage | ✅ 已有 | OHLC + 五档 + K 线 + AI 诊股 |
+| | IndexDetailPage | 🆕 | 指数详情（复用 StockDetail 骨架，无五档） |
+| | SectorBoardPage | 🆕 | 申万一级/二级行业 + 涨跌幅排行 + 板块详情 |
+| **资讯 / 社区** | NewsListPage | 🆕 | 7×24 快讯流 / 个股新闻 / 大盘解读 |
+| | NewsDetailPage | 🆕 | 资讯正文 + 相关个股标签 + AI 摘要 |
+| **AI** | ChatHomePage | ✅ 已有 | 4 快捷指令 + 会话入口 + 模型入口 |
+| | ChatSessionListPage | 🆕 | 历史会话列表（侧栏 / 抽屉） |
+| | ChatDetailPage | 🆕 | 单会话流式 + 工具调用可视化 + 卡片 |
+| | ModelSettingsPage | ✅ §4 已设计 | 服务商列表 + Key 状态 + 模型管理 |
+| | DebateViewPage | 🆕 | 多空辩论气泡轮播（PR-09 闭环） |
+| | AgentProgressOverlay | 🆕 | AI 执行进度全屏遮罩（基本面→技术→舆情→风控） |
+| **自选 / 设置** | WatchlistPage | 🆕 | 自选股分组管理（默认 / 自建 / 拖拽排序） |
+| | AlertSettingsPage | 🆕 | 预警条件（价格突破 / 涨跌幅阈值 / 异动放量） |
+| | UserSettingsPage | 🆕 | 主题（深/浅/跟随系统）/ 字号 / 关于 / 免责声明 |
+
+> 增量 14 页（🆕），加上已有 5 页 = **总 19 页**。对照图 1（当前只有 MarketList 一页的简陋状态），需要补的量很清楚。
+
+### 6.2 关键页面规格（节选，避免文档膨胀）
+
+**StockSearchPage（搜索页）**
+
+- 数据：实时搜索（SSE 流式联想）+ 热搜词（10 个）+ 历史（本地存 10 条）
+- 交互：顶部输入框获焦 → 联想下拉浮层（每次按键触发防抖 300ms）→ 点击联想项 → 跳详情；底部"热门"标签云 + "最近搜索"列表
+- 状态：Idle（空）/ Typing（联想中 0.6s 超时）/ Success（联想结果）/ Empty（无匹配）
+
+**ModelSettingsPage（完整规格补充）**
+
+- 服务商区域（参考图 2 形态）：每家一行卡片，左侧 logo + 名称，右侧状态徽章（✅/⚠️/❌） + 「配置」按钮
+- 已配置项：展开后显示 Key 末四位 + 模型数 + 探活延迟
+- 未配置项：行变浅灰 + 「添加 Key」按钮 → 弹窗填 Key + 选服务地域（如有）
+- 顶部搜索框（参考图 2 的「搜索模型平台」）：按键过滤服务商
+- 底部「+ 添加服务商」 → 弹窗让用户填自定义 baseUrl（自托管/代理/第三方聚合）
+- Key 安全：Key 存后端 / 配置文件，**前端永不回传原始 Key**（只显示后四位）
+
+**ChatDetailPage（单会话流式页）**
+
+- 顶部：会话标题（点击可改名）+ 模型徽章（点击跳 ModelSettings 切换）
+- 中部：消息列表（用户右 / AI 左 / 工具调用灰色提示 / 结构化卡）
+- 底部：输入框（多行自适应）+ 发送按钮 + 停止按钮（流式中变红）
+- Agent 进度：流式时顶部出现 `AgentProgressOverlay`，逐个点亮「基本面 ✓ → 技术 ✓ → 舆情 ⟳ → 风控 ○」
+
+**DebateViewPage（多空辩论）**
+
+- 入口：StockDetail AI 诊股结果下「换个角度看」/ ChatDetail 提及「多空」时跳转
+- 布局：上半屏多空气泡轮播（左右切换卡片）+ 下半屏分歧点高亮清单
+- 交互：卡片左右滑切多/空 + 顶部 Tab 切换 2 轮辩论 + 「总结」按钮 → 收束为中立结论卡
+
+**AlertSettingsPage（预警）**
+
+- 数据：当前自选股 + 各股已设预警条数（角标）
+- 交互：单股 → 「添加预警」 → 弹窗：条件类型（价格突破 / 涨跌幅阈值 / 异动放量 / 财报日历）+ 阈值输入 + 推送渠道（Web 通知 / 邮件占位）
+- 状态：列表已存预警 / 「+ 新建」入口
+
+### 6.3 页面间跳转关系（部分）
+
+```
+HomePage (Tab Bar)
+├── 行情 Tab → MarketListPage → StockDetailPage / IndexListPage → IndexDetailPage
+│                                ↘ SearchPage (搜索)
+│                                ↘ SectorBoardPage
+├── 资讯 Tab → NewsListPage → NewsDetailPage
+├── AI Tab → ChatHomePage → ChatSessionListPage → ChatDetailPage
+│                              ↘ ModelSettingsPage
+│                              ↘ DebateViewPage (从 ChatDetail / StockDetail 进入)
+└── 我的 Tab → WatchlistPage / AlertSettingsPage / UserSettingsPage
+```
+
+---
+
+## 7. 服务商集成设计（参考图 2，14 家预置 + 1 个自定义）
+
+> 用户明确要求"日常会用的服务商即可，只需填 Key 就能用"。**不要逐个模型配 capability**——选服务商 → 填 Key → 自动拉取该平台所有模型，能力按模型名启发式判断。
+
+### 7.1 预置服务商清单（14 家 + 自定义）
+
+| 名称 | 协议 | 站点 | baseUrl | 备注 |
+|---|---|---|---|---|
+| **OpenAI** | OpenAI | openai.com | `https://api.openai.com/v1` | 国际最主流 |
+| **Azure OpenAI** | OpenAI | azure.com | 用户填 | 企业部署 |
+| **DeepSeek** | OpenAI | deepseek.com | `https://api.deepseek.com` | 国产首选，价格低 |
+| **智谱 GLM** | OpenAI | bigmodel.cn | `https://open.bigmodel.cn/api/paas/v4` | 国产 + 工具调用强 |
+| **硅基流动** | OpenAI | siliconflow.cn | `https://api.siliconflow.cn/v1` | 多模型聚合 + 限时免费 |
+| **阿里通义千问** | OpenAI（DashScope 兼容层） | dashscope.aliyuncs.com | `https://dashscope.aliyuncs.com/compatible-mode/v1` | 国产大厂 |
+| **月之暗面 Kimi** | OpenAI（Moonshot 兼容） | moonshot.cn | `https://api.moonshot.cn/v1` | 长上下文 |
+| **字节豆包** | OpenAI（火山引擎） | volcengine.com | 用户填（地域相关） | 国产大厂 |
+| **百度千帆** | OpenAI（千帆兼容） | qianfan.baidubce.com | `https://qianfan.baidubce.com/v2` | 国产大厂 |
+| **腾讯混元** | OpenAI | hunyuan.cloud.tencent.com | `https://api.hunyuan.cloud.tencent.com/v1` | 知牛框架同源 |
+| **OpenRouter** | OpenAI | openrouter.ai | `https://openrouter.ai/api/v1` | 全球模型聚合 |
+| **CherryIN** | OpenAI | cherryin.ai | `https://api.cherryin.ai/v1` | 国内聚合 |
+| **AiHubMix** | OpenAI | aihubmix.com | `https://aihubmix.com/v1` | 国内聚合 |
+| **DMXAPI** | OpenAI | dmxapi.com | `https://www.dmxapi.com/v1` | 国内聚合 |
+| **+ 自定义** | OpenAI | — | 用户填 | 自托管 / 代理 / 第三方 |
+
+> 选型标准：**OpenAI 协议覆盖 14/15**（极个别需兼容层），意味着网关代码无需为某家定制——和现有 config.py 的"三厂商 OpenAI 兼容"判断完全一致。
+
+### 7.2 服务商配置文件（providers.json 扩展）
+
+```json
+{
+  "providers": [
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "logo": "🟢",
+      "baseUrl": "https://api.openai.com/v1",
+      "apiKeyEnv": "OPENAI_API_KEY",
+      "protocol": "openai",
+      "supportsDiscover": true,
+      "keyHint": "以 sk- 开头",
+      "tier": "international"
+    },
+    {
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "logo": "🐋",
+      "baseUrl": "https://api.deepseek.com",
+      "apiKeyEnv": "DEEPSEEK_API_KEY",
+      "protocol": "openai",
+      "supportsDiscover": true,
+      "keyHint": "以 sk- 开头",
+      "tier": "domestic"
+    },
+    {
+      "id": "azure",
+      "name": "Azure OpenAI",
+      "logo": "☁️",
+      "baseUrl": null,
+      "apiKeyEnv": "AZURE_OPENAI_API_KEY",
+      "protocol": "openai",
+      "supportsDiscover": false,
+      "keyHint": "需同时配置 AZURE_OPENAI_ENDPOINT",
+      "tier": "international",
+      "requiresEndpoint": true
+    }
+  ]
+}
+```
+
+### 7.3 用户体验路径（极简）
+
+```
+1. 首次进入 ModelSettingsPage
+   → 看到 14 家服务商列表（参考图 2 形态）
+   → 状态徽章全部 ⚠️ 未配置
+
+2. 点击某家「配置」
+   → 弹窗：仅 1 个输入框（Key）+ 1 个"使用代理"开关
+   → 提交 → 后端校验（curl /models 一次）→ 成功显示该家模型数
+
+3. 自动刷新该家模型列表
+   → 后端调 GET {baseUrl}/models → 聚合到 /v1/models 响应
+   → 前端看到"已配置 12 个模型"展开列表
+
+4. 回到聊天页
+   → 模型下拉新增该家所有模型（按 tier 分组）
+   → 选一个 → 立即可用
+
+总时间：1 分钟内可完成"选服务商 → 填 Key → 获得所有模型"全流程。
+```
+
+### 7.4 模型能力自动启发式（不需手工配）
+
+| 模型名模式 | 自动打 capability 标签 |
+|---|---|
+| `*-reasoner` / `*-thinking` / `o1*` / `o3*` / `deepseek-r1*` | `reasoning` |
+| `*-vision` / `*-vl` / `glm-4v*` / `gpt-4o*` | `vision` |
+| `*-mini` / `*-flash` / `*-lite` / `glm-4-flash` | `fast` |
+| `*32k*` / `*128k*` / `*-long*` / `*200k*` | `long_context` |
+| 其余 | `chat`（默认） |
+
+> 启发式匹配不准确时仍可后端手修 `models.json` 覆盖；与自动发现共存。
+
+---
+
+## 8. Function Calling 多工具设计
+
+> 评图 AI 场景 25% 的核心武器——"AI 能力贴合股票业务"（买卖/趋势/风险/信号/问答/图表联动）由 7 个工具承载。
+
+### 8.1 工具清单（7 个）
+
+| # | 工具名 | 用途 | 数据源 | 触发场景 |
+|---|---|---|---|---|
+| 1 | `get_realtime_quote` | 单股实时报价 + 五档 | 新浪 | "现在茅台多少钱" |
+| 2 | `get_kline` | K 线数据 | 新浪 / Tushare | "看看近 60 日走势" |
+| 3 | `get_financials` | 财务 + 估值 | Tushare | "茅台的 PE / ROE" |
+| 4 | `search_news` | 个股新闻 / 舆情 | 财经新闻聚合 | "宁德最近有什么消息" |
+| 5 | `screen_stocks` | 条件选股 | 新浪 + Tushare | "市值 500 亿以上的科技股" |
+| 6 | `compare_stocks` | 多股对比 | 新浪 | "茅台 vs 五粮液" |
+| 7 | `create_alert` | 创建预警 | 本地 SQLDelight | "茅台跌破 1300 提醒我" |
+
+### 8.2 工具 JSON Schema（示范 2 个，完整 7 个见附录）
+
+```json
+{
+  "tools": [
+    {
+      "name": "get_realtime_quote",
+      "description": "获取股票 / 指数的实时报价与五档盘口；返回最新价 / 涨跌幅 / 最高最低 / 成交量 / 买一卖一",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ticker": { "type": "string", "description": "股票代码，如 sh600519 / sz000001" }
+        },
+        "required": ["ticker"]
+      }
+    },
+    {
+      "name": "screen_stocks",
+      "description": "按条件筛选股票列表（行业 / 市值 / 涨跌幅 / 估值），返回排序后的标的列表",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "industry":    { "type": "string", "description": "申万行业名，如 '白酒' / '半导体'" },
+          "marketCapMin":{ "type": "number", "description": "最小市值（亿元）" },
+          "marketCapMax":{ "type": "number", "description": "最大市值（亿元）" },
+          "changePctMin":{ "type": "number", "description": "涨跌幅下限（%）" },
+          "changePctMax":{ "type": "number", "description": "涨跌幅上限（%）" },
+          "peMax":       { "type": "number", "description": "PE 上限" },
+          "limit":       { "type": "integer","description": "返回数量上限，默认 20" }
+        }
+      }
+    }
+  ],
+  "tool_choice": "auto"
+}
+```
+
+### 8.3 后端 UseCase 编排
+
+```python
+# gateway.py 简化的工具调用循环
+async def chat_with_tools(req):
+    messages = req["messages"]
+    for round in range(MAX_TOOL_ROUNDS):  # 防无限循环
+        resp = await openai_chat(messages, tools=TOOL_SCHEMAS)
+        if resp.finish_reason != "tool_calls":
+            return stream(resp)
+        for tc in resp.tool_calls:
+            result = await TOOL_DISPATCH[tc.name](**tc.args)
+            messages.append(tool_result(tc.id, result))
+        # 下一轮把工具结果回灌，模型继续推理
+    return final_answer(messages)
+```
+
+**关键约束**：
+- `MAX_TOOL_ROUNDS = 5`（防 LLM 幻觉死循环）
+- 工具调用串行（避免成本爆炸）
+- 工具失败 → 错误回灌模型，让模型决定改问还是兜底回答
+
+### 8.4 前端可视化（ChatDetailPage）
+
+- 流式时工具调用显示为灰色提示卡「🔧 正在调用 get_realtime_quote...」
+- 完成后变绿「✓ 行情已抓取（茅台 ¥1292.83 +0.11%）」
+- 用户可点击展开看原始返回
+- Agent 进度条同步点亮（基本面 ✓ → 技术 ✓ → 舆情 ✓ → 风控 ✓）
+
+---
+
+## 9. 后端 API 完整列表（v2 扩展）
+
+> 现有 5 个路由（chat/completions、/v1/models、/healthz、quote/realtime、quote/kline）远远不够；按页面矩阵和工具集反推，需要扩展到 18 个。
+
+### 9.1 网关端（OpenAI 兼容，4 个）
+
+| 方法 | 路径 | 用途 |
+|---|---|---|
+| POST | `/v1/chat/completions` | 聊天（流式 + 工具调用） |
+| GET | `/v1/models` | 模型目录（聚合 + capability + available） |
+| POST | `/v1/embeddings` | （预留）文本向量化 |
+| GET | `/v1/usage` | 用量统计（按模型 / 按天） |
+
+### 9.2 行情端（5 个）
+
+| 方法 | 路径 | 用途 | 数据源 |
+|---|---|---|---|
+| GET | `/quote/realtime` | 单股实时报价 | 新浪 + 五档 |
+| GET | `/quote/kline` | K 线（日/周/月/分钟） | 新浪 / Tushare |
+| GET | `/quote/indices` | 主要指数列表 | 新浪 |
+| GET | `/quote/sectors` | 申万行业板块 | 新浪 / Tushare |
+| GET | `/quote/screener` | 条件选股 | 新浪 + Tushare |
+
+### 9.3 资讯端（2 个）
+
+| 方法 | 路径 | 用途 |
+|---|---|---|
+| GET | `/news/list` | 7×24 快讯 / 个股新闻 |
+| GET | `/news/detail` | 资讯正文 |
+
+### 9.4 管理端（受 GATEWAY_API_KEY 保护，3 个）
+
+| 方法 | 路径 | 用途 |
+|---|---|---|
+| POST | `/admin/refresh-models` | 触发模型自动发现 |
+| GET | `/admin/providers` | 列出所有服务商（含 Key 是否配置） |
+| POST | `/admin/probe/{provider_id}` | 单家探活 |
+
+### 9.5 分析端（1 个）
+
+| 方法 | 路径 | 用途 |
+|---|---|---|
+| GET | `/analytics/usage` | 用量 / 延迟 / 命中率 / 成本 |
+
+> 总计 **15+ 路由**（v2 计划），覆盖页面矩阵所有数据需求 + 工具调用 + 运营分析。
+
+---
+
+## 10. 数据分析维度（运营面板）
+
+> 给评委与运营方一个「真实在跑」的体感——不是 Demo 一次性产物，而是有数据飞轮的平台。
+
+### 10.1 用量统计（每小时聚合）
+
+| 维度 | 字段 | 用途 |
+|---|---|---|
+| **按模型** | model_id / provider / request_count / prompt_tokens / completion_tokens / cost_usd | "deepseek-chat 这个月用了多少" |
+| **按用户** | user_id / device_id / first_seen / last_seen / total_request | 简化（Demo 阶段按设备维度） |
+| **按时段** | hour_bucket / request_count / avg_latency | 流量监控 |
+
+### 10.2 性能监控
+
+- **P50 / P95 延迟**（按模型分桶）
+- **首 token 延迟**（流式场景）
+- **总时长**（含工具调用）
+
+### 10.3 模型可用性
+
+- **命中率** = 成功请求 / 总请求
+- **降级率** = 触发降级的请求 / 总请求
+- **空 Key 率** = 无 Key 走 Mock 的请求 / 总请求
+- **ProviderError 分布**（5 类 reason 计数）
+
+### 10.4 成本估算
+
+- 按 token 数 × 单价（providers.json 可声明 input/output $/M tokens）
+- 国产模型按 ¥ 换算
+- 预算告警（Demo 阶段不实现）
+
+### 10.5 可视化（Web 端，ModelSettingsPage 「用量」Tab）
+
+- 三张卡：今日调用 / 本月成本 / 平均延迟
+- 折线图：近 7 天调用量
+- 饼图：模型调用分布
+- 排行榜：Top 5 模型 / Top 5 工具
+
+> Demo 阶段做轻量版（in-memory + 定期 dump），不接 BI。
+
+---
+
+## 11. 参考来源（2026-08-24 实测）
 
 1. CherryHQ/cherry-studio — https://github.com/CherryHQ/cherry-studio （PR #19006 端点解析链、#18745 静默过滤、#17661 FTS 泄漏、packages/provider-registry 架构、sync-registry-data.yml CI 分发）
 2. 知牛现有网关实现 — `backend/app/config.py` / `gateway.py` / `quote.py`（提交 df04a8b、8b71e1d）
