@@ -27,7 +27,7 @@ from .config import (
 )
 from .discovery import merged_models_for_provider, refresh_models
 from .gateway import gateway
-from .quote import quote_realtime, quote_kline
+from .quote import quote_indices, quote_kline, quote_realtime, quote_screener, quote_sectors
 
 load_dotenv(override=True)
 
@@ -240,3 +240,21 @@ async def proxy_quote_kline(
 ):
     """K 线代理：GET /quote/kline?symbol=sh600519&scale=240&datalen=120"""
     return await quote_kline(symbol, scale=scale, datalen=datalen)
+
+
+@app.get("/quote/indices", dependencies=[Depends(require_gateway_key)])
+async def proxy_quote_indices():
+    """A4：主流指数列表。GET /quote/indices"""
+    return await quote_indices()
+
+
+@app.get("/quote/sectors", dependencies=[Depends(require_gateway_key)])
+async def proxy_quote_sectors():
+    """A4：申万板块涨跌排行。GET /quote/sectors"""
+    return await quote_sectors()
+
+
+@app.get("/quote/screener", dependencies=[Depends(require_gateway_key)])
+async def proxy_quote_screener(industry: str = "", min_pct: float = 0.0):
+    """A4：条件选股。GET /quote/screener?industry=&min_pct="""
+    return await quote_screener(industry=industry, min_pct=min_pct)

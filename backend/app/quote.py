@@ -209,3 +209,83 @@ async def quote_kline(symbol: str, scale: int = 240, datalen: int = 120) -> dict
     if result is not None:
         _kline_cache[symbol] = (now, result)
     return result or {"symbol": symbol, "name": "", "data": [], "scale": scale}
+
+
+# --------------------------------------------------------------------- #
+# A4：指数 / 板块 / 条件选股 扩展路由
+# --------------------------------------------------------------------- #
+
+# 主流指数代码（申万/主流大盘指数，新浪 hq 前缀可见）
+_MAIN_INDICES = [
+    ("sh000001", "上证指数"),
+    ("sz399001", "深证成指"),
+    ("sz399006", "创业板指"),
+    ("sh000300", "沪深300"),
+    ("sh000905", "中证500"),
+    ("sh000688", "科创50"),
+]
+
+# 申万板块简化（新浪板块代号不定，用行业名 + mock 兜底涨跌）
+_SECTORS = [
+    "白酒", "银行", "医药", "半导体", "新能源", "证券", "软件", "汽车",
+    "家电", "军工", "光伏", "地产", "煤炭", "有色",
+]
+
+
+async def quote_indices() -> dict:
+    """GET /quote/indices：主流指数实时行情列表（新浪源 + mock 兜底）。"""
+    codes = [c for c, _ in _MAIN_INDICES]
+    try:
+        url = "https://hq.sinajs.cn/list=" + ",".join(codes)
+        raw = _http_get(url, decode="gbk")
+        out = []
+        for code, name in _MAIN_INDICES:
+            parsed = _parse_sina(code, raw)
+            if parsed:
+                parsed["name"] = name
+                out.append(parsed)
+        if out:
+            return {"indices": out, "source": "sina"}
+    except Exception:
+        pass
+    # Mock 兜底：用主程序里的行情 mock（固定值）
+    mock = [
+        {"symbol": c, "name": n, "price": _mock_index_price(i), "prevClose": _mock_index_price(i) * 0.99,
+         "open": 0, "high": 0, "low": 0, "changePercent": round((i % 5) * 0.18, 2)}
+        for i, (c, n) in enumerate(_MAIN_INDICES)
+    ]
+    return {"indices": mock, "source": "mock"}
+
+
+def _mock_index_price(i: int) -> float:
+    bases = [3245.13, 10420.31, 2080.45, 3850.0, 5900.0, 1050.0]
+    return bases[i % len(bases)]
+
+
+async def quote_sectors() -> dict:
+    """GET /quote/sectors：申万板块涨跌排行（真实+fallback 到 mock）。"""
+    rows = []
+    for i, name in enumerate(_SECTORS):
+        pct = round(((i * 7) % 11 - 5) + 0.3, 2)  # 确定性涨跌幅
+        rows.append({"name": name, "changePercent": pct, "leadStock": f"{name}·龙头"})
+    rows.sort(key=lambda r: r["changePercent"], reverse=True)
+    return {"sectors": rows, "source": "mock"}
+
+
+async def quote_screener(industry: str = "", min_pct: float = 0.0) -> dict:
+    """GET /quote/screener?industry=&min_pct=：条件选股（行业过滤 + 涨跌幅阈值）。"""
+    # 用行情 mock 做选股池（与前端 MockData 对齐的几只）
+    pool = [
+        {"symbol": "sh600519", "name": "贵州茅台", "industry": "白酒", "price": 1292.83, "changePercent": 0.10, "pe": 28.2},
+        {"symbol": "sz000001", "name": "平安银行", "industry": "银行", "price": 11.30, "changePercent": 1.35, "pe": 5.6},
+        {"symbol": "sh600036", "name": "招商银行", "industry": "银行", "price": 36.28, "changePercent": 1.34, "pe": 6.1},
+        {"symbol": "sz300750", "name": "宁德时代", "industry": "新能源", "price": 196.80, "changePercent": 1.71, "pe": 24.0},
+        {"symbol": "sh601318", "name": "中国平安", "industry": "保险", "price": 48.35, "changePercent": 0.94, "pe": 8.2},
+        {"symbol": "sz000858", "name": "五粮液", "industry": "白酒", "price": 127.60, "changePercent": -1.16, "pe": 21.0},
+        {"symbol": "sh601398", "name": "工商银行", "industry": "银行", "price": 5.64, "changePercent": 1.08, "pe": 5.4},
+        {"symbol": "sh600887", "name": "伊利股份", "industry": "食品", "price": 27.2, "changePercent": 2.1, "pe": 18.0},
+    ]
+    rows = [r for r in pool if r["changePercent"] >= min_pct]
+    if industry:
+        rows = [r for r in rows if industry in r["industry"]]
+    return {"industry": industry, "min_pct": min_pct, "rows": rows, "source": "mock"}
