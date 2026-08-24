@@ -17,6 +17,26 @@
 
 ---
 
+## ✅ Web 前端进度（dev-prompt.md 阶段B：B1-B6/B8/B9 完成，2026-08-24）
+
+| # | 任务 | 状态 | commit | 验收证据 |
+|---|---|:---:|---|---|
+| B1 | Tokens.kt 浅色基准 + MarketList Token 皮肤 | ✅ | `943bb97` | Light Token 全命中；茅台涨红 D93025/五粮液跌绿 1E8E3E |
+| B2 | ModelSettingsPage（14家服务商+响应式Tab） | ✅ | `6275cfa` | 模型15行↔用量3行互斥切换生效 |
+| B3 | 聊天页接真实后端 LLM（Ktor JS + SSE） | ✅ | `0e60bb0` | 点「看大盘」→POST localhost:8000 200 + SSE 流式上屏 |
+| B4 | StockDetail Canvas K 线蜡烛（红涨绿跌） | ✅ | `0487526` | 1848×200 画布有像素、红阳线可见 |
+| B5a | StockSearchPage（搜索联想+热门+跳详情） | ✅ | `c1c49ae` | 联想随关键词变、结果跳详情 |
+| B5b | IndexBoardPage（指数·板块双Tab） | ✅ | `7103c58` | 双Tab切换、红涨绿跌、修 toString 残留 |
+| B6 | NewsListPage（快讯/个股双Tab） | ✅ | `f99140b` | 快讯7+个股4条、时间+标签+标题 |
+| B8 | DebateViewPage（多空辩论+分歧点+总结） | ✅ | `892a098` | 多空切换、分歧3条、总结卡 |
+| B9 | 一键启动脚本 scripts/dev.sh | ✅ | `2cf30a8` | 三服务全 200 |
+
+**全页面回归（8/8）**：MarketList/StockDetail/ChatHome/ModelSettings/StockSearch/IndexBoard/NewsList/DebateView 全部渲染，console 仅 favicon 404 无害。
+
+**待办（可后续）**：B7 会话列表/详情页、六态深度验证（断网/空/错）、≤90s 录屏。
+
+---
+
 ## 🎯 最新指令（2026-08-24 用户决策，覆盖下方部分待定项）
 
 1. **Web 端优先**：iOS / Android / 鸿蒙 / macOS 全部暂停（编译产物保留），全部精力聚焦 Web(H5) 打穿。冲刺清单见 `docs/llm-router-design.md` §5（W-A1~A8）。
