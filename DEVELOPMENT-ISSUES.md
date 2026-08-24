@@ -2,6 +2,21 @@
 > 更新：2026-08-24
 ---
 
+## ✅ 后端升级进度（dev-prompt.md 阶段A：A1→A6 全部完成，2026-08-24）
+
+| # | 任务 | 状态 | commit | 验收证据 |
+|---|---|:---:|---|---|
+| A1 | providers.json 声明式配置（14家+custom+routes） | ✅ | `7a0f94a` | 单测 13 项绿；/healthz 15 厂商 base_url 正确 |
+| A2 | 模型自动发现（/admin/refresh-models + /v1/models 能力目录） | ✅ | `55eacd8` | 单测 16 项；/v1/models 含 models_detail；无 Key admin 返回 400 |
+| A3 | Function Calling 7 工具编排（5轮+回灌+SSE） | ✅ | `0124fa0` | 单测 26 项；带工具聊天无 Key Mock 兜底 delta+assistant+[DONE] |
+| A4 | 行情路由扩展（indices/sectors/screener） | ✅ | `84a581d` | 单测 32 项；indices 真实新浪、screener 银行过滤正确 |
+| A5 | 资讯端点（/news/list + /news/detail） | ✅ | `5662cc2` | curl：keyword=茅台→2条；detail n3 正文 |
+| A6 | 用量统计（/analytics/usage） | ✅ | `5662cc2` | 2次聊天按模型聚合 request_count/P50·P95/degraded_rate |
+
+**后端阶段 A 全部落地**：真实端点可用（新浪行情 / 三家 LLM 兼容），缺 Key 时全链路 Mock 兜底不白屏。前端（阶段B）可消费：/quote/*（行情）、/news（资讯）、/v1/models+refresh（模型设置页）、/analytics/usage（用量 Tab）。
+
+---
+
 ## 🎯 最新指令（2026-08-24 用户决策，覆盖下方部分待定项）
 
 1. **Web 端优先**：iOS / Android / 鸿蒙 / macOS 全部暂停（编译产物保留），全部精力聚焦 Web(H5) 打穿。冲刺清单见 `docs/llm-router-design.md` §5（W-A1~A8）。
