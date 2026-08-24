@@ -13,11 +13,11 @@ from typing import AsyncIterator, Dict, List, Optional
 from openai import AsyncOpenAI
 
 from .config import (
-    PROVIDERS,
     ProviderError,
     ProviderResolved,
     resolve_candidates,
 )
+from .tools import execute_tool, get_tools_schema
 
 
 class LLMGateway:
@@ -210,6 +210,145 @@ class LLMGateway:
             status = getattr(getattr(e, "status_code", None), "value", None)
             reason = ProviderError.reason_from_status(status)
             raise ProviderError(reason, message=None) from e
+
+    # ------------------------------------------------------------------ #
+    # A3: Function Calling 工具编排（多轮 tool_calls → 执行 → 回灌 → 再请求）
+    # ------------------------------------------------------------------ #
+
+    async def chat_completions_orchestrated(
+        self,
+        model: str,
+        messages: list,
+        *,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        response_format: Optional[dict] = None,
+        extra_body: Optional[dict] = None,
+        max_rounds: int = 5,
+    ) -> AsyncIterator[dict]:
+        """带 Function Calling 的多轮工具编排，产出统一 SSE 事件流。
+
+        每轮：
+          1. 请求模型（非流式），附带 tools schema
+          2. 若响应含 tool_calls → 发 agent_progress 进度帧，执行工具，回灌 role:tool，继续
+          3. 直到 finish_reason != "tool_calls" 或达 MAX_TOOL_ROUNDS
+
+        产出帧：
+          - {"type":"progress","step":N,"label":工具名}   (agent_progress)
+          - {"type":"delta","content":最终答复}           (最终内容)
+          - {"role":"assistant",...}完整块（非流式对外兼容）
+        工具执行不依赖上游，纯本地，缺 Key 也可演示编排。
+        """
+        tools = get_tools_schema()
+        history: List[dict] = [dict(m) for m in messages]
+
+        for round_index in range(1, max_rounds + 1):
+            final = await self._call_once(
+                model, history,
+                tools=tools, temperature=temperature, max_tokens=max_tokens,
+                response_format=response_format, extra_body=extra_body,
+            )
+            if final is None:
+                # 全候选失败 / 无 Key → 走 Mock 兜底单次答复
+                user = next((m["content"] for m in reversed(history) if m.get("role") == "user"), "")
+                content = (
+                    "【本地 Mock LLM · 离线兜底】\n"
+                    f"> 触发原因：所有候选厂商均未配置 API Key。\n\n"
+                    f"针对「{user[:40] or '（无输入）'}」的演示答复。"
+                )
+                yield {"type": "delta", "content": content}
+                yield {"role": "assistant", "content": content, "finish_reason": "stop"}
+                return
+
+            # 检查是否需要调工具
+            tool_calls = final.get("tool_calls")
+            finish_reason = final.get("finish_reason")
+            if not tool_calls or finish_reason == "stop":
+                # 最终答复
+                content = final.get("content") or ""
+                yield {"type": "delta", "content": content}
+                if content:
+                    yield {"role": "assistant", "content": content, "finish_reason": "stop"}
+                return
+
+            # 执行本轮所有工具：助理 tool_calls 消息 + 每工具 role:tool 结果回灌
+            history.append({"role": "assistant", "content": final.get("content") or None, "tool_calls": tool_calls})
+            for tc in tool_calls:
+                fn = tc.get("function", {})
+                name = fn.get("name", "")
+                try:
+                    args = json.loads((fn.get("arguments") or "{}".encode()).decode() if isinstance(fn.get("arguments"), bytes) else (fn.get("arguments") or "{}"))
+                except Exception:
+                    args = {}
+                used_tool_names.append(name)
+                result = execute_tool(name, args)
+                yield {"type": "progress", "step": round_index, "label": name, "tool_call_id": tc.get("id")}
+                history.append({
+                    "role": "tool",
+                    "tool_call_id": tc.get("id"),
+                    "name": name,
+                    "content": json.dumps(result, ensure_ascii=False),
+                })
+
+            if round_index >= max_rounds:
+                # 达上限收敛
+                yield {"type": "delta", "content": "（已达工具轮数上限，结束）"}
+                yield {"role": "assistant", "content": "已达工具调用上限，请简化问题重试。", "finish_reason": "stop"}
+                return
+
+    async def _call_once(
+        self,
+        model: str,
+        messages: list,
+        *,
+        tools: Optional[list] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        response_format: Optional[dict] = None,
+        extra_body: Optional[dict] = None,
+    ) -> Optional[dict]:
+        """单次非流式请求首选候选；全失败/无 Key 返回 None（交给上层 Mock 兜底）。"""
+        candidates = resolve_candidates(model)
+        used_any_key = False
+        for cand in candidates:
+            if not cand.api_key:
+                continue
+            used_any_key = True
+            try:
+                client = AsyncOpenAI(base_url=cand.base_url, api_key=cand.api_key)
+                payload = dict(model=cand.model, messages=messages, stream=False)
+                if tools:
+                    payload["tools"] = tools
+                    payload["tool_choice"] = "auto"
+                if temperature is not None:
+                    payload["temperature"] = temperature
+                if max_tokens:
+                    payload["max_tokens"] = max_tokens
+                if response_format:
+                    payload["response_format"] = response_format
+                extra = dict(cand.extra_body)
+                if extra_body:
+                    extra.update(extra_body)
+                resp = await client.chat.completions.create(**payload, extra_body=extra or None)
+                msg = resp.choices[0].message
+                out = {"model": cand.model, "provider": cand.provider}
+                if getattr(resp.choices[0], "finish_reason", None):
+                    out["finish_reason"] = str(resp.choices[0].finish_reason)
+                if getattr(msg, "content", None):
+                    out["content"] = msg.content
+                if getattr(msg, "tool_calls", None):
+                    out["tool_calls"] = [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                        }
+                        for tc in (msg.tool_calls or [])
+                    ]
+                return out
+            except Exception:
+                continue
+        return None
 
 
 gateway = LLMGateway()

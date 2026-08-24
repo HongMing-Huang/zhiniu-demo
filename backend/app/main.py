@@ -117,9 +117,47 @@ async def chat_completions(
         )
 
     async def event_stream():
+        payload = _build_payload()
         try:
-            async for chunk in gateway.chat_completions(**_build_payload()):
-                yield _sse(chunk)
+            if payload.get("tools"):
+                # A3：带工具 → 走 Function Calling 编排（内部多轮，对外发 progress/delta 帧）
+                async for frame in gateway.chat_completions_orchestrated(
+                    model=payload.get("model"),
+                    messages=payload.get("messages", []),
+                    temperature=payload.get("temperature"),
+                    max_tokens=payload.get("max_tokens"),
+                    response_format=payload.get("response_format"),
+                    extra_body=payload.get("extra_body"),
+                ):
+                    ftype = frame.get("type")
+                    if ftype == "progress":
+                        # 工具调用进度 → SSE event:agent_progress 帧
+                        yield _sse(
+                            {"step": frame.get("step"), "label": frame.get("label"), "tool_call_id": frame.get("tool_call_id")},
+                            event="agent_progress",
+                        )
+                    elif ftype == "delta":
+                        yield _sse(
+                            {
+                                "id": "orchestrated",
+                                "object": "chat.completion.chunk",
+                                "model": payload.get("model"),
+                                "choices": [{"index": 0, "delta": {"content": frame.get("content")}, "finish_reason": None}],
+                            }
+                        )
+                    else:
+                        # 最终 assistant 完整块
+                        yield _sse(
+                            {
+                                "id": "orchestrated",
+                                "object": "chat.completion",
+                                "model": payload.get("model"),
+                                "choices": [{"index": 0, "message": {"role": "assistant", "content": frame.get("content")}, "finish_reason": frame.get("finish_reason", "stop")}],
+                            }
+                        )
+            else:
+                async for chunk in gateway.chat_completions(**payload):
+                    yield _sse(chunk)
             yield _sse_done()
         except ProviderError as e:
             err = {
