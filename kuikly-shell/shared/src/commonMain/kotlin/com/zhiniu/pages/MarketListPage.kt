@@ -10,6 +10,7 @@ import com.tencent.kuikly.core.views.List
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
 import com.zhiniu.base.BasePager
+import com.zhiniu.base.openZhiniuPage
 import com.zhiniu.data.mock.MockDataSource
 import com.zhiniu.domain.model.Quote
 import kotlin.math.roundToInt
@@ -21,9 +22,7 @@ private enum class MarketMode(val label: String) {
 
 /** 行情列表页：指数条 + 分类 Tab + 股票行列表（Kuikly 官方 core DSL）。 */
 @Page("MarketList", supportInLocal = true)
-internal class MarketListPage(
-    private val navigator: (String, Map<String, String>) -> Unit = { _, _ -> },
-) : BasePager() {
+internal class MarketListPage : BasePager() {
 
     private var mode by observable(MarketMode.ALL)
 
@@ -76,7 +75,7 @@ internal class MarketListPage(
                         Text { attr { marginLeft(6f); text(ctx.pct(q)); color(ctx.priceColor(q)) } }
                     }
                     // 行点击 → 详情
-                    event { click { ctx.navigator("StockDetail", mapOf("symbol" to q.symbol, "name" to q.name)) } }
+                    event { click { ctx.openZhiniuPage("StockDetail", mapOf("symbol" to q.symbol, "name" to q.name)) } }
                 }
             }
         }
