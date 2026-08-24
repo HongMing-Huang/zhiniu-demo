@@ -29,11 +29,14 @@
 | B5b | IndexBoardPage（指数·板块双Tab） | ✅ | `7103c58` | 双Tab切换、红涨绿跌、修 toString 残留 |
 | B6 | NewsListPage（快讯/个股双Tab） | ✅ | `f99140b` | 快讯7+个股4条、时间+标签+标题 |
 | B8 | DebateViewPage（多空辩论+分歧点+总结） | ✅ | `892a098` | 多空切换、分歧3条、总结卡 |
+| B7 | ChatSessionListPage（会话列表+新建入口） | ✅ | `9a929a8` | 4 条会话+新建入口渲染正常 |
 | B9 | 一键启动脚本 scripts/dev.sh | ✅ | `2cf30a8` | 三服务全 200 |
 
-**全页面回归（8/8）**：MarketList/StockDetail/ChatHome/ModelSettings/StockSearch/IndexBoard/NewsList/DebateView 全部渲染，console 仅 favicon 404 无害。
+**全页面回归（9/9）**：MarketList/StockDetail/ChatHome/ModelSettings/StockSearch/IndexBoard/NewsList/DebateView/ChatSessionList 全部渲染，console 仅 favicon 404 无害。
 
-**待办（可后续）**：B7 会话列表/详情页、六态深度验证（断网/空/错）、≤90s 录屏。
+**阶段 B 全部完成（B1-B9）**：9 个可运行页面 + 真实后端 LLM 链路 + Canvas K 线 + Light Token + 一键启动脚本。
+
+**待办（可后续）**：六态深度验证（断网/空/错逐页）、≤90s 演示录屏。
 
 ---
 
