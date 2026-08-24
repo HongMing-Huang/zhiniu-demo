@@ -28,7 +28,6 @@ internal class StockDetailPage : BasePager() {
     private val mock = MockDataSource()
 
     // vforLazy 数据源必须是 ObservableList，故用 val 持有普通列表 + 转换
-    private val depthRows = buildDepthRows()
     private val klineBars: List<KLineBar> = mock.kline("sh600519")
 
     override fun willInit() {
@@ -71,7 +70,7 @@ internal class StockDetailPage : BasePager() {
 
             // 五档盘口（vforLazy 需 ObservableList → 用封装的 List<Pair> 手工 forEach）
             Text { attr { marginLeft(10f); marginTop(12f); fontSize(15f); color(Color(0xFF333333)); text("五档盘口") } }
-            ctx.depthRows.forEach { row ->
+            ctx.depthRows().forEach { row ->
                 View {
                     attr { flexDirectionRow(); padding(4f); marginLeft(8f) }
                     Text { attr { flex(1f); fontSize(13f); color(Color(0xFF444444)); text(row.first) } }
@@ -98,12 +97,12 @@ internal class StockDetailPage : BasePager() {
         }
     }
 
-    private fun buildDepthRows(): List<Pair<String, String>> {
-        val q = mock.quotes().first()
+    private fun depthRows(): List<Pair<String, String>> {
+        val q = quote
         val names = listOf("买一", "买二", "买三", "买四", "买五")
         return names.mapIndexed { i, label ->
-            val price = if (q.bids.size > i) q.bids[i].price else q.price
-            val vol = if (q.bids.size > i) q.bids[i].volume else 0L
+            val price = if (q != null && q.bids.size > i) q.bids[i].price else q?.price ?: 0.0
+            val vol = if (q != null && q.bids.size > i) q.bids[i].volume else 0L
             label to "${two("$price")} / ${vol}手"
         }
     }
