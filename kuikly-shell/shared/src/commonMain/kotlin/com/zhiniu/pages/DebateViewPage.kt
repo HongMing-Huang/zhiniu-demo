@@ -69,7 +69,7 @@ internal class DebateViewPage : BasePager() {
                             marginRight(Tokens.space4)
                             fontSize(Tokens.fsH3)
                             text(s)
-                            color(if (ctx.side == s) Color(hexInt(if (s == "多方") Tokens.up else Tokens.down)) else Color(hexInt(Tokens.textTertiary)))
+                            color(if (ctx.side == s) Color(hexInt(if (s == "多方") Tokens.up else Tokens.down)) else Color(hexInt(Tokens.textMuted)))
                         }
                         event { click { ctx.side = s; ctx.rebuild() } }
                     }
@@ -80,7 +80,7 @@ internal class DebateViewPage : BasePager() {
                 attr { height(220f); marginTop(Tokens.space2) }
                 vforLazy({ ctx.points }) { p, _, _ ->
                     View {
-                        attr { margin(Tokens.space2); backgroundColor(Color(hexInt(if (p.speaker == "多方") Tokens.bgHover else Tokens.bgCard))) }
+                        attr { margin(Tokens.space2); backgroundColor(Color(hexInt(if (p.speaker == "多方") Tokens.bgCardHover else Tokens.bgCard))) }
                         Text {
                             attr {
                                 margin(Tokens.space2); fontSize(Tokens.fsBody)
@@ -93,7 +93,7 @@ internal class DebateViewPage : BasePager() {
             }
             // 分歧点高亮
             Text {
-                attr { marginLeft(Tokens.space3); marginTop(Tokens.space2); fontSize(Tokens.fsH3); color(Color(hexInt(Tokens.warn))); text("⚠ 分歧点") }
+                attr { marginLeft(Tokens.space3); marginTop(Tokens.space2); fontSize(Tokens.fsH3); color(Color(hexInt(Tokens.warn))); text("分歧点") }
             }
             List {
                 attr { height(130f); marginTop(Tokens.space2) }

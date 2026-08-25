@@ -38,7 +38,7 @@ internal class StockSearchPage : BasePager() {
         val kw = keyword.trim()
         if (kw.isEmpty()) {
             // 展示推荐
-            hotTags.forEach { results.add("🔥 $it") }
+            hotTags.forEach { results.add(it) }
             return
         }
         allStocks.forEach { q ->
@@ -61,8 +61,8 @@ internal class StockSearchPage : BasePager() {
                 Text {
                     attr {
                         fontSize(Tokens.fsBody)
-                        color(Color(hexInt(if (ctx.keyword.isEmpty()) Tokens.textTertiary else Tokens.textPrimary)))
-                        text(if (ctx.keyword.isEmpty()) "🔍 搜索：茅台 / 平安 / 宁德…" else "🔍 ${ctx.keyword}")
+                        color(Color(hexInt(if (ctx.keyword.isEmpty()) Tokens.textMuted else Tokens.textPrimary)))
+                        text(if (ctx.keyword.isEmpty()) "搜索：茅台 / 平安 / 宁德…" else ctx.keyword)
                     }
                     event { click { ctx.keyword = ctx.nextDemo(ctx.keyword); ctx.refresh() } }
                 }

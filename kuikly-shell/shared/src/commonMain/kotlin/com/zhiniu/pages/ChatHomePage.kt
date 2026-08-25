@@ -37,7 +37,7 @@ internal class ChatHomePage : BasePager() {
 
     override fun willInit() {
         super.willInit()
-        messages.add("👋 你好，我是知牛。可以问我：看大盘 / 诊个股 / 解释指标 / 对比两只。")
+        messages.add("你好，我是知牛。可以问我：看大盘 / 诊个股 / 解释指标 / 对比两只。")
     }
 
     override fun body(): ViewBuilder {
@@ -52,7 +52,7 @@ internal class ChatHomePage : BasePager() {
                     attr { fontSize(Tokens.fsBody); color(Color(hexInt(Tokens.brand))); text("模型：zhiniu/quick") }
                 }
                 Text {
-                    attr { marginLeft(Tokens.space4); fontSize(Tokens.fsBody); color(Color(hexInt(Tokens.textTertiary))); text("看行情 →") }
+                    attr { marginLeft(Tokens.space4); fontSize(Tokens.fsBody); color(Color(hexInt(Tokens.textMuted))); text("看行情 →") }
                     event { click { ctx.openZhiniuPage("MarketList") } }
                 }
             }
@@ -80,7 +80,7 @@ internal class ChatHomePage : BasePager() {
             View {
                 attr { flexDirectionRow(); marginTop(Tokens.space3); marginLeft(Tokens.space2); marginRight(Tokens.space2) }
                 Text {
-                    attr { flex(1f); fontSize(Tokens.fsBody); color(Color(hexInt(if (ctx.draft.isEmpty()) Tokens.textTertiary else Tokens.textPrimary))); text(ctx.draft.ifBlank { "问点什么…" }) }
+                    attr { flex(1f); fontSize(Tokens.fsBody); color(Color(hexInt(if (ctx.draft.isEmpty()) Tokens.textMuted else Tokens.textPrimary))); text(ctx.draft.ifBlank { "问点什么…" }) }
                     event { click { ctx.draft = "诊一下贵州茅台 sh600519" } }
                 }
                 Text {
@@ -113,15 +113,15 @@ internal class ChatHomePage : BasePager() {
                     when (chunk) {
                         is StreamChunk.Delta -> {
                             sb.append(chunk.text)
-                            val full = "🤖 " + sb.toString()
+                            val full = sb.toString()
                             replace(botId, full)
                         }
-                        is StreamChunk.Error -> replace(botId, "⚠ " + chunk.msg)
+                        is StreamChunk.Error -> replace(botId, chunk.msg)
                         else -> Unit
                     }
                 }
             } catch (e: Exception) {
-                replace(botId, "⚠ 网关调用失败: ${e.message ?: e::class.simpleName}")
+                replace(botId, "网关调用失败: ${e.message ?: e::class.simpleName}")
             }
         }
     }

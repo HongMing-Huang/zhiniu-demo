@@ -61,7 +61,7 @@ internal class ModelSettingsPage : BasePager() {
                             marginRight(Tokens.space4)
                             fontSize(Tokens.fsH3)
                             text(t)
-                            color(if (ctx.tab == t) Color(hexInt(Tokens.textPrimary)) else Color(hexInt(Tokens.textTertiary)))
+                            color(if (ctx.tab == t) Color(hexInt(Tokens.textPrimary)) else Color(hexInt(Tokens.textMuted)))
                         }
                         event { click { ctx.tab = t; ctx.rebuilt() } }
                     }

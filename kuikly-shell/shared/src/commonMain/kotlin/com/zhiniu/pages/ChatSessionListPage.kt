@@ -48,7 +48,7 @@ internal class ChatSessionListPage : BasePager() {
                     View {
                         attr { margin(Tokens.space2); backgroundColor(Color(hexInt(Tokens.bgCard))) }
                         Text { attr { marginLeft(Tokens.space2); marginTop(Tokens.space2); fontSize(Tokens.fsH3); color(Color(hexInt(Tokens.textPrimary))); text(s.title) } }
-                        Text { attr { marginLeft(Tokens.space2); marginTop(Tokens.space1); fontSize(Tokens.fsCaption); color(Color(hexInt(Tokens.textTertiary))); text("${s.time} · ${s.preview}") } }
+                        Text { attr { marginLeft(Tokens.space2); marginTop(Tokens.space1); fontSize(Tokens.fsCaption); color(Color(hexInt(Tokens.textMuted))); text("${s.time} · ${s.preview}") } }
                     }
                 }
             }

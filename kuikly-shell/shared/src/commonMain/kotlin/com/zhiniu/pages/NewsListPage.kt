@@ -67,7 +67,7 @@ internal class NewsListPage : BasePager() {
                             marginRight(Tokens.space4)
                             fontSize(Tokens.fsH3)
                             text(t)
-                            color(if (ctx.tab == t) Color(hexInt(Tokens.textPrimary)) else Color(hexInt(Tokens.textTertiary)))
+                            color(if (ctx.tab == t) Color(hexInt(Tokens.textPrimary)) else Color(hexInt(Tokens.textMuted)))
                         }
                         event { click { ctx.tab = t; ctx.rebuild() } }
                     }
@@ -82,7 +82,7 @@ internal class NewsListPage : BasePager() {
                             margin(Tokens.space2)
                             backgroundColor(Color(hexInt(Tokens.bgCard)))
                         }
-                        Text { attr { fontSize(Tokens.fsCaption); color(Color(hexInt(Tokens.textTertiary))); text(n.time) } }
+                        Text { attr { fontSize(Tokens.fsCaption); color(Color(hexInt(Tokens.textMuted))); text(n.time) } }
                         Text {
                             attr {
                                 marginLeft(Tokens.space2); fontSize(Tokens.fsCaption)
