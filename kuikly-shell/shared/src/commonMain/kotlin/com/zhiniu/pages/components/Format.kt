@@ -56,3 +56,30 @@ const val CONTENT_W = 1320f
 
 /** 水平边距。 */
 const val PAD = 24f
+
+/** 整数千分位：3128 → "3,128"；986400000000 → "9,864亿"（配合亿单位使用）。 */
+fun fmtInt(v: Long): String {
+    val neg = v < 0
+    val s = kotlin.math.abs(v).toString()
+    val sb = StringBuilder()
+    for (i in s.indices) {
+        if (i > 0 && (s.length - i) % 3 == 0) sb.append(',')
+        sb.append(s[i])
+    }
+    return (if (neg) "-" else "") + sb.toString()
+}
+
+/** 成交量（手）→ "2.18万手" / "38.5万手"。 */
+fun fmtVolHand(v: Long): String {
+    return when {
+        v >= 100_000_000 -> fmt2(v / 100_000_000.0) + "亿手"
+        v >= 10_000 -> fmt2(v / 10_000.0) + "万手"
+        else -> fmtInt(v) + "手"
+    }
+}
+
+/** 振幅 %。 */
+fun fmtAmplitude(high: Double, low: Double, prevClose: Double): String {
+    if (prevClose == 0.0) return "0.00%"
+    return fmt2((high - low) / prevClose * 100.0) + "%"
+}

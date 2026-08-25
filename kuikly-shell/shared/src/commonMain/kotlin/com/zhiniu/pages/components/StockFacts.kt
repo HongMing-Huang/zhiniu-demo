@@ -77,6 +77,17 @@ fun aiViewOf(q: Quote): AiView {
     )
 }
 
+/** 市场宽度（Demo 快照：宽基口径）。 */
+data class MarketBreadth(
+    val upCount: Long = 3128,
+    val downCount: Long = 1932,
+    val amountYi: Long = 9864,
+    val status: String = "偏强",
+) {
+    val total: Long get() = upCount + downCount
+    val upRatio: Double get() = upCount.toDouble() / total
+}
+
 /** AI 市场观点（AI研究 页）。 */
 data class MarketInsight(val tag: String, val text: String, val tagHex: String)
 

@@ -1,12 +1,10 @@
-// 知牛 · 市场壳（单页 Shell：Header + 四个分区 + 个股详情覆盖层，同一窗口内切换，永不新开页面）
-// 布局：背景铺满浏览器；Header 与内容共用 1320 内容宽 + 24 边距，大屏居中，小屏自适应。
+// 知牛 · 市场壳（单页 Shell：GlobalHeader + 市场/自选/AI研究/排行 + 个股详情覆盖层）
+// 同一窗口内切换内容，永不新开页面；所有 UI 仅使用公共组件与 Theme Token。
 package com.zhiniu.pages
 
 import com.tencent.kuikly.core.annotations.Page
-import com.tencent.kuikly.core.base.Animation
 import com.tencent.kuikly.core.base.Border
 import com.tencent.kuikly.core.base.BorderStyle
-import com.tencent.kuikly.core.base.Translate
 import com.tencent.kuikly.core.base.ViewBuilder
 import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.directives.velse
@@ -15,22 +13,24 @@ import com.tencent.kuikly.core.directives.vfor
 import com.tencent.kuikly.core.directives.vif
 import com.tencent.kuikly.core.reactive.handler.observable
 import com.tencent.kuikly.core.reactive.handler.observableList
-import com.tencent.kuikly.core.views.Canvas
+import com.tencent.kuikly.core.timer.setTimeout
 import com.tencent.kuikly.core.views.List
 import com.tencent.kuikly.core.views.Text
-import com.tencent.kuikly.core.views.TextAlign
 import com.tencent.kuikly.core.views.View
 import com.zhiniu.base.BasePager
 import com.zhiniu.data.mock.MockDataSource
 import com.zhiniu.domain.model.KLineBar
 import com.zhiniu.domain.model.Quote
 import com.zhiniu.pages.components.*
+import com.zhiniu.pages.components.chart.ChartIndicator
+import com.zhiniu.pages.components.common.*
+import com.zhiniu.pages.components.market.*
 
-/** 市场首屏页（也是 App 的唯一入口页：详情在壳内切换）。 */
+/** 市场首屏页（App 唯一入口：详情在壳内切换）。 */
 @Page("MarketList", supportInLocal = true)
 internal class MarketListPage : MarketShell()
 
-/** 兼容旧 URL（直接打开某只股票）：同一壳内直接进入详情，仍不新开窗口。 */
+/** 兼容旧 URL：同一壳内直接进入详情。 */
 @Page("StockDetail", supportInLocal = true)
 internal class StockDetailPage : MarketShell() {
     override fun initialSymbolParam(): String? =
@@ -47,22 +47,30 @@ internal abstract class MarketShell : BasePager() {
     var themeOpen by observable(false)
     var settingsOpen by observable(false)
     var filterOpen by observable(false)
+    var sortOpen by observable(false)
     var aiOpen by observable(false)
     var marketTab by observable("全部")
+    var sortBy by observable("默认排序")
     var filterDir by observable("全部")
     var filterGain by observable("不限")
     var filterAmount by observable("不限")
-    var klineTab by observable("日K")
+    var timeframe by observable("日K")
+    var indicator by observable(ChartIndicator.MA)
+    var detailTab by observable("概览")
     var crossX by observable(-1f)
     var crossY by observable(-1f)
     var aiDraft by observable("")
     var queryText by observable("")
     var aiChat by observableList<AiChatLine>()
-
     var watchlist by observableList<String>()
     var recentSearch by observableList<String>()
     var marketRows by observableList<Quote>()
     var searchResults by observableList<Quote>()
+    var recentRows by observableList<Quote>()
+    var hotRows by observableList<Quote>()
+    var marketLoading by observable(true)
+    var detailLoading by observable(false)
+    var aiAnalyzing by observable(false)
 
     // ================= 数据 =================
     protected val mock = MockDataSource()
@@ -79,7 +87,6 @@ internal abstract class MarketShell : BasePager() {
     fun totalAmount(): Double = universe().sumOf { it.amount }
     fun rankRows(): List<Quote> = universe().sortedByDescending { it.changePercent }
 
-    /** 由 OHLC 确定性生成 14 点迷你走势。 */
     fun sparkOf(q: Quote): List<Double> {
         val seed = stableHash(q.symbol) % 997
         val pts = ArrayList<Double>(14)
@@ -101,16 +108,7 @@ internal abstract class MarketShell : BasePager() {
         recentSearch.remove(sym)
         recentSearch.add(0, sym)
         while (recentSearch.size > 4) recentSearch.removeAt(recentSearch.size - 1)
-    }
-
-    fun openFromSearch() {
-        val q = queryText.trim()
-        if (q.isEmpty()) return
-        val hit = universe().firstOrNull { it.name.contains(q) || it.symbol.contains(q.lowercase()) } ?: return
-        rememberSearch(hit.symbol)
-        queryText = ""
-        searchOpen = false
-        openDetail(hit.symbol, section)
+        recentRows.diffUpdate(recentSearch.mapNotNull { quoteOf(it) })
     }
 
     fun sendAiDraft() {
@@ -132,12 +130,16 @@ internal abstract class MarketShell : BasePager() {
         }
     }
 
-    /** 详情 K 线（按 symbol+tab 缓存，确定性）。 */
-    fun klineFor(sym: String, tab: String): List<KLineBar> {
-        val key = "$sym|$tab"
+    // ================= K 线数据（按 symbol+timeframe 缓存，确定性） =================
+    fun klineFor(sym: String, tf: String): List<KLineBar> {
+        val key = "$sym|$tf"
         klineCache[key]?.let { return it }
-        val bars = when (tab) {
-            "分时" -> intraday(sym)
+        val bars = when (tf) {
+            "分时" -> intraday(sym, 48)
+            "5分" -> intraday(sym, 96)
+            "15分" -> intraday(sym, 48)
+            "30分" -> intraday(sym, 40)
+            "60分" -> intraday(sym, 20)
             "周K" -> resample(sym, 52)
             "月K" -> resample(sym, 36)
             else -> mock.kline(sym)
@@ -146,22 +148,24 @@ internal abstract class MarketShell : BasePager() {
         return bars
     }
 
-    private fun intraday(sym: String): List<KLineBar> {
+    /** 分钟级 K 线（演示：5 分钟一根，多日拼接）。 */
+    private fun intraday(sym: String, n: Int): List<KLineBar> {
         val q = quoteOf(sym) ?: return mock.kline(sym)
-        val n = 48
         val seed = stableHash(sym) % 37
         var price = q.open
         val bars = ArrayList<KLineBar>(n)
+        val slotsPerDay = 48
         for (i in 0 until n) {
-            val wave = kotlin.math.sin(i * 0.55 + seed) * q.high * 0.0018
+            val wave = kotlin.math.sin(i * 0.55 + seed) * q.high * 0.0022
             val open = price
             val close = open + (q.price - q.open) / (n - 1) + wave
-            val hi = maxOf(open, close) + q.high * 0.0008
-            val lo = minOf(open, close) - q.high * 0.0008
+            val hi = maxOf(open, close) + q.high * 0.001
+            val lo = minOf(open, close) - q.high * 0.001
+            val slot = i % slotsPerDay
             val label = when {
-                i == 0 -> "09:30"
-                i == n - 1 -> "15:00"
-                i % 8 == 0 -> "${10 + i / 8}:30"
+                slot == 0 -> "09:30"
+                slot == slotsPerDay / 2 -> "13:00"
+                slot % 12 == 0 -> "${10 + slot / 12}:00"
                 else -> "·"
             }
             bars.add(KLineBar(label, open, hi, lo, close, 1000L * (i + 1)))
@@ -184,41 +188,20 @@ internal abstract class MarketShell : BasePager() {
     }
 
     // ================= 几何 =================
-    /** Header/内容共用内容宽右边缘（绝对坐标）。 */
     fun contentRightEdge(): Float {
         val vw = pageData.activityWidth
         return if (vw > CONTENT_W) (vw - CONTENT_W) / 2f + CONTENT_W - PAD else vw - PAD
     }
 
-    fun popoverLeft(width: Float): Float = contentRightEdge() - width
-
-    /** 屏幕可用内容宽（小于 1320 时铺满，否则 1320 居中）。 */
+    /** 内容宽（Header 与正文共用）。 */
     fun contentWidth(): Float = minOf(pageData.activityWidth.coerceAtLeast(0f), CONTENT_W)
 
-    // ================= 生命周期 =================
-    override fun created() {
-        super.created()
-        ThemeState.start()
-        if (watchlist.size < 2) {
-            watchlist.clear()
-            watchlist.add("sh600519")
-            watchlist.add("sz300750")
-        }
-        refreshMarketRows()
-    }
+    fun popoverLeft(width: Float): Float = contentRightEdge() - width
 
-    override fun willInit() {
-        super.willInit()
-        initialSymbolParam()?.let { sym ->
-            openSymbol = sym
-            detailFrom = "市场"
-            section = "市场"
-        }
-    }
+    /** 响应式：<1280 隐藏部分表格列。 */
+    fun isNarrow(): Boolean = pageData.activityWidth < 1280f
 
-    protected open fun initialSymbolParam(): String? = null
-
-    // ================= 过滤 =================
+    // ================= 过滤 / 排序 =================
     fun visibleRows(): List<Quote> {
         var rows = universe()
         rows = when (marketTab) {
@@ -243,6 +226,13 @@ internal abstract class MarketShell : BasePager() {
             "≥50亿" -> rows.filter { it.amount >= 50e8 }
             else -> rows
         }
+        rows = when (sortBy) {
+            "涨幅" -> rows.sortedByDescending { it.changePercent }
+            "跌幅" -> rows.sortedBy { it.changePercent }
+            "成交额" -> rows.sortedByDescending { it.amount }
+            "换手率" -> rows.sortedByDescending { factsOf(it).turnover }
+            else -> rows
+        }
         return rows
     }
 
@@ -258,31 +248,99 @@ internal abstract class MarketShell : BasePager() {
         )
     }
 
+    // ================= 生命周期 =================
+    override fun created() {
+        super.created()
+        AppTheme.start()
+        if (watchlist.size < 2) {
+            watchlist.clear()
+            watchlist.add("sh600519")
+            watchlist.add("sz300750")
+        }
+        hotRows.diffUpdate(hotStocks())
+        // 模拟行情加载（骨架屏 → 数据）
+        marketLoading = true
+        setTimeout(420) {
+            marketLoading = false
+            refreshMarketRows()
+        }
+    }
+
+    override fun willInit() {
+        super.willInit()
+        initialSymbolParam()?.let { sym ->
+            openSymbol = sym
+            detailFrom = "市场"
+            section = "市场"
+        }
+    }
+
+    protected open fun initialSymbolParam(): String? = null
+
     // ================= Body =================
     override fun body(): ViewBuilder {
         return {
             attr {
                 flexDirectionColumn()
-                backgroundColor(ThemeState.palette.c(ThemeState.palette.pageBg))
-                animate(ANIM_THEME, value = ThemeState.isDark)
+                backgroundColor(AppTheme.colors.c(AppTheme.colors.pageBg))
+                animate(ANIM_THEME, value = AppTheme.isDark)
             }
-            header(this@MarketShell)
-            Hdiv1()
+            GlobalHeader(
+                navs = listOf("市场", "自选", "AI研究", "排行"),
+                activeNav = { this@MarketShell.section },
+                contentWidth = this@MarketShell.contentWidth(),
+                onNav = { nav ->
+                    this@MarketShell.section = nav
+                    this@MarketShell.openSymbol = null
+                    this@MarketShell.aiOpen = false
+                    this@MarketShell.closePopovers()
+                },
+                onSearchFocus = { this@MarketShell.searchOpen = true },
+                onSearchChange = { t ->
+                    this@MarketShell.queryText = t
+                    this@MarketShell.refreshSearchResults()
+                    this@MarketShell.searchOpen = true
+                },
+                onTheme = { this@MarketShell.themeOpen = !this@MarketShell.themeOpen },
+                onSettings = { this@MarketShell.settingsOpen = !this@MarketShell.settingsOpen },
+            )
+            Divider()
             List {
                 attr {
                     flex(1f)
-                    backgroundColor(ThemeState.palette.c(ThemeState.palette.pageBg))
-                    animate(ANIM_THEME, value = ThemeState.isDark)
+                    backgroundColor(AppTheme.colors.c(AppTheme.colors.pageBg))
+                    animate(ANIM_THEME, value = AppTheme.isDark)
                 }
                 contentInner(this@MarketShell)
                 View { attr { height(1f) } }
             }
-            // ---- 浮层（最后渲染，不跳页）----
-            backdropLayer(this@MarketShell)
-            searchPopover(this@MarketShell)
+            // ---- 浮层（不跳页）----
+            Backdrop({ this@MarketShell.searchOpen || this@MarketShell.themeOpen ||
+                this@MarketShell.settingsOpen || this@MarketShell.filterOpen ||
+                this@MarketShell.sortOpen }) { this@MarketShell.closePopovers() }
+            StockSearchOverlay(
+                visible = { this@MarketShell.searchOpen },
+                query = { this@MarketShell.queryText },
+                recent = { this@MarketShell.recentRows },
+                hot = { this@MarketShell.hotRows },
+                results = { this@MarketShell.searchResults },
+                left = this@MarketShell.popoverLeft(460f),
+                onQueryChange = { t ->
+                    this@MarketShell.queryText = t
+                    this@MarketShell.refreshSearchResults()
+                },
+                onPick = { q ->
+                    this@MarketShell.rememberSearch(q.symbol)
+                    this@MarketShell.queryText = ""
+                    this@MarketShell.searchOpen = false
+                    this@MarketShell.openDetail(q.symbol, this@MarketShell.section)
+                },
+                onClose = { this@MarketShell.searchOpen = false },
+            )
             themePopover(this@MarketShell)
             settingsPopover(this@MarketShell)
             filterPopover(this@MarketShell)
+            sortPopover(this@MarketShell)
             aiDrawer(this@MarketShell)
         }
     }
@@ -291,8 +349,12 @@ internal abstract class MarketShell : BasePager() {
     fun openDetail(sym: String, from: String) {
         detailFrom = from
         openSymbol = sym
-        klineTab = "日K"
+        timeframe = "日K"
+        indicator = ChartIndicator.MA
+        detailTab = "概览"
         crossX = -1f; crossY = -1f
+        detailLoading = true
+        setTimeout(320) { detailLoading = false }
         closePopovers()
     }
 
@@ -306,6 +368,7 @@ internal abstract class MarketShell : BasePager() {
         themeOpen = false
         settingsOpen = false
         filterOpen = false
+        sortOpen = false
     }
 }
 
@@ -313,132 +376,12 @@ internal abstract class MarketShell : BasePager() {
 data class AiChatLine(val role: String, val text: String)
 
 // =====================================================================
-// 视图构建（顶层扩展函数 + host 显式传参；Kuikly 编译器插件限制下最稳形态）
+// 视图构建（顶层扩展函数 + host 显式传参）
 // =====================================================================
 
-internal fun ViewContainer<*, *>.Hdiv1() {
-    View {
-        attr {
-            height(1f)
-            backgroundColor(ThemeState.palette.c(ThemeState.palette.border))
-            animate(ANIM_THEME, value = ThemeState.isDark)
-        }
-    }
-}
-
-// ================= 顶部导航 =================
-internal fun ViewContainer<*, *>.header(host: MarketShell) {
-    val pal = { ThemeState.palette }
-    View {
-        attr {
-            height(60f)
-            flexDirectionRow()
-            justifyContentCenter()
-            backgroundColor(pal().c(pal().surface))
-            animate(ANIM_THEME, value = ThemeState.isDark)
-        }
-        View {
-            attr {
-                width(host.contentWidth())
-                flexDirectionRow()
-                alignItemsCenter()
-                padding(left = PAD, right = PAD)
-            }
-            Text {
-                attr {
-                    fontSize(19f); fontWeightSemiBold()
-                    color(pal().c(pal().textPrimary))
-                    text("知牛")
-                    animate(ANIM_THEME, value = ThemeState.isDark)
-                }
-            }
-            View { attr { width(26f) } }
-            listOf("市场", "自选", "AI研究", "排行").forEach { nav -> navItem(host, nav) }
-            View { attr { flex(1f) } }
-            searchEntry(host)
-            IconButton(IconKind.SUN, 17f, onClick = {
-                host.themeOpen = !host.themeOpen
-                host.searchOpen = false; host.settingsOpen = false; host.filterOpen = false
-            })
-            IconButton(IconKind.SETTINGS, 17f, onClick = {
-                host.settingsOpen = !host.settingsOpen
-                host.searchOpen = false; host.themeOpen = false; host.filterOpen = false
-            })
-        }
-    }
-}
-
-internal fun ViewContainer<*, *>.navItem(host: MarketShell, nav: String) {
-    val pal = { ThemeState.palette }
-    View {
-        attr {
-            padding(left = 12f, right = 12f)
-            alignSelfStretch()
-            cssClass("zn-nav zn-click")
-            highlightBackgroundColor(pal().ca(pal().textSecondary, 8))
-        }
-        event { click {
-            host.section = nav
-            host.openSymbol = null
-            host.aiOpen = false
-            host.closePopovers()
-        } }
-        Text {
-            attr {
-                fontSize(14f)
-                color(pal().c(if (host.section == nav) pal().textPrimary else pal().textSecondary))
-                text(nav)
-                animate(ANIM_THEME, value = ThemeState.isDark)
-            }
-        }
-        View {
-            attr {
-                absolutePosition(top = 57f, left = 12f, right = 12f)
-                height(3f)
-                borderRadius(allBorderRadius = 2f)
-                backgroundColor(pal().c(pal().textPrimary))
-                opacity(if (host.section == nav) 1f else 0f)
-                animate(Animation.easeOut(0.16f), value = host.section)
-            }
-        }
-    }
-}
-
-internal fun ViewContainer<*, *>.searchEntry(host: MarketShell) {
-    val pal = { ThemeState.palette }
-    View {
-        attr {
-            width(288f); height(36f)
-            borderRadius(8f)
-            flexDirectionRow()
-            alignItemsCenter()
-            padding(left = 10f, right = 10f)
-            backgroundColor(pal().c(pal().surfaceSecondary))
-            highlightBackgroundColor(pal().ca(pal().textSecondary, 10))
-            cssClass("zn-nav zn-click")
-            animate(ANIM_THEME, value = ThemeState.isDark)
-        }
-        event { click {
-            host.searchOpen = !host.searchOpen
-            host.themeOpen = false; host.settingsOpen = false; host.filterOpen = false
-        } }
-        Icon(IconKind.SEARCH, 15f, pal().textTertiary)
-        Text {
-            attr {
-                marginLeft(8f)
-                fontSize(13f)
-                color(pal().c(pal().textTertiary))
-                text("搜索股票 / 代码")
-                animate(ANIM_THEME, value = ThemeState.isDark)
-            }
-        }
-    }
-    View { attr { width(6f) } }
-}
-
-// ================= 内容 =================
+/** 内容容器：宽屏 1320 居中 + 左右 32 padding。 */
 internal fun ViewContainer<*, *>.contentInner(host: MarketShell) {
-    val sidePad = 24f + maxOf(0f, (host.pageData.activityWidth - CONTENT_W) / 2f)
+    val sidePad = 32f + maxOf(0f, (host.pageData.activityWidth - CONTENT_W) / 2f)
     View {
         attr {
             padding(left = sidePad, right = sidePad)
@@ -452,585 +395,314 @@ internal fun ViewContainer<*, *>.contentInner(host: MarketShell) {
     }
 }
 
-internal fun ViewContainer<*, *>.sectionTitle(title: String, sub: String, rightHint: String) {
-    val pal = { ThemeState.palette }
+// ================= 市场区 =================
+internal fun ViewContainer<*, *>.marketSection(host: MarketShell) {
+    val colors = { AppTheme.colors }
+    // 标题区
     View { attr { marginTop(32f) } }
     View {
         attr { flexDirectionRow(); alignItemsCenter() }
         Text {
             attr {
-                fontSize(24f); fontWeightSemiBold()
-                color(pal().c(pal().textPrimary))
-                text(title)
-                animate(ANIM_THEME, value = ThemeState.isDark)
+                fontSize(AppTypography.fs24); fontWeightSemiBold()
+                color(colors().c(colors().textPrimary))
+                text("市场")
+                animate(ANIM_THEME, value = AppTheme.isDark)
             }
         }
         View { attr { flex(1f) } }
         Text {
             attr {
-                fontSize(12f)
-                color(pal().c(pal().textTertiary))
-                text(rightHint)
-                animate(ANIM_THEME, value = ThemeState.isDark)
+                fontSize(AppTypography.fs12)
+                color(colors().c(colors().textTertiary))
+                text("Demo 行情 · 14:32 更新")
+                animate(ANIM_THEME, value = AppTheme.isDark)
             }
         }
     }
-    View { attr { marginTop(4f) } }
-    Text {
-        attr {
-            fontSize(13f)
-            color(pal().c(pal().textSecondary))
-            text(sub)
-            animate(ANIM_THEME, value = ThemeState.isDark)
+    View { attr { marginTop(6f) } }
+    View {
+        attr { flexDirectionRow(); alignItemsCenter() }
+        Text {
+            attr {
+                fontSize(AppTypography.fs13); fontWeightMedium()
+                color(colors().c(colors().textPrimary))
+                text("沪深 A 股")
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+        }
+        Text {
+            attr {
+                marginLeft(10f)
+                fontSize(AppTypography.fs13)
+                color(colors().c(colors().textSecondary))
+                text("实时了解主要指数、市场热度与个股行情")
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
         }
     }
-}
-
-// ================= 市场区 =================
-internal fun ViewContainer<*, *>.marketSection(host: MarketShell) {
-    sectionTitle("市场", "沪深 A 股行情", "今日 · Demo 数据")
-    View { attr { height(16f) } }
-    overviewCards(host)
-    View { attr { height(24f) } }
+    // 市场快照：3 卡
+    View { attr { height(20f) } }
+    View {
+        attr { flexDirectionRow() }
+        MarketOverviewCard("主要指数") { indexCard(host) }
+        View { attr { width(14f) } }
+        MarketOverviewCard("市场热门") { hotCard(host) }
+        View { attr { width(14f) } }
+        MarketOverviewCard("市场宽度") {
+            MarketBreadthContent(
+                upCount = 3128,
+                downCount = 1932,
+                upRatio = 3128.0 / (3128 + 1932),
+                amountLabel = "9,864 亿",
+                status = "偏强",
+            )
+        }
+    }
+    // 股票筛选
+    View { attr { height(26f) } }
     marketToolbar(host)
-    Hdiv1()
-    View { attr { height(8f) } }
-    tableHeader()
-    vif({ host.marketRows.isEmpty() }) { emptyTable() }
-    vfor({ host.marketRows }) { q -> stockRow(host, q) }
-}
-
-internal fun ViewContainer<*, *>.overviewCards(host: MarketShell) {
-    View {
-        attr { flexDirectionRow(); height(166f) }
-        cardShell("主要指数") { indexCard(host) }
-        View { attr { width(12f) } }
-        cardShell("热门股票") { hotCard(host) }
-        View { attr { width(12f) } }
-        cardShell("市场状态") { statusCard(host) }
-    }
-}
-
-internal fun ViewContainer<*, *>.cardShell(title: String, content: ViewContainer<*, *>.() -> Unit) {
-    val pal = { ThemeState.palette }
-    View {
-        attr {
-            flex(1f)
-            backgroundColor(pal().c(pal().surface))
-            border(Border(1f, BorderStyle.SOLID, pal().c(pal().borderStrong)))
-            borderRadius(10f)
-            cssClass("zn-card")
-            animate(ANIM_THEME, value = ThemeState.isDark)
-        }
-        View {
-            attr { padding(top = 14f, left = 16f, right = 16f) }
-            CardTitleRow(title)
-            View { attr { height(9f) } }
-            content()
+    Divider()
+    // 行情 Table
+    vif({ host.marketLoading }) { TableSkeleton(7) }
+    velse {
+        StockTableHeader(host.isNarrow())
+        vif({ host.marketRows.isEmpty() }) { emptyTable() }
+        vfor({ host.marketRows }) { q ->
+            StockRow(q, host.sparkOf(q), host.isNarrow()) { host.openDetail(q.symbol, "市场") }
         }
     }
 }
 
 internal fun ViewContainer<*, *>.indexCard(host: MarketShell) {
-    val pal = { ThemeState.palette }
-    host.indicesOf().forEach { idx ->
-        View {
-            attr { flexDirectionRow(); alignItemsCenter(); height(31f) }
-            Text {
-                attr {
-                    width(76f)
-                    fontSize(12f)
-                    color(pal().c(pal().textSecondary))
-                    text(idx.name)
-                    animate(ANIM_THEME, value = ThemeState.isDark)
-                }
-            }
-            View { attr { flex(1f) } }
-            Text {
-                attr {
-                    fontSize(14f); fontWeightSemiBold()
-                    color(pal().c(pal().textPrimary))
-                    text(fmt2(idx.price))
-                    fontFamily(NUM_FONT)
-                    animate(ANIM_THEME, value = ThemeState.isDark)
-                }
-            }
-            Text {
-                attr {
-                    width(66f)
-                    fontSize(13f); fontWeightSemiBold()
-                    color(pal().c(if (idx.isUp) pal().up else pal().down))
-                    text(fmtPct(idx.changePercent))
-                    fontFamily(NUM_FONT)
-                    textAlignRight()
-                    animate(ANIM_THEME, value = ThemeState.isDark)
-                }
-            }
-            sparklineView(host.sparkOf(idx), idx.isUp, 52f, 20f)
-        }
-    }
+    host.indicesOf().forEach { idx -> IndexRow(idx, host.sparkOf(idx)) }
 }
 
 internal fun ViewContainer<*, *>.hotCard(host: MarketShell) {
-    val pal = { ThemeState.palette }
-    host.hotStocks().forEach { st ->
-        View {
-            attr {
-                flexDirectionRow(); alignItemsCenter(); height(31f)
-                cssClass("zn-nav zn-click")
-            }
-            event { click { host.openDetail(st.symbol, "市场") } }
-            Text {
-                attr {
-                    width(112f)
-                    fontSize(13f)
-                    color(pal().c(pal().textPrimary))
-                    text(st.name)
-                    animate(ANIM_THEME, value = ThemeState.isDark)
-                }
-            }
-            View { attr { flex(1f) } }
-            Text {
-                attr {
-                    fontSize(14f); fontWeightSemiBold()
-                    color(pal().c(pal().textPrimary))
-                    text(fmt2(st.price))
-                    fontFamily(NUM_FONT)
-                    animate(ANIM_THEME, value = ThemeState.isDark)
-                }
-            }
-            Text {
-                attr {
-                    width(66f)
-                    fontSize(13f); fontWeightSemiBold()
-                    color(pal().c(if (st.isUp) pal().up else pal().down))
-                    text(fmtPct(st.changePercent))
-                    fontFamily(NUM_FONT)
-                    textAlignRight()
-                    animate(ANIM_THEME, value = ThemeState.isDark)
-                }
-            }
-        }
-    }
-}
-
-internal fun ViewContainer<*, *>.statusCard(host: MarketShell) {
-    val pal = { ThemeState.palette }
-    metricRow("上涨", host.upCount().toString(), pal().up)
-    metricRow("下跌", host.downCount().toString(), pal().down)
-    metricRow("成交额", fmtAmount(host.totalAmount()), pal().textPrimary)
-    View { attr { flex(1f) } }
-}
-
-internal fun ViewContainer<*, *>.metricRow(label: String, value: String, valueHex: String) {
-    val pal = { ThemeState.palette }
-    View {
-        attr { flexDirectionRow(); alignItemsCenter(); height(31f) }
-        Text {
-            attr {
-                width(64f)
-                fontSize(12f)
-                color(pal().c(pal().textSecondary))
-                text(label)
-                animate(ANIM_THEME, value = ThemeState.isDark)
-            }
-        }
-        View { attr { flex(1f) } }
-        Text {
-            attr {
-                fontSize(14f); fontWeightSemiBold()
-                color(pal().c(valueHex))
-                text(value)
-                fontFamily(NUM_FONT)
-                animate(ANIM_THEME, value = ThemeState.isDark)
-            }
-        }
-    }
-}
-
-// ---------- 表格工具条 ----------
-internal fun ViewContainer<*, *>.marketToolbar(host: MarketShell) {
-    val pal = { ThemeState.palette }
-    View {
-        attr { flexDirectionRow(); alignItemsFlexEnd(); height(44f) }
-        val tabs = listOf("全部", "沪市", "深市", "创业板", "科创板")
-        tabs.forEach { t ->
-            View {
-                attr {
-                    width(64f); height(44f)
-                    alignItemsCenter(); justifyContentCenter()
-                    cssClass("zn-nav zn-click")
-                }
-                event { click { host.marketTab = t; host.refreshMarketRows() } }
-                Text {
-                    attr {
-                        fontSize(14f)
-                        fontWeight600()
-                        color(pal().c(if (host.marketTab == t) pal().textPrimary else pal().textTertiary))
-                        text(t)
-                        animate(ANIM_THEME, value = ThemeState.isDark)
-                    }
-                }
-            }
-        }
-        View {
-            attr {
-                absolutePosition(top = 42f, left = 20f)
-                width(24f); height(2f)
-                borderRadius(allBorderRadius = 1f)
-                backgroundColor(pal().c(pal().textPrimary))
-                transform(translate = Translate((tabs.indexOf(host.marketTab) * 64f / 24f), 0f))
-                animate(Animation.easeOut(0.16f), value = host.marketTab)
-            }
-        }
-        View { attr { flex(1f) } }
-        toolButton("筛选", IconKind.FILTER) {
-            host.filterOpen = !host.filterOpen
-            host.searchOpen = false; host.themeOpen = false; host.settingsOpen = false
-        }
-        View { attr { width(6f) } }
-        toolButton("搜索", IconKind.SEARCH) {
-            host.searchOpen = !host.searchOpen
-            host.filterOpen = false; host.themeOpen = false; host.settingsOpen = false
-        }
-    }
-}
-
-internal fun ViewContainer<*, *>.toolButton(label: String, icon: IconKind, onClick: () -> Unit) {
-    val pal = { ThemeState.palette }
-    View {
-        attr {
-            height(32f)
-            borderRadius(8f)
-            flexDirectionRow()
-            alignItemsCenter()
-            padding(left = 10f, right = 10f)
-            backgroundColor(pal().c(pal().surfaceSecondary))
-            highlightBackgroundColor(pal().ca(pal().textSecondary, 10))
-            cssClass("zn-nav zn-click")
-            animate(ANIM_THEME, value = ThemeState.isDark)
-        }
-        event { click { onClick() } }
-        Icon(icon, 14f, pal().textSecondary)
-        Text {
-            attr {
-                marginLeft(6f)
-                fontSize(13f)
-                color(pal().c(pal().textSecondary))
-                text(label)
-                animate(ANIM_THEME, value = ThemeState.isDark)
-            }
-        }
-    }
-}
-
-// ---------- 表格 ----------
-internal fun ViewContainer<*, *>.tableHeader() {
-    val pal = { ThemeState.palette }
-    View {
-        attr { flexDirectionRow(); alignItemsCenter(); height(30f) }
-        View { attr { flex(1f) } }
-        Text {
-            attr {
-                width(220f); fontSize(11f)
-                color(pal().c(pal().textTertiary))
-                text("股票")
-            }
-        }
-        th("最新价", 150f, TextAlign.RIGHT)
-        th("涨跌幅", 110f, TextAlign.RIGHT)
-        th("今日走势", 130f, TextAlign.CENTER)
-        th("最高 / 最低", 200f, TextAlign.RIGHT)
-        th("成交额", 150f, TextAlign.RIGHT)
-        View { attr { flex(1f) } }
-    }
-}
-
-internal fun ViewContainer<*, *>.th(label: String, width: Float, align: TextAlign) {
-    val pal = { ThemeState.palette }
-    View {
-        attr { width(width) }
-        Text {
-            attr {
-                fontSize(11f)
-                color(pal().c(pal().textTertiary))
-                text(label)
-                when (align) {
-                    TextAlign.RIGHT -> textAlignRight()
-                    TextAlign.CENTER -> textAlignCenter()
-                    else -> textAlignLeft()
-                }
-                animate(ANIM_THEME, value = ThemeState.isDark)
-            }
-        }
-    }
-}
-
-internal fun ViewContainer<*, *>.stockRow(host: MarketShell, q: Quote) {
-    val pal = { ThemeState.palette }
-    View {
-        attr {
-            flexDirectionRow()
-            alignItemsCenter()
-            height(60f)
-            cssClass("zn-row zn-click")
-            highlightBackgroundColor(pal().ca(pal().textSecondary, 7))
-        }
-        event { click { host.openDetail(q.symbol, "市场") } }
-        View { attr { flex(1f) } }
-        View {
-            attr { width(220f) }
-            Text {
-                attr {
-                    fontSize(14f); fontWeightMedium()
-                    color(pal().c(pal().textPrimary))
-                    text(q.name)
-                    animate(ANIM_THEME, value = ThemeState.isDark)
-                }
-            }
-            Text {
-                attr {
-                    marginTop(3f)
-                    fontSize(11f)
-                    color(pal().c(pal().textTertiary))
-                    text(fmtSymbol(q.symbol))
-                    animate(ANIM_THEME, value = ThemeState.isDark)
-                }
-            }
-        }
-        Text {
-            attr {
-                width(150f)
-                fontSize(14f); fontWeightSemiBold()
-                color(pal().c(pal().textPrimary))
-                text(fmt2(q.price))
-                fontFamily(NUM_FONT)
-                textAlignRight()
-                animate(ANIM_THEME, value = ThemeState.isDark)
-            }
-        }
-        Text {
-            attr {
-                width(110f)
-                fontSize(14f); fontWeightSemiBold()
-                color(pal().c(if (q.isUp) pal().up else pal().down))
-                text(fmtPct(q.changePercent))
-                fontFamily(NUM_FONT)
-                textAlignRight()
-                animate(ANIM_THEME, value = ThemeState.isDark)
-            }
-        }
-        View {
-            attr { width(130f); allCenter() }
-            sparklineView(host.sparkOf(q), q.isUp, 92f, 30f)
-        }
-        View {
-            attr { width(200f); flexDirectionRow() }
-            Text {
-                attr {
-                    width(88f)
-                    fontSize(12f)
-                    color(pal().c(pal().up))
-                    text(fmt2(q.high))
-                    fontFamily(NUM_FONT)
-                    textAlignRight()
-                    animate(ANIM_THEME, value = ThemeState.isDark)
-                }
-            }
-            Text {
-                attr {
-                    width(18f)
-                    fontSize(11f)
-                    color(pal().c(pal().textTertiary))
-                    text("/")
-                    textAlignCenter()
-                    lineHeight(16f)
-                    animate(ANIM_THEME, value = ThemeState.isDark)
-                }
-            }
-            Text {
-                attr {
-                    width(88f)
-                    fontSize(12f)
-                    color(pal().c(pal().down))
-                    text(fmt2(q.low))
-                    fontFamily(NUM_FONT)
-                    textAlignLeft()
-                    animate(ANIM_THEME, value = ThemeState.isDark)
-                }
-            }
-        }
-        Text {
-            attr {
-                width(150f)
-                fontSize(13f)
-                color(pal().c(pal().textSecondary))
-                text(fmtAmount(q.amount))
-                fontFamily(NUM_FONT)
-                textAlignRight()
-                animate(ANIM_THEME, value = ThemeState.isDark)
-            }
-        }
-        View { attr { flex(1f) } }
-        // 行底分隔线（内嵌，保证 vfor 单一孩子约束）
-        View {
-            attr {
-                absolutePosition(top = 59f, left = 0f, right = 0f)
-                height(1f)
-                backgroundColor(ThemeState.palette.c(ThemeState.palette.border))
-                animate(ANIM_THEME, value = ThemeState.isDark)
-            }
-        }
-    }
+    host.hotStocks().forEach { st -> HotStockRow(st) { host.openDetail(st.symbol, "市场") } }
 }
 
 internal fun ViewContainer<*, *>.emptyTable() {
-    val pal = { ThemeState.palette }
+    val colors = { AppTheme.colors }
     View {
         attr { height(120f); allCenter() }
         Text {
             attr {
-                fontSize(13f)
-                color(pal().c(pal().textTertiary))
+                fontSize(AppTypography.fs13)
+                color(colors().c(colors().textTertiary))
                 text("没有符合条件的股票")
-                animate(ANIM_THEME, value = ThemeState.isDark)
             }
         }
     }
 }
 
-internal fun ViewContainer<*, *>.sparklineView(values: List<Double>, isUp: Boolean, w: Float, h: Float) {
-    Canvas({
-        attr { width(w); height(h) }
-    }) { context, cw, ch ->
-        val pal = { ThemeState.palette }
-        drawSparkLine(context, values, pal().c(if (isUp) pal().up else pal().down), cw, ch)
+// ---------- 筛选工具条 ----------
+internal fun ViewContainer<*, *>.marketToolbar(host: MarketShell) {
+    View {
+        attr { flexDirectionRow(); alignItemsCenter() }
+        AppTabs(listOf("全部", "沪市", "深市", "创业板", "科创板"), { host.marketTab }, 64f, 44f) { t ->
+            host.marketTab = t
+            host.refreshMarketRows()
+        }
+        View { attr { flex(1f) } }
+        toolbarButton(host, "排序") {
+            // 排序按钮文案由下方 Text 渲染
+        }
+        View { attr { width(8f) } }
+        toolbarButton(host, "筛选") { }
+        View { attr { width(8f) } }
+        toolbarButton(host, "搜索") { }
+    }
+}
+
+/** 工具条按钮：底+描边+图标+文字。 */
+internal fun ViewContainer<*, *>.toolbarButton(
+    host: MarketShell,
+    label: String,
+    icon: ViewContainer<*, *>.() -> Unit,
+) {
+    val colors = { AppTheme.colors }
+    View {
+        attr {
+            height(32f); borderRadius(AppRadius.r8)
+            flexDirectionRow(); alignItemsCenter()
+            padding(left = 10f, right = 10f)
+            backgroundColor(colors().c(colors().surfaceSecondary))
+            border(Border(1f, BorderStyle.SOLID, colors().c(colors().border)))
+            highlightBackgroundColor(colors().ca(colors().textSecondary, 10))
+            cssClass("zn-nav zn-click")
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+        event { click {
+            when (label) {
+                "筛选" -> {
+                    host.filterOpen = !host.filterOpen
+                    host.searchOpen = false; host.sortOpen = false; host.themeOpen = false; host.settingsOpen = false
+                }
+                "搜索" -> {
+                    host.searchOpen = !host.searchOpen
+                    host.filterOpen = false; host.sortOpen = false; host.themeOpen = false; host.settingsOpen = false
+                }
+                else -> {
+                    host.sortOpen = !host.sortOpen
+                    host.searchOpen = false; host.filterOpen = false; host.themeOpen = false; host.settingsOpen = false
+                }
+            }
+        } }
+        icon()
+        if (label == "排序") {
+            Text {
+                attr {
+                    marginLeft(4f)
+                    fontSize(AppTypography.fs13)
+                    color(colors().c(colors().textPrimary))
+                    text(host.sortBy)
+                }
+            }
+            Icon(IconKind.CHEVRON_DOWN, 12f, { colors().textTertiary })
+        } else {
+            Icon(if (label == "筛选") IconKind.FILTER else IconKind.SEARCH, 13f, { colors().textSecondary })
+            Text {
+                attr {
+                    marginLeft(6f)
+                    fontSize(AppTypography.fs13)
+                    color(colors().c(colors().textSecondary))
+                    text(label)
+                }
+            }
+        }
     }
 }
 
 // ================= 自选 =================
 internal fun ViewContainer<*, *>.watchlistSection(host: MarketShell) {
-    sectionTitle(
-        "自选", "关注的股票，随时查看行情",
-        if (host.watchlist.isEmpty()) "" else "${host.watchlist.size} 只 · Demo 数据"
-    )
-    View { attr { height(16f) } }
-    vif({ host.watchlist.isEmpty() }) {
-        View {
-            attr { height(240f); allCenter() }
-            Icon(IconKind.STAR, 26f, ThemeState.palette.textTertiary)
-            Text {
-                attr {
-                    marginTop(12f)
-                    fontSize(14f)
-                    color(ThemeState.palette.c(ThemeState.palette.textSecondary))
-                    text("还没有自选股票")
-                    animate(ANIM_THEME, value = ThemeState.isDark)
-                }
-            }
-            Text {
-                attr {
-                    marginTop(6f)
-                    fontSize(12f)
-                    color(ThemeState.palette.c(ThemeState.palette.textTertiary))
-                    text("在个股详情页点击星标即可加入自选")
-                    animate(ANIM_THEME, value = ThemeState.isDark)
-                }
-            }
-            View { attr { height(18f) } }
-            OutlineButton("去市场看看", 34f, onClick = { host.section = "市场" })
+    val colors = { AppTheme.colors }
+    View { attr { marginTop(32f) } }
+    Text {
+        attr {
+            fontSize(AppTypography.fs24); fontWeightSemiBold()
+            color(colors().c(colors().textPrimary))
+            text("自选")
+            animate(ANIM_THEME, value = AppTheme.isDark)
         }
     }
+    View { attr { marginTop(6f) } }
+    Text {
+        attr {
+            fontSize(AppTypography.fs13)
+            color(colors().c(colors().textSecondary))
+            text(if (host.watchlist.isEmpty()) "关注的股票会出现在这里" else "关注的股票，随时查看行情")
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+    }
+    View { attr { height(20f) } }
+    vif({ host.watchlist.isEmpty() }) {
+        EmptyState(
+            IconKind.STAR, "暂无自选股票",
+            "将感兴趣的股票加入自选，\n可以在这里快速查看行情。",
+            "搜索股票",
+        ) { host.searchOpen = true }
+    }
     velse {
-        Hdiv1()
-        View { attr { height(16f) } }
-        tableHeader()
+        Divider()
+        View { attr { height(8f) } }
+        StockTableHeader(host.isNarrow())
         vfor({ host.watchlist }) { sym ->
-            host.quoteOf(sym)?.let { q -> stockRow(host, q) }
+            host.quoteOf(sym)?.let { q ->
+                StockRow(q, host.sparkOf(q), host.isNarrow()) { host.openDetail(q.symbol, "自选") }
+            }
         }
     }
 }
 
 // ================= 排行 =================
 internal fun ViewContainer<*, *>.rankSection(host: MarketShell) {
-    sectionTitle("排行", "按今日涨跌幅排序 · 沪深 A 股", "今日 · Demo 数据")
-    View { attr { height(16f) } }
-    Hdiv1()
+    val colors = { AppTheme.colors }
+    View { attr { marginTop(32f) } }
+    Text {
+        attr {
+            fontSize(AppTypography.fs24); fontWeightSemiBold()
+            color(colors().c(colors().textPrimary))
+            text("排行")
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+    }
+    View { attr { marginTop(6f) } }
+    Text {
+        attr {
+            fontSize(AppTypography.fs13)
+            color(colors().c(colors().textSecondary))
+            text("按今日涨跌幅排序 · 沪深 A 股")
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+    }
+    View { attr { height(20f) } }
+    Divider()
     View { attr { height(8f) } }
-    tableHeader()
-    host.rankRows().forEach { q -> stockRow(host, q) }
+    StockTableHeader(host.isNarrow())
+    host.rankRows().forEach { q ->
+        StockRow(q, host.sparkOf(q), host.isNarrow()) { host.openDetail(q.symbol, "排行") }
+    }
     View { attr { height(20f) } }
     Text {
         attr {
-            fontSize(11f)
-            color(ThemeState.palette.c(ThemeState.palette.textTertiary))
+            fontSize(AppTypography.fs11)
+            color(colors().c(colors().textTertiary))
             text("排行数据为演示数据，仅用于说明产品形态。")
-            animate(ANIM_THEME, value = ThemeState.isDark)
         }
     }
 }
 
 // ================= AI 研究 =================
 internal fun ViewContainer<*, *>.aiSection(host: MarketShell) {
-    val pal = { ThemeState.palette }
-    sectionTitle("AI 研究", "知牛多智能体 · 每日市场研判", "今日 · Demo 数据")
-    View { attr { height(16f) } }
-    View {
+    val colors = { AppTheme.colors }
+    View { attr { marginTop(32f) } }
+    Text {
         attr {
-            height(124f)
-            borderRadius(10f)
-            border(Border(1f, BorderStyle.SOLID, pal().c(pal().borderStrong)))
-            backgroundColor(pal().c(pal().surface))
-            cssClass("zn-card")
-            animate(ANIM_THEME, value = ThemeState.isDark)
+            fontSize(AppTypography.fs24); fontWeightSemiBold()
+            color(colors().c(colors().textPrimary))
+            text("AI 研究")
+            animate(ANIM_THEME, value = AppTheme.isDark)
         }
+    }
+    View { attr { marginTop(6f) } }
+    Text {
+        attr {
+            fontSize(AppTypography.fs13)
+            color(colors().c(colors().textSecondary))
+            text("知牛多智能体 · 每日市场研判")
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+    }
+    View { attr { height(20f) } }
+    AppCard {
         View {
-            attr { padding(top = 16f, left = 18f, right = 18f) }
-            View {
-                attr { flexDirectionRow(); alignItemsCenter() }
-                Icon(IconKind.SPARKLES, 16f, pal().textPrimary)
-                Text {
-                    attr {
-                        marginLeft(8f)
-                        fontSize(15f); fontWeightSemiBold()
-                        color(pal().c(pal().textPrimary))
-                        text("知牛 AI · 市场观点")
-                        animate(ANIM_THEME, value = ThemeState.isDark)
-                    }
-                }
-                View { attr { flex(1f) } }
-                Text {
-                    attr {
-                        fontSize(12f)
-                        color(pal().c(pal().textTertiary))
-                        text("综合情绪 62 · 偏暖")
-                        animate(ANIM_THEME, value = ThemeState.isDark)
-                    }
-                }
-            }
-            View { attr { height(10f) } }
+            attr { flexDirectionRow(); alignItemsCenter() }
+            Icon(IconKind.SPARKLES, 16f, { colors().textPrimary })
             Text {
                 attr {
-                    fontSize(13f)
-                    lineHeight(21f)
-                    color(pal().c(pal().textSecondary))
-                    text("指数温和放量上行，主线集中在消费与新能源；短线情绪回暖，但需留意量能持续性。")
-                    animate(ANIM_THEME, value = ThemeState.isDark)
+                    marginLeft(8f)
+                    fontSize(AppTypography.fs15); fontWeightSemiBold()
+                    color(colors().c(colors().textPrimary))
+                    text("知牛 AI · 市场观点")
                 }
+            }
+            View { attr { flex(1f) } }
+            StatusBadge("综合情绪 62 · 偏暖", { colors().up })
+        }
+        View { attr { height(12f) } }
+        Text {
+            attr {
+                fontSize(AppTypography.fs13); lineHeight(21f)
+                color(colors().c(colors().textSecondary))
+                text("指数温和放量上行，主线集中在消费与新能源；短线情绪回暖，但需留意量能持续性。")
             }
         }
     }
     View { attr { height(24f) } }
-    Text {
-        attr {
-            fontSize(13f); fontWeightMedium()
-            color(pal().c(pal().textPrimary))
-            text("今日 AI 观点")
-            animate(ANIM_THEME, value = ThemeState.isDark)
-        }
-    }
-    View { attr { height(6f) } }
-    Hdiv1()
+    SectionHeader("今日 AI 观点")
+    View { attr { height(4f) } }
+    Divider()
     marketInsights().forEach { ins ->
         View {
             attr {
@@ -1039,30 +711,16 @@ internal fun ViewContainer<*, *>.aiSection(host: MarketShell) {
                 alignItemsCenter()
                 cssClass("zn-row")
             }
-            View {
-                attr {
-                    padding(left = 8f, right = 8f)
-                    borderRadius(6f)
-                    backgroundColor(pal().ca(ins.tagHex, 12))
-                }
-                Text {
-                    attr {
-                        fontSize(11f); fontWeightSemiBold()
-                        color(pal().c(ins.tagHex))
-                        text(ins.tag)
-                    }
-                }
-            }
+            StatusBadge(ins.tag, { ins.tagHex })
             Text {
                 attr {
                     marginLeft(12f)
-                    fontSize(13f)
-                    color(pal().c(pal().textSecondary))
+                    fontSize(AppTypography.fs13)
+                    color(colors().c(colors().textSecondary))
                     text(ins.text)
-                    animate(ANIM_THEME, value = ThemeState.isDark)
                 }
             }
         }
-        Hdiv1()
+        Divider()
     }
 }

@@ -14,14 +14,14 @@ enum class IconKind { SEARCH, STAR, SUN, MOON, MONITOR, SETTINGS, FILTER, ARROW_
 fun ViewContainer<*, *>.Icon(
     kind: IconKind,
     size: Float = 18f,
-    colorHex: String? = null,
+    colorHex: () -> String? = { null },
     filled: Boolean = false,
 ) {
     Canvas({
         attr { width(size); height(size) }
     }) { context, w, h ->
-        val pal = ThemeState.palette
-        val color = Color(hexI(colorHex ?: pal.textSecondary))
+        val pal = AppTheme.colors
+        val color = Color(hexI(colorHex() ?: pal.textSecondary))
         drawIcon(context, kind, size, color, filled)
     }
 }
