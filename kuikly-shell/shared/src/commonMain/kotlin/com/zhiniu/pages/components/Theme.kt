@@ -73,7 +73,7 @@ open class AppColors(
     val dif: String, val dea: String, val rsi: String,
     val chartBg: String, val chartGrid: String, val axisText: String,
     val crosshair: String,         // Crosshair 虚线
-    val aiAccent: String = "#A56BEA", // AI 高亮色（仅在 AI 区域）
+    val aiAccent: String = "#D9FF43", // AI 高亮色（仅在 AI 区域，绿黄荧光）
     val surfaceRaised: String = surface, // Surface Raised（Dark 用）
 )
 
@@ -89,8 +89,8 @@ object LightColors : AppColors(
     textPrimary = "#171A1F",
     textSecondary = "#66707A",
     textTertiary = "#98A1AB",
-    up = "#E5484D",
-    down = "#13A66A",
+    up = "#F04F5F",
+    down = "#16B364",
     flat = "#98A1AB",
     ma5 = "#E9A23B",
     ma10 = "#4D7CFE",
@@ -117,8 +117,8 @@ object DarkColors : AppColors(
     textPrimary = "#F3F4F5",
     textSecondary = "#9AA3AD",
     textTertiary = "#69727D",
-    up = "#E5484D",
-    down = "#13A66A",
+    up = "#F04F5F",
+    down = "#16B364",
     flat = "#69727D",
     ma5 = "#E9A23B",
     ma10 = "#4D7CFE",

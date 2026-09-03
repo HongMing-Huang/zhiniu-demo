@@ -23,7 +23,7 @@
 ### 2.2 视觉气质
 - 关键词：克制 / 清晰 / 冷静 / 高信息密度 / 金融 / 工具 / 准确
 - 禁：传统 Admin Dashboard 巨型 Card、ChatGPT 首页、蓝紫渐变、毛玻璃、霓虹发光、过量 Shadow、Emoji
-- 图表颜色：仅 A 股红涨 #E5484D / 绿跌 #14A66A；UI 自身保持黑白灰
+- 图表颜色：仅 A 股红涨 #F04F5F / 绿跌 #16B364；UI 自身保持黑白灰；AI 强调仅在 AI 区域用 #D9FF43（前景深色 #0B0D0F），MA/RSI 等指标线用橙/蓝/紫区分（不与 AI 强调同色系）
 
 ### 2.3 主题
 - Light：Page #F6F7F9 · Surface #FFFFFF · SurfaceSubtle #F2F4F6 · Hover #EEF1F4 · Border #E4E7EB · BorderStrong #D5D9DE · TextPrimary #15181C · TextSecondary #68717C · TextMuted #969FA9
