@@ -4,7 +4,7 @@
 package com.zhiniu
 
 import com.zhiniu.domain.model.CandleDirection
-import com.zhiniu.domain.model.KLineBar
+import com.zhiniu.domain.model.Candle
 import com.zhiniu.domain.model.KLineChart
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 class KLineChartTest {
 
     private fun bar(open: Double, close: Double, high: Double, low: Double) =
-        KLineBar("2026-01-01", open, high, low, close, 100L)
+        Candle("2026-01-01", open, high, low, close, 100L)
 
     @Test fun `ma5 correct windowed average`() {
         val closes = listOf(1.0, 2.0, 3.0, 4.0, 5.0, 6.0)

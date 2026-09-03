@@ -1,12 +1,11 @@
-// 知牛 · 公共按钮（底层使用 Kuikly 官方 Button 组件；图标类使用 View+Canvas）
+// 知牛 · 公共按钮（AppButton + IconButton）
+// 风格：克制、黑色 Primary，无大圆角；动画 100ms 背景。
 package com.zhiniu.pages.components.common
 
 import com.tencent.kuikly.core.base.Animation
 import com.tencent.kuikly.core.base.Border
 import com.tencent.kuikly.core.base.BorderStyle
-import com.tencent.kuikly.core.base.Color
 import com.tencent.kuikly.core.base.ViewContainer
-import com.tencent.kuikly.core.views.compose.Button
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
 import com.zhiniu.pages.components.ANIM_THEME
@@ -15,135 +14,147 @@ import com.zhiniu.pages.components.AppTheme
 import com.zhiniu.pages.components.AppTypography
 import com.zhiniu.pages.components.Icon
 import com.zhiniu.pages.components.IconKind
-import com.zhiniu.pages.components.cssClass
 import com.zhiniu.pages.components.c
 import com.zhiniu.pages.components.ca
+import com.zhiniu.pages.components.cssClass
 
-/** 主按钮：深底白字（Light 反转于 Dark）。用于 AI 分析 / 发送。 */
+/** 主按钮：textPrimary 实色 + 反色文字。 */
 fun ViewContainer<*, *>.PrimaryButton(label: String, height: Float = 36f, onClick: () -> Unit) {
-    val colors = { AppTheme.colors }
-    val bg = if (AppTheme.isDark) colors().textPrimary else colors().textPrimary
-    val fg = if (AppTheme.isDark) "#17191C" else "#FFFFFF"
-    Button {
+    val colors = AppTheme.colors
+    View {
         attr {
             height(height)
-            backgroundColor(colors().c(bg))
-            highlightBackgroundColor(colors().ca(colors().textSecondary, 26))
-            borderRadius(AppRadius.r8)
             padding(left = 16f, right = 16f)
-            titleAttr {
+            borderRadius(AppRadius.radius6)
+            backgroundColor(colors.c(colors.textPrimary))
+            highlightBackgroundColor(colors.ca(colors.textSecondary, 18))
+            alignItemsCenter(); allCenter()
+            cssClass("zn-click")
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+        event { click { onClick() } }
+        Text {
+            attr {
                 fontSize(AppTypography.fs14); fontWeightSemiBold()
-                color(colors().c(fg))
+                color(colors.c(colors.surface))
                 text(label)
             }
-            animate(ANIM_THEME, value = AppTheme.isDark)
-        }
-        event {
-            click { onClick() }
         }
     }
 }
 
-/** 次按钮：表面 + 描边。用于 加自选。 */
+/** 次按钮：surface 底 + 1px border。 */
 fun ViewContainer<*, *>.SecondaryButton(label: String, height: Float = 36f, onClick: () -> Unit) {
-    val colors = { AppTheme.colors }
-    Button {
+    val colors = AppTheme.colors
+    View {
         attr {
             height(height)
-            backgroundColor(colors().c(colors().surface))
-            border(Border(1f, BorderStyle.SOLID, colors().c(colors().borderStrong)))
-            highlightBackgroundColor(colors().ca(colors().textSecondary, 10))
-            borderRadius(AppRadius.r8)
             padding(left = 14f, right = 14f)
-            titleAttr {
-                fontSize(AppTypography.fs14)
-                color(colors().c(colors().textPrimary))
-                text(label)
-            }
+            borderRadius(AppRadius.radius6)
+            backgroundColor(colors.c(colors.surface))
+            border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+            highlightBackgroundColor(colors.ca(colors.textSecondary, 10))
+            alignItemsCenter(); allCenter()
+            cssClass("zn-click")
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
-        event {
-            click { onClick() }
-        }
-    }
-}
-
-/** 幽灵按钮：透明 + 弱文字。用于 筛选 / 更多。 */
-fun ViewContainer<*, *>.GhostButton(label: String, height: Float = 34f, onClick: () -> Unit) {
-    val colors = { AppTheme.colors }
-    Button {
-        attr {
-            height(height)
-            borderRadius(AppRadius.r8)
-            padding(left = 12f, right = 12f)
-            titleAttr {
-                fontSize(AppTypography.fs13)
-                color(colors().c(colors().textSecondary))
+        event { click { onClick() } }
+        Text {
+            attr {
+                fontSize(AppTypography.fs14)
+                color(colors.c(colors.textPrimary))
                 text(label)
             }
-            cssClass("zn-iconbtn")
-        }
-        event {
-            click { onClick() }
         }
     }
 }
 
-/** 图标按钮（Canvas 线性图标，16/18/20px）。 */
+/** 幽灵按钮：透明 + 弱文字。 */
+fun ViewContainer<*, *>.GhostButton(label: String, height: Float = 34f, onClick: () -> Unit) {
+    val colors = AppTheme.colors
+    View {
+        attr {
+            height(height)
+            padding(left = 12f, right = 12f)
+            borderRadius(AppRadius.radius6)
+            backgroundColor(colors.c(colors.surface))
+            highlightBackgroundColor(colors.ca(colors.textSecondary, 8))
+            alignItemsCenter(); allCenter()
+            cssClass("zn-click")
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+        event { click { onClick() } }
+        Text {
+            attr {
+                fontSize(AppTypography.fs13)
+                color(colors.c(colors.textSecondary))
+                text(label)
+            }
+        }
+    }
+}
+
+/** 图标按钮：36×36 方块，hover 表面色。 */
 fun ViewContainer<*, *>.IconButton(
     kind: IconKind,
     size: Float = 18f,
-    height: Float = 36f,
+    box: Float = 36f,
+    colorHex: () -> String? = { null },
     onClick: () -> Unit,
 ) {
-    val colors = { AppTheme.colors }
+    val colors = AppTheme.colors
+    val finalColor = colorHex() ?: colors.textSecondary
     View {
         attr {
-            height(height); width(height)
-            borderRadius(AppRadius.r8)
+            width(box); height(box)
+            borderRadius(AppRadius.radius6)
             allCenter()
-            backgroundColor(Color.TRANSPARENT)
-            highlightBackgroundColor(colors().ca(colors().textSecondary, 10))
+            backgroundColor(com.tencent.kuikly.core.base.Color.TRANSPARENT)
+            highlightBackgroundColor(colors.ca(colors.textSecondary, 12))
             cssClass("zn-iconbtn zn-click")
+            animate(ANIM_THEME, value = AppTheme.isDark)
         }
         event { click { onClick() } }
-        Icon(kind, size, { colors().textSecondary })
+        Icon(kind, size) { finalColor }
     }
 }
 
-/** 自选按钮：星标切换（Canvas 绘制，非 Emoji）。 */
-fun ViewContainer<*, *>.FavoriteButton(
-    subscribed: () -> Boolean,
-    height: Float = 34f,
-    onToggle: () -> Unit,
-) {
-    val colors = { AppTheme.colors }
+
+/** 自选按钮：星标切换（调用方传入收藏切换逻辑）。 */
+fun ViewContainer<*, *>.FavoriteButton(active: () -> Boolean, height: Float = 34f, onToggle: () -> Unit) {
+    val colors = AppTheme.colors
+    val isActive = active()
     View {
         attr {
             height(height)
-            borderRadius(AppRadius.r8)
-            flexDirectionRow()
-            alignItemsCenter()
-            padding(left = 12f, right = 12f)
-            border(Border(1f, BorderStyle.SOLID, colors().c(colors().borderStrong)))
-            backgroundColor(colors().c(colors().surface))
-            highlightBackgroundColor(colors().ca(colors().textSecondary, 8))
-            cssClass("zn-nav zn-click")
+            padding(left = 14f, right = 14f)
+            borderRadius(6f)
+            flexDirectionRow(); alignItemsCenter()
+            backgroundColor(colors.c(colors.surface))
+            border(
+                com.tencent.kuikly.core.base.Border(
+                    1f,
+                    com.tencent.kuikly.core.base.BorderStyle.SOLID,
+                    colors.c(colors.border),
+                )
+            )
+            highlightBackgroundColor(colors.ca(colors.textSecondary, 8))
+            cssClass("zn-click")
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
         event { click { onToggle() } }
         Icon(
-            IconKind.STAR, 15f,
-            { if (subscribed()) colors().textPrimary else colors().textTertiary },
-            filled = subscribed(),
-        )
+            IconKind.STAR,
+            14f,
+        ) {
+            if (isActive) colors.textPrimary else colors.textTertiary
+        }
+        View { attr { width(6f) } }
         Text {
             attr {
-                marginLeft(6f)
                 fontSize(AppTypography.fs13)
-                color(colors().c(if (subscribed()) colors().textPrimary else colors().textSecondary))
-                text(if (subscribed()) "已自选" else "加自选")
-                animate(ANIM_THEME, value = AppTheme.isDark)
+                color(colors.c(if (isActive) colors.textPrimary else colors.textSecondary))
+                text(if (isActive) "已自选" else "加自选")
             }
         }
     }

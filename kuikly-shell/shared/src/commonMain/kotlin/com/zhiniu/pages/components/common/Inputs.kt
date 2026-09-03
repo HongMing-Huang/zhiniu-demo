@@ -1,4 +1,5 @@
-// 知牛 · 公共输入组件（底层 Kuikly Input）
+// 知牛 · 公共输入（AppInput / SearchField）
+// AppInput：底部输入条（AI Composer）；SearchField：Header 全局搜索（伪输入，点击打开 StockSearchOverlay）。
 package com.zhiniu.pages.components.common
 
 import com.tencent.kuikly.core.base.Animation
@@ -10,113 +11,87 @@ import com.tencent.kuikly.core.views.Input
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
 import com.zhiniu.pages.components.ANIM_THEME
+import com.zhiniu.pages.components.ca
+import com.zhiniu.pages.components.cssClass
 import com.zhiniu.pages.components.AppRadius
 import com.zhiniu.pages.components.AppTheme
 import com.zhiniu.pages.components.AppTypography
 import com.zhiniu.pages.components.Icon
 import com.zhiniu.pages.components.IconKind
 import com.zhiniu.pages.components.c
-import com.zhiniu.pages.components.ca
-import com.zhiniu.pages.components.cssClass
 
-/** 输入框：圆角容器 + Kuikly Input（focus 时 border 加深、表面提亮）。 */
+/**
+ * 文本输入框（圆角容器 + Kuikly Input）。
+ * @param height 输入框高（38 标准）。
+ */
 fun ViewContainer<*, *>.AppInput(
     placeholder: String,
     text: String,
     height: Float = 38f,
-    focused: Boolean = false,
     onTextChange: (String) -> Unit,
     onReturn: (() -> Unit)? = null,
-    autofocus: Boolean = false,
 ) {
-    val colors = { AppTheme.colors }
+    val colors = AppTheme.colors
     View {
         attr {
-            height(height)
             flex(1f)
-            borderRadius(AppRadius.r8)
-            backgroundColor(colors().c(if (focused) colors().surface else colors().surfaceSecondary))
-            border(Border(1f, BorderStyle.SOLID, colors().c(if (focused) colors().borderStrong else colors().border)))
+            height(height)
+            borderRadius(AppRadius.radius6)
+            backgroundColor(colors.c(colors.surfaceSecondary))
+            border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+            padding(left = 12f, right = 12f)
             overflow(true)
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
         Input {
             attr {
+                flex(1f)
                 height(height)
                 fontSize(AppTypography.fs13)
-                color(colors().c(colors().textPrimary))
+                color(colors.c(colors.textPrimary))
                 placeholder(placeholder)
-                placeholderColor(colors().c(colors().textTertiary))
-                tintColor(colors().c(colors().textPrimary))
+                placeholderColor(colors.c(colors.textTertiary))
+                tintColor(colors.c(colors.textPrimary))
                 backgroundColor(Color.TRANSPARENT)
-                if (autofocus) autofocus(true)
             }
             event {
                 textDidChange { params -> onTextChange(params.text) }
-                inputReturn {
-                    onReturn?.invoke()
-                }
+                onReturn?.let { inputReturn { it() } }
             }
         }
     }
 }
 
-/** 搜索框：Search 图标 + Input，用于 Header / 弹层。 */
+/**
+ * Header 全局搜索：伪输入框（240×36），点击后由调用方打开 StockSearchOverlay。
+ * Header 是全局入口；Market 工具条只放 IconButton 触发同一 Overlay。
+ */
 fun ViewContainer<*, *>.SearchField(
-    placeholder: String,
-    text: String,
-    width: Float,
-    height: Float = 36f,
-    onTextChange: (String) -> Unit,
-    onReturn: (() -> Unit)? = null,
-    onFocus: (() -> Unit)? = null,
+    width: Float = 240f,
+    onClick: () -> Unit,
 ) {
-    val colors = { AppTheme.colors }
+    val colors = AppTheme.colors
     View {
         attr {
-            width(width); height(height)
-            borderRadius(AppRadius.r8)
-            flexDirectionRow()
-            alignItemsCenter()
+            width(width); height(36f)
+            borderRadius(AppRadius.radius6)
+            flexDirectionRow(); alignItemsCenter()
             padding(left = 10f, right = 10f)
-            backgroundColor(colors().c(colors().surfaceSecondary))
-            border(Border(1f, BorderStyle.SOLID, colors().c(colors().border)))
-            highlightBackgroundColor(colors().ca(colors().textSecondary, 8))
-            cssClass("zn-nav zn-click")
+            backgroundColor(colors.c(colors.surfaceSecondary))
+            border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+            highlightBackgroundColor(colors.ca(colors.textSecondary, 8))
+            cssClass("zn-iconbtn zn-click")
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
-        Icon(IconKind.SEARCH, 15f, { colors().textTertiary })
-        View {
-            attr { width(8f) }
-        }
-        Input {
+        event { click { onClick() } }
+        Icon(IconKind.SEARCH, 15f) { colors.textTertiary }
+        View { attr { width(8f) } }
+        Text {
             attr {
-                height(height)
-                flex(1f)
                 fontSize(AppTypography.fs13)
-                color(colors().c(colors().textPrimary))
-                placeholder(placeholder)
-                placeholderColor(colors().c(colors().textTertiary))
-                tintColor(colors().c(colors().textPrimary))
-                backgroundColor(Color.TRANSPARENT)
+                color(colors.c(colors.textTertiary))
+                text("搜索股票 / 代码")
             }
-            event {
-                textDidChange { params -> onTextChange(params.text) }
-                inputReturn { onReturn?.invoke() }
-                inputFocus { onFocus?.invoke() }
-            }
-        }
-    }
-}
-
-/** 标签文本（输入框左侧辅助）。 */
-fun ViewContainer<*, *>.FieldLabel(label: String) {
-    val colors = { AppTheme.colors }
-    Text {
-        attr {
-            fontSize(AppTypography.fs12)
-            color(colors().c(colors().textSecondary))
-            text(label)
         }
     }
 }

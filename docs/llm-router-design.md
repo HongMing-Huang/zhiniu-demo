@@ -1,31 +1,25 @@
 # 知牛 · 多 LLM 统一路由管理设计（借鉴 Cherry Studio）
 
-> 版本：v1.0 · 2026-08-24
-> 背景：用户指示——LLM 不是简单接一个模型，要参考 [CherryHQ/cherry-studio](https://github.com/CherryHQ/cherry-studio) 做多厂商适配、统一路由、内容管理的完整能力；其他端暂停，先完成 Web 端。
-> 本文档 = 调研结论 + 差距对照 + 增强设计 + Web 冲刺计划。
-
 ---
 
 ## 1. Cherry Studio 调研结论（2026-08-24 实测仓库）
 
-> 项目体量：PR 编号已达 #19236+，近两万个 PR，9+ 活跃贡献者，2026-08 连续多日密集提交，工程化成熟度极高（CI/CD + 分支保护 + i18n 门禁 + changeset 版本管理）。技术栈：Electron + React + TypeScript，pnpm monorepo。
-
 ### 1.1 它的多 LLM 管理 core design（我们借鉴的四件事）
 
-| # | 设计 | Cherry Studio 实现 | 对知牛的价值 |
-|---|---|---|---|
-| ① | **声明式 Provider preset** | 每个 provider 一个 TS 配置文件（`packages/provider-registry/src/providers/*.ts`）：`baseUrl` + `endpointTypes` + `adapterFamily` + `defaultChatEndpoint`，编译生成 `providers.json` / `models.json` / `provider-models.json` catalog | Provider 配置数据化：新增厂商 = 加一个 JSON 条目，不改业务代码 |
-| ② | **模型自动发现** | 从 provider 自身 API（`/models`）拉取模型列表 + 中央 `models.json` 目录（含能力标签、contextWindow 元数据） | 网关有 Key 时动态聚合各厂商真实模型清单，而非手写死 |
-| ③ | **三层端点解析链** | `模型级 endpointTypes → 网关路由 resolveGatewayChatRoute → provider defaultChatEndpoint`，优先级明确 | 路由不只是全局降级链：模型可覆盖路由（vision 走 vision 模型、reasoning 走 reasoner） |
-| ④ | **配置热更新** | catalog 发布到数据镜像分支，CI 签名分发到所有客户端，模型配置免发版更新 | 知牛场景简化：providers.json 放后端，重启即生效，无需发版 |
+| # | 设计                      | Cherry Studio 实现                                                                                                                                                                                                     | 对知牛的价值                                                      |
+| - | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| ① | **声明式 Provider preset** | 每个 provider 一个 TS 配置文件（`packages/provider-registry/src/providers/*.ts`）：`baseUrl` + `endpointTypes` + `adapterFamily` + `defaultChatEndpoint`，编译生成 `providers.json` / `models.json` / `provider-models.json` catalog | Provider 配置数据化：新增厂商 = 加一个 JSON 条目，不改业务代码                    |
+| ② | **模型自动发现**              | 从 provider 自身 API（`/models`）拉取模型列表 + 中央 `models.json` 目录（含能力标签、contextWindow 元数据）                                                                                                                                    | 网关有 Key 时动态聚合各厂商真实模型清单，而非手写死                                |
+| ③ | **三层端点解析链**             | `模型级 endpointTypes → 网关路由 resolveGatewayChatRoute → provider defaultChatEndpoint`，优先级明确                                                                                                                              | 路由不只是全局降级链：模型可覆盖路由（vision 走 vision 模型、reasoning 走 reasoner） |
+| ④ | **配置热更新**               | catalog 发布到数据镜像分支，CI 签名分发到所有客户端，模型配置免发版更新                                                                                                                                                                            | 知牛场景简化：providers.json 放后端，重启即生效，无需发版                        |
 
 ### 1.2 它踩过的坑（我们直接绕开）
 
-| 坑 | Cherry Studio Issue | 知牛对策 |
-|---|---|---|
-| 模型不兼容被**静默过滤**（选择器里直接消失、无解释） | #18745 | 设置页/模型列表对不可用模型**明示原因**（缺 Key / 限流 / 不支持端点），绝不静默 |
-| 动态 provider 省略 `defaultChatEndpoint` 导致端点解析失败 | #19006 | 每个 provider 必须声明 `defaultModel`，配置加载时校验完整性 |
-| FTS 索引泄漏隐藏 reasoning 内容 | #17661 | 网关日志不落盘 reasoning_content；会话历史仅存用户侧 |
+| 坑                                             | Cherry Studio Issue | 知牛对策                                            |
+| --------------------------------------------- | ------------------- | ----------------------------------------------- |
+| 模型不兼容被**静默过滤**（选择器里直接消失、无解释）                  | #18745              | 设置页/模型列表对不可用模型**明示原因**（缺 Key / 限流 / 不支持端点），绝不静默 |
+| 动态 provider 省略 `defaultChatEndpoint` 导致端点解析失败 | #19006              | 每个 provider 必须声明 `defaultModel`，配置加载时校验完整性      |
+| FTS 索引泄漏隐藏 reasoning 内容                       | #17661              | 网关日志不落盘 reasoning_content；会话历史仅存用户侧             |
 
 ---
 
@@ -33,15 +27,15 @@
 
 现有 `backend/app/config.py` 的能力与缺口：
 
-| 能力 | 现状（config.py） | Cherry Studio | 差距 → 增强动作 |
-|---|---|---|---|
-| Provider 注册 | Python dict 硬编码（3 厂商） | 声明式 preset + catalog | **P0**：抽到 `providers.json`，运行时加载 |
-| 模型清单 | 手写 `models` 列表 | API 自动发现 + 中央目录 | **P0**：网关加 `refresh_models()`（有 Key 时拉 `/v1/models` 聚合缓存） |
-| 路由 | 别名降级链（zhiniu/quick…） | 三层解析（模型级→网关级→provider 默认） | **P1**：models.json 加 `capabilities`（vision/reasoning/fast），别名解析时按能力过滤候选 |
-| 模型元数据 | 无 | 能力标签 + contextWindow | **P1**：随 providers.json 一起声明 |
-| Key 状态 | `/v1/models` 返回 `key_configured` | 设置 UI 管理 | **P1**：`/healthz` 扩展 per-provider 探活（真实调一次轻请求） |
-| 管理 UI | 无 | 完整设置页 | **P0（Web 端）**：新增「模型设置页」（见 §4） |
-| 错误结构化 | ✅ ProviderError 5 类 + 中文提示 | 类似 | 已达标，保持 |
+| 能力          | 现状（config.py）                    | Cherry Studio             | 差距 → 增强动作                                                               |
+| ----------- | -------------------------------- | ------------------------- | ----------------------------------------------------------------------- |
+| Provider 注册 | Python dict 硬编码（3 厂商）            | 声明式 preset + catalog      | **P0**：抽到 `providers.json`，运行时加载                                        |
+| 模型清单        | 手写 `models` 列表                   | API 自动发现 + 中央目录           | **P0**：网关加 `refresh_models()`（有 Key 时拉 `/v1/models` 聚合缓存）               |
+| 路由          | 别名降级链（zhiniu/quick…）             | 三层解析（模型级→网关级→provider 默认） | **P1**：models.json 加 `capabilities`（vision/reasoning/fast），别名解析时按能力过滤候选 |
+| 模型元数据       | 无                                | 能力标签 + contextWindow      | **P1**：随 providers.json 一起声明                                            |
+| Key 状态      | `/v1/models` 返回 `key_configured` | 设置 UI 管理                  | **P1**：`/healthz` 扩展 per-provider 探活（真实调一次轻请求）                          |
+| 管理 UI       | 无                                | 完整设置页                     | **P0（Web 端）**：新增「模型设置页」（见 §4）                                           |
+| 错误结构化       | ✅ ProviderError 5 类 + 中文提示       | 类似                        | 已达标，保持                                                                  |
 
 > 结论：我们的**降级链和错误处理已达标甚至更细**（结构化 reason + 中文排障提示是加分项）；核心差距在「**声明式配置 + 自动发现 + 管理 UI**」三件事，正好都是 Web 端可交付的。
 
@@ -133,13 +127,13 @@ GET /v1/models
 
 ### 4.1 页面结构（Kuikly core DSL，与三页同构）
 
-| 区块 | 内容 | 数据源 |
-|---|---|---|
-| Provider 列表 | 每厂商一行：名称 / base_url / Key 状态徽章（✅已配置 / ⚠️未配置）/ 模型数 | `GET /v1/models` 的 provider 段 |
-| 模型列表 | 按厂商分组；每模型：id / 能力标签（fast·reasoning·vision）/ 可用性（可用置蓝、不可用置灰+原因） | 同上 |
-| 别名路由面板 | 4 条路由（quick/think/flash/vision）各自的降级链可视化：`deepseek → glm → hunyuan` 箭头链 | `routes` 段 |
-| 健康检查 | 「检测连通性」按钮 → 逐厂商探活结果 + 延迟 ms | `GET /healthz?probe=true` |
-| 操作 | 「刷新模型列表」（admin，需网关 Key） | `POST /admin/refresh-models` |
+| 区块          | 内容                                                                      | 数据源                           |
+| ----------- | ----------------------------------------------------------------------- | ----------------------------- |
+| Provider 列表 | 每厂商一行：名称 / base_url / Key 状态徽章（✅已配置 / ⚠️未配置）/ 模型数                       | `GET /v1/models` 的 provider 段 |
+| 模型列表        | 按厂商分组；每模型：id / 能力标签（fast·reasoning·vision）/ 可用性（可用置蓝、不可用置灰+原因）          | 同上                            |
+| 别名路由面板      | 4 条路由（quick/think/flash/vision）各自的降级链可视化：`deepseek → glm → hunyuan` 箭头链 | `routes` 段                    |
+| 健康检查        | 「检测连通性」按钮 → 逐厂商探活结果 + 延迟 ms                                             | `GET /healthz?probe=true`     |
+| 操作          | 「刷新模型列表」（admin，需网关 Key）                                                 | `POST /admin/refresh-models`  |
 
 ### 4.2 交互细节（对齐 §12 的五要素规范）
 
@@ -159,56 +153,54 @@ GET /v1/models
 
 ### 5.1 冲刺任务清单（按序，P0 先行）
 
-| # | 任务 | 验收标准（Web 浏览器） | 评分映射 |
-|---|---|---|---|
-| W-A1 | providers.json 声明式配置迁移 | 网关启动读 JSON；单测 9+3 过 | 25% 工程质量 |
-| W-A2 | 模型自动发现 + /admin/refresh-models | 配 Key 后能拉到厂商真实模型清单 | 10% 真实 API |
-| W-A3 | 聊天页接通真实 LLM（网关 SSE → SseParser → 流式气泡） | 输入问题，逐字流式回答（无 Key 时 Mock 也流式） | 25% AI 场景 |
-| W-A4 | ModelSettingsPage（§4 全部区块） | 可视化 provider/模型/路由/健康 | 25% AI 场景 + 体验 |
-| W-A5 | 多空辩论气泡（PR-09） | 「换个角度看」→ 多/空轮播 + 分歧高亮 | 25% 创新场景 |
-| W-A6 | K 线 Canvas 真渲染（KLineChart 逻辑层已就绪） | 详情页蜡烛图 + MA5/10/20 + 十字游标 | 40% 功能 |
-| W-A7 | 状态机六态 Web 全验证（骨架/空/错/重试/Stale） | 逐态录屏 | 40% 状态完整性 |
-| W-A8 | 演示收尾：8083+8090 双 server 一键脚本 + 录屏 | ≤90s 视频覆盖全链路 | 交付物 |
+| #    | 任务                                     | 验收标准（Web 浏览器）                 | 评分映射           |
+| ---- | -------------------------------------- | ----------------------------- | -------------- |
+| W-A1 | providers.json 声明式配置迁移                 | 网关启动读 JSON；单测 9+3 过           | 25% 工程质量       |
+| W-A2 | 模型自动发现 + /admin/refresh-models         | 配 Key 后能拉到厂商真实模型清单            | 10% 真实 API     |
+| W-A3 | 聊天页接通真实 LLM（网关 SSE → SseParser → 流式气泡） | 输入问题，逐字流式回答（无 Key 时 Mock 也流式） | 25% AI 场景      |
+| W-A4 | ModelSettingsPage（§4 全部区块）             | 可视化 provider/模型/路由/健康         | 25% AI 场景 + 体验 |
+| W-A5 | 多空辩论气泡（PR-09）                          | 「换个角度看」→ 多/空轮播 + 分歧高亮         | 25% 创新场景       |
+| W-A6 | K 线 Canvas 真渲染（KLineChart 逻辑层已就绪）      | 详情页蜡烛图 + MA5/10/20 + 十字游标     | 40% 功能         |
+| W-A7 | 状态机六态 Web 全验证（骨架/空/错/重试/Stale）         | 逐态录屏                          | 40% 状态完整性      |
+| W-A8 | 演示收尾：8083+8090 双 server 一键脚本 + 录屏      | ≤90s 视频覆盖全链路                  | 交付物            |
 
 ### 5.2 明确暂停项（恢复条件）
 
-| 暂停项 | 恢复触发条件 |
-|---|---|
-| iOS 模拟器运行 | 用户 Xcode 下载 iOS Simulator Runtime 后 |
-| Android installDebug | 用户配置 Android SDK / 模拟器后 |
-| 鸿蒙 / macOS | Web 端全部 P0 完成且时间富余 |
+| 暂停项                  | 恢复触发条件                              |
+| -------------------- | ----------------------------------- |
+| iOS 模拟器运行            | 用户 Xcode 下载 iOS Simulator Runtime 后 |
+| Android installDebug | 用户配置 Android SDK / 模拟器后             |
+| 鸿蒙 / macOS           | Web 端全部 P0 完成且时间富余                  |
 
 ### 5.3 比赛要求（评分）对照——Web 单端能拿多少分
 
-| 维度 | Web 端可达成 | 依赖 |
-|---|---|---|
-| 功能完整性 40% | ✅ 全额可达成（三页+设置页+六态全在 Web 验证） | W-A1~A8 |
-| 工程质量 25% | ✅ 全额（四层 + 单测 + 声明式配置是亮点） | W-A1 |
+| 维度        | Web 端可达成                         | 依赖            |
+| --------- | -------------------------------- | ------------- |
+| 功能完整性 40% | ✅ 全额可达成（三页+设置页+六态全在 Web 验证）      | W-A1~A8       |
+| 工程质量 25%  | ✅ 全额（四层 + 单测 + 声明式配置是亮点）         | W-A1          |
 | AI 场景 25% | ✅ 全额（真实 LLM + 流式 + 辩论 + 模型管理可视化） | W-A3~A5 + Key |
-| 加分 10% | 🔶 部分（真实 API✅、体验优化✅；多端覆盖 4 分暂弃） | Web 完成后再回补多端 |
+| 加分 10%    | 🔶 部分（真实 API✅、体验优化✅；多端覆盖 4 分暂弃）  | Web 完成后再回补多端  |
 
 > 策略结论：**Web 打穿 = 40+25+25+6 ≈ 96 分的上限路径**，多端 4 分作为时间富余后的回补项，不阻塞主线。
-
 
 ### 5.4 业务深度冲刺清单（W-B，借鉴 Cherry Studio 真实使用形态）
 
 > §5.1 是工程冲刺，本节是**业务深度冲刺**——把"日常会用"的体验补齐。
 
-| # | 任务 | 验收标准 | 评分映射 |
-|---|---|---|---|
-| W-B1 | **14 家预置服务商**集成到 providers.json | 配置生效，UI 列出全部 | 10% 真实 API |
-| W-B2 | **ModelSettingsPage** 服务商卡片 + 弹窗填 Key + 一键探活 | 浏览器端可演示填 Key → 看到模型列表 | 25% AI 场景 + 体验 |
-| W-B3 | **StockSearchPage** 实时搜索 + 联想 + 历史 | 输入 ticker/拼音/汉字联想可点 | 40% 功能 |
-| W-B4 | **NewsListPage / NewsDetailPage** 资讯流（7×24 + 个股） | 至少 2 种 tab + AI 摘要 | 40% 功能 |
-| W-B5 | **IndexListPage / IndexDetailPage** 指数完整闭环 | 主流指数列表 + 点击进详情 | 40% 功能 |
-| W-B6 | **SectorBoardPage** 申万行业板块 | 列表 + 涨跌幅排行 | 40% 功能 |
-| W-B7 | **ChatSessionListPage / ChatDetailPage** 会话管理 + 流式 | 多会话管理 + 流式渲染 | 25% AI |
-| W-B8 | **WatchlistPage / AlertSettingsPage** 自选 + 预警 | CRUD 完整 + 拖拽排序 | 40% 功能 |
-| W-B9 | **Function Calling 7 工具** 后端实现 + 工具调用可视化 | 聊天页能跑通"看茅台 PE" → 工具调 → 返回 | 25% AI 创新 |
-| W-B10 | **多空辩论 DebateViewPage**（PR-09 闭环） | 多/空轮播 + 分歧高亮 | 25% AI 创新 |
-| W-B11 | **AgentProgressOverlay** 全屏执行进度 | 4 Agent 逐个点亮 | 25% AI 体验 |
-| W-B12 | **Analytics 用量面板**（v1 轻量版） | 3 张卡 + 调用分布图 | 10% 体验 + 加分 |
-
+| #     | 任务                                                 | 验收标准                      | 评分映射           |
+| ----- | -------------------------------------------------- | ------------------------- | -------------- |
+| W-B1  | **14 家预置服务商**集成到 providers.json                    | 配置生效，UI 列出全部              | 10% 真实 API     |
+| W-B2  | **ModelSettingsPage** 服务商卡片 + 弹窗填 Key + 一键探活       | 浏览器端可演示填 Key → 看到模型列表     | 25% AI 场景 + 体验 |
+| W-B3  | **StockSearchPage** 实时搜索 + 联想 + 历史                 | 输入 ticker/拼音/汉字联想可点       | 40% 功能         |
+| W-B4  | **NewsListPage / NewsDetailPage** 资讯流（7×24 + 个股）   | 至少 2 种 tab + AI 摘要        | 40% 功能         |
+| W-B5  | **IndexListPage / IndexDetailPage** 指数完整闭环         | 主流指数列表 + 点击进详情            | 40% 功能         |
+| W-B6  | **SectorBoardPage** 申万行业板块                         | 列表 + 涨跌幅排行                | 40% 功能         |
+| W-B7  | **ChatSessionListPage / ChatDetailPage** 会话管理 + 流式 | 多会话管理 + 流式渲染              | 25% AI         |
+| W-B8  | **WatchlistPage / AlertSettingsPage** 自选 + 预警      | CRUD 完整 + 拖拽排序            | 40% 功能         |
+| W-B9  | **Function Calling 7 工具** 后端实现 + 工具调用可视化           | 聊天页能跑通"看茅台 PE" → 工具调 → 返回 | 25% AI 创新      |
+| W-B10 | **多空辩论 DebateViewPage**（PR-09 闭环）                  | 多/空轮播 + 分歧高亮              | 25% AI 创新      |
+| W-B11 | **AgentProgressOverlay** 全屏执行进度                    | 4 Agent 逐个点亮              | 25% AI 体验      |
+| W-B12 | **Analytics 用量面板**（v1 轻量版）                         | 3 张卡 + 调用分布图              | 10% 体验 + 加分    |
 
 ---
 
@@ -218,28 +210,28 @@ GET /v1/models
 
 ### 6.1 页面总览（5 大类，19 页）
 
-| 大类 | 页面 | 状态 | 主要职责 |
-|---|---|:---:|---|
-| **启动 / 导航** | SplashPage | 🆕 | 品牌闪屏 300ms → 进 Home |
-| | HomePage（Tab 容器） | ✅ 已有 | 承载底部 4 Tab 切换 |
-| | MainTabBar | 🆕 | 底部导航（行情 / 资讯 / AI / 我的） |
-| **行情** | MarketListPage | ✅ 已有 | 自选/全部/涨幅/跌幅 Tab + 个股行 |
-| | IndexListPage | 🆕 | 指数列表（上证/深证/创业板/北证 50/恒生/纳指/道指） |
-| | StockSearchPage | 🆕 | 顶部搜索 + 联想 + 历史 + 热门 |
-| | StockDetailPage | ✅ 已有 | OHLC + 五档 + K 线 + AI 诊股 |
-| | IndexDetailPage | 🆕 | 指数详情（复用 StockDetail 骨架，无五档） |
-| | SectorBoardPage | 🆕 | 申万一级/二级行业 + 涨跌幅排行 + 板块详情 |
-| **资讯 / 社区** | NewsListPage | 🆕 | 7×24 快讯流 / 个股新闻 / 大盘解读 |
-| | NewsDetailPage | 🆕 | 资讯正文 + 相关个股标签 + AI 摘要 |
-| **AI** | ChatHomePage | ✅ 已有 | 4 快捷指令 + 会话入口 + 模型入口 |
-| | ChatSessionListPage | 🆕 | 历史会话列表（侧栏 / 抽屉） |
-| | ChatDetailPage | 🆕 | 单会话流式 + 工具调用可视化 + 卡片 |
-| | ModelSettingsPage | ✅ §4 已设计 | 服务商列表 + Key 状态 + 模型管理 |
-| | DebateViewPage | 🆕 | 多空辩论气泡轮播（PR-09 闭环） |
-| | AgentProgressOverlay | 🆕 | AI 执行进度全屏遮罩（基本面→技术→舆情→风控） |
-| **自选 / 设置** | WatchlistPage | 🆕 | 自选股分组管理（默认 / 自建 / 拖拽排序） |
-| | AlertSettingsPage | 🆕 | 预警条件（价格突破 / 涨跌幅阈值 / 异动放量） |
-| | UserSettingsPage | 🆕 | 主题（深/浅/跟随系统）/ 字号 / 关于 / 免责声明 |
+| 大类          | 页面                   |    状态    | 主要职责                           |
+| ----------- | -------------------- | :------: | ------------------------------ |
+| **启动 / 导航** | SplashPage           |    🆕    | 品牌闪屏 300ms → 进 Home            |
+|             | HomePage（Tab 容器）     |   ✅ 已有   | 承载底部 4 Tab 切换                  |
+|             | MainTabBar           |    🆕    | 底部导航（行情 / 资讯 / AI / 我的）        |
+| **行情**      | MarketListPage       |   ✅ 已有   | 自选/全部/涨幅/跌幅 Tab + 个股行          |
+|             | IndexListPage        |    🆕    | 指数列表（上证/深证/创业板/北证 50/恒生/纳指/道指） |
+|             | StockSearchPage      |    🆕    | 顶部搜索 + 联想 + 历史 + 热门            |
+|             | StockDetailPage      |   ✅ 已有   | OHLC + 五档 + K 线 + AI 诊股        |
+|             | IndexDetailPage      |    🆕    | 指数详情（复用 StockDetail 骨架，无五档）    |
+|             | SectorBoardPage      |    🆕    | 申万一级/二级行业 + 涨跌幅排行 + 板块详情       |
+| **资讯 / 社区** | NewsListPage         |    🆕    | 7×24 快讯流 / 个股新闻 / 大盘解读         |
+|             | NewsDetailPage       |    🆕    | 资讯正文 + 相关个股标签 + AI 摘要          |
+| **AI**      | ChatHomePage         |   ✅ 已有   | 4 快捷指令 + 会话入口 + 模型入口           |
+|             | ChatSessionListPage  |    🆕    | 历史会话列表（侧栏 / 抽屉）                |
+|             | ChatDetailPage       |    🆕    | 单会话流式 + 工具调用可视化 + 卡片           |
+|             | ModelSettingsPage    | ✅ §4 已设计 | 服务商列表 + Key 状态 + 模型管理          |
+|             | DebateViewPage       |    🆕    | 多空辩论气泡轮播（PR-09 闭环）             |
+|             | AgentProgressOverlay |    🆕    | AI 执行进度全屏遮罩（基本面→技术→舆情→风控）      |
+| **自选 / 设置** | WatchlistPage        |    🆕    | 自选股分组管理（默认 / 自建 / 拖拽排序）        |
+|             | AlertSettingsPage    |    🆕    | 预警条件（价格突破 / 涨跌幅阈值 / 异动放量）      |
+|             | UserSettingsPage     |    🆕    | 主题（深/浅/跟随系统）/ 字号 / 关于 / 免责声明   |
 
 > 增量 14 页（🆕），加上已有 5 页 = **总 19 页**。对照图 1（当前只有 MarketList 一页的简陋状态），需要补的量很清楚。
 
@@ -301,23 +293,23 @@ HomePage (Tab Bar)
 
 ### 7.1 预置服务商清单（14 家 + 自定义）
 
-| 名称 | 协议 | 站点 | baseUrl | 备注 |
-|---|---|---|---|---|
-| **OpenAI** | OpenAI | openai.com | `https://api.openai.com/v1` | 国际最主流 |
-| **Azure OpenAI** | OpenAI | azure.com | 用户填 | 企业部署 |
-| **DeepSeek** | OpenAI | deepseek.com | `https://api.deepseek.com` | 国产首选，价格低 |
-| **智谱 GLM** | OpenAI | bigmodel.cn | `https://open.bigmodel.cn/api/paas/v4` | 国产 + 工具调用强 |
-| **硅基流动** | OpenAI | siliconflow.cn | `https://api.siliconflow.cn/v1` | 多模型聚合 + 限时免费 |
-| **阿里通义千问** | OpenAI（DashScope 兼容层） | dashscope.aliyuncs.com | `https://dashscope.aliyuncs.com/compatible-mode/v1` | 国产大厂 |
-| **月之暗面 Kimi** | OpenAI（Moonshot 兼容） | moonshot.cn | `https://api.moonshot.cn/v1` | 长上下文 |
-| **字节豆包** | OpenAI（火山引擎） | volcengine.com | 用户填（地域相关） | 国产大厂 |
-| **百度千帆** | OpenAI（千帆兼容） | qianfan.baidubce.com | `https://qianfan.baidubce.com/v2` | 国产大厂 |
-| **腾讯混元** | OpenAI | hunyuan.cloud.tencent.com | `https://api.hunyuan.cloud.tencent.com/v1` | 知牛框架同源 |
-| **OpenRouter** | OpenAI | openrouter.ai | `https://openrouter.ai/api/v1` | 全球模型聚合 |
-| **CherryIN** | OpenAI | cherryin.ai | `https://api.cherryin.ai/v1` | 国内聚合 |
-| **AiHubMix** | OpenAI | aihubmix.com | `https://aihubmix.com/v1` | 国内聚合 |
-| **DMXAPI** | OpenAI | dmxapi.com | `https://www.dmxapi.com/v1` | 国内聚合 |
-| **+ 自定义** | OpenAI | — | 用户填 | 自托管 / 代理 / 第三方 |
+| 名称               | 协议                    | 站点                        | baseUrl                                             | 备注             |
+| ---------------- | --------------------- | ------------------------- | --------------------------------------------------- | -------------- |
+| **OpenAI**       | OpenAI                | openai.com                | `https://api.openai.com/v1`                         | 国际最主流          |
+| **Azure OpenAI** | OpenAI                | azure.com                 | 用户填                                                 | 企业部署           |
+| **DeepSeek**     | OpenAI                | deepseek.com              | `https://api.deepseek.com`                          | 国产首选，价格低       |
+| **智谱 GLM**       | OpenAI                | bigmodel.cn               | `https://open.bigmodel.cn/api/paas/v4`              | 国产 + 工具调用强     |
+| **硅基流动**         | OpenAI                | siliconflow.cn            | `https://api.siliconflow.cn/v1`                     | 多模型聚合 + 限时免费   |
+| **阿里通义千问**       | OpenAI（DashScope 兼容层） | dashscope.aliyuncs.com    | `https://dashscope.aliyuncs.com/compatible-mode/v1` | 国产大厂           |
+| **月之暗面 Kimi**    | OpenAI（Moonshot 兼容）   | moonshot.cn               | `https://api.moonshot.cn/v1`                        | 长上下文           |
+| **字节豆包**         | OpenAI（火山引擎）          | volcengine.com            | 用户填（地域相关）                                           | 国产大厂           |
+| **百度千帆**         | OpenAI（千帆兼容）          | qianfan.baidubce.com      | `https://qianfan.baidubce.com/v2`                   | 国产大厂           |
+| **腾讯混元**         | OpenAI                | hunyuan.cloud.tencent.com | `https://api.hunyuan.cloud.tencent.com/v1`          | 知牛框架同源         |
+| **OpenRouter**   | OpenAI                | openrouter.ai             | `https://openrouter.ai/api/v1`                      | 全球模型聚合         |
+| **CherryIN**     | OpenAI                | cherryin.ai               | `https://api.cherryin.ai/v1`                        | 国内聚合           |
+| **AiHubMix**     | OpenAI                | aihubmix.com              | `https://aihubmix.com/v1`                           | 国内聚合           |
+| **DMXAPI**       | OpenAI                | dmxapi.com                | `https://www.dmxapi.com/v1`                         | 国内聚合           |
+| **+ 自定义**        | OpenAI                | —                         | 用户填                                                 | 自托管 / 代理 / 第三方 |
 
 > 选型标准：**OpenAI 协议覆盖 14/15**（极个别需兼容层），意味着网关代码无需为某家定制——和现有 config.py 的"三厂商 OpenAI 兼容"判断完全一致。
 
@@ -388,13 +380,13 @@ HomePage (Tab Bar)
 
 ### 7.4 模型能力自动启发式（不需手工配）
 
-| 模型名模式 | 自动打 capability 标签 |
-|---|---|
-| `*-reasoner` / `*-thinking` / `o1*` / `o3*` / `deepseek-r1*` | `reasoning` |
-| `*-vision` / `*-vl` / `glm-4v*` / `gpt-4o*` | `vision` |
-| `*-mini` / `*-flash` / `*-lite` / `glm-4-flash` | `fast` |
-| `*32k*` / `*128k*` / `*-long*` / `*200k*` | `long_context` |
-| 其余 | `chat`（默认） |
+| 模型名模式                                                        | 自动打 capability 标签 |
+| ------------------------------------------------------------ | ----------------- |
+| `*-reasoner` / `*-thinking` / `o1*` / `o3*` / `deepseek-r1*` | `reasoning`       |
+| `*-vision` / `*-vl` / `glm-4v*` / `gpt-4o*`                  | `vision`          |
+| `*-mini` / `*-flash` / `*-lite` / `glm-4-flash`              | `fast`            |
+| `*32k*` / `*128k*` / `*-long*` / `*200k*`                    | `long_context`    |
+| 其余                                                           | `chat`（默认）        |
 
 > 启发式匹配不准确时仍可后端手修 `models.json` 覆盖；与自动发现共存。
 
@@ -406,15 +398,15 @@ HomePage (Tab Bar)
 
 ### 8.1 工具清单（7 个）
 
-| # | 工具名 | 用途 | 数据源 | 触发场景 |
-|---|---|---|---|---|
-| 1 | `get_realtime_quote` | 单股实时报价 + 五档 | 新浪 | "现在茅台多少钱" |
-| 2 | `get_kline` | K 线数据 | 新浪 / Tushare | "看看近 60 日走势" |
-| 3 | `get_financials` | 财务 + 估值 | Tushare | "茅台的 PE / ROE" |
-| 4 | `search_news` | 个股新闻 / 舆情 | 财经新闻聚合 | "宁德最近有什么消息" |
-| 5 | `screen_stocks` | 条件选股 | 新浪 + Tushare | "市值 500 亿以上的科技股" |
-| 6 | `compare_stocks` | 多股对比 | 新浪 | "茅台 vs 五粮液" |
-| 7 | `create_alert` | 创建预警 | 本地 SQLDelight | "茅台跌破 1300 提醒我" |
+| # | 工具名                  | 用途          | 数据源           | 触发场景             |
+| - | -------------------- | ----------- | ------------- | ---------------- |
+| 1 | `get_realtime_quote` | 单股实时报价 + 五档 | 新浪            | "现在茅台多少钱"        |
+| 2 | `get_kline`          | K 线数据       | 新浪 / Tushare  | "看看近 60 日走势"     |
+| 3 | `get_financials`     | 财务 + 估值     | Tushare       | "茅台的 PE / ROE"   |
+| 4 | `search_news`        | 个股新闻 / 舆情   | 财经新闻聚合        | "宁德最近有什么消息"      |
+| 5 | `screen_stocks`      | 条件选股        | 新浪 + Tushare  | "市值 500 亿以上的科技股" |
+| 6 | `compare_stocks`     | 多股对比        | 新浪            | "茅台 vs 五粮液"      |
+| 7 | `create_alert`       | 创建预警        | 本地 SQLDelight | "茅台跌破 1300 提醒我"  |
 
 ### 8.2 工具 JSON Schema（示范 2 个，完整 7 个见附录）
 
@@ -471,6 +463,7 @@ async def chat_with_tools(req):
 ```
 
 **关键约束**：
+
 - `MAX_TOOL_ROUNDS = 5`（防 LLM 幻觉死循环）
 - 工具调用串行（避免成本爆炸）
 - 工具失败 → 错误回灌模型，让模型决定改问还是兜底回答
@@ -490,42 +483,42 @@ async def chat_with_tools(req):
 
 ### 9.1 网关端（OpenAI 兼容，4 个）
 
-| 方法 | 路径 | 用途 |
-|---|---|---|
-| POST | `/v1/chat/completions` | 聊天（流式 + 工具调用） |
-| GET | `/v1/models` | 模型目录（聚合 + capability + available） |
-| POST | `/v1/embeddings` | （预留）文本向量化 |
-| GET | `/v1/usage` | 用量统计（按模型 / 按天） |
+| 方法   | 路径                     | 用途                                |
+| ---- | ---------------------- | --------------------------------- |
+| POST | `/v1/chat/completions` | 聊天（流式 + 工具调用）                     |
+| GET  | `/v1/models`           | 模型目录（聚合 + capability + available） |
+| POST | `/v1/embeddings`       | （预留）文本向量化                         |
+| GET  | `/v1/usage`            | 用量统计（按模型 / 按天）                    |
 
 ### 9.2 行情端（5 个）
 
-| 方法 | 路径 | 用途 | 数据源 |
-|---|---|---|---|
-| GET | `/quote/realtime` | 单股实时报价 | 新浪 + 五档 |
-| GET | `/quote/kline` | K 线（日/周/月/分钟） | 新浪 / Tushare |
-| GET | `/quote/indices` | 主要指数列表 | 新浪 |
-| GET | `/quote/sectors` | 申万行业板块 | 新浪 / Tushare |
-| GET | `/quote/screener` | 条件选股 | 新浪 + Tushare |
+| 方法  | 路径                | 用途            | 数据源          |
+| --- | ----------------- | ------------- | ------------ |
+| GET | `/quote/realtime` | 单股实时报价        | 新浪 + 五档      |
+| GET | `/quote/kline`    | K 线（日/周/月/分钟） | 新浪 / Tushare |
+| GET | `/quote/indices`  | 主要指数列表        | 新浪           |
+| GET | `/quote/sectors`  | 申万行业板块        | 新浪 / Tushare |
+| GET | `/quote/screener` | 条件选股          | 新浪 + Tushare |
 
 ### 9.3 资讯端（2 个）
 
-| 方法 | 路径 | 用途 |
-|---|---|---|
-| GET | `/news/list` | 7×24 快讯 / 个股新闻 |
-| GET | `/news/detail` | 资讯正文 |
+| 方法  | 路径             | 用途             |
+| --- | -------------- | -------------- |
+| GET | `/news/list`   | 7×24 快讯 / 个股新闻 |
+| GET | `/news/detail` | 资讯正文           |
 
 ### 9.4 管理端（受 GATEWAY_API_KEY 保护，3 个）
 
-| 方法 | 路径 | 用途 |
-|---|---|---|
-| POST | `/admin/refresh-models` | 触发模型自动发现 |
-| GET | `/admin/providers` | 列出所有服务商（含 Key 是否配置） |
-| POST | `/admin/probe/{provider_id}` | 单家探活 |
+| 方法   | 路径                           | 用途                  |
+| ---- | ---------------------------- | ------------------- |
+| POST | `/admin/refresh-models`      | 触发模型自动发现            |
+| GET  | `/admin/providers`           | 列出所有服务商（含 Key 是否配置） |
+| POST | `/admin/probe/{provider_id}` | 单家探活                |
 
 ### 9.5 分析端（1 个）
 
-| 方法 | 路径 | 用途 |
-|---|---|---|
+| 方法  | 路径                 | 用途                 |
+| --- | ------------------ | ------------------ |
 | GET | `/analytics/usage` | 用量 / 延迟 / 命中率 / 成本 |
 
 > 总计 **15+ 路由**（v2 计划），覆盖页面矩阵所有数据需求 + 工具调用 + 运营分析。
@@ -538,11 +531,11 @@ async def chat_with_tools(req):
 
 ### 10.1 用量统计（每小时聚合）
 
-| 维度 | 字段 | 用途 |
-|---|---|---|
+| 维度      | 字段                                                                                 | 用途                      |
+| ------- | ---------------------------------------------------------------------------------- | ----------------------- |
 | **按模型** | model_id / provider / request_count / prompt_tokens / completion_tokens / cost_usd | "deepseek-chat 这个月用了多少" |
-| **按用户** | user_id / device_id / first_seen / last_seen / total_request | 简化（Demo 阶段按设备维度） |
-| **按时段** | hour_bucket / request_count / avg_latency | 流量监控 |
+| **按用户** | user_id / device_id / first_seen / last_seen / total_request                       | 简化（Demo 阶段按设备维度）        |
+| **按时段** | hour_bucket / request_count / avg_latency                                          | 流量监控                    |
 
 ### 10.2 性能监控
 
@@ -576,6 +569,6 @@ async def chat_with_tools(req):
 
 ## 11. 参考来源（2026-08-24 实测）
 
-1. CherryHQ/cherry-studio — https://github.com/CherryHQ/cherry-studio （PR #19006 端点解析链、#18745 静默过滤、#17661 FTS 泄漏、packages/provider-registry 架构、sync-registry-data.yml CI 分发）
+1. CherryHQ/cherry-studio — <https://github.com/CherryHQ/cherry-studio> （PR #19006 端点解析链、#18745 静默过滤、#17661 FTS 泄漏、packages/provider-registry 架构、sync-registry-data.yml CI 分发）
 2. 知牛现有网关实现 — `backend/app/config.py` / `gateway.py` / `quote.py`（提交 df04a8b、8b71e1d）
 3. 评分标准 — `docs/zhiniu-technical-design.md` §12 评分落地矩阵

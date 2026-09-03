@@ -51,11 +51,9 @@ fun marketLabelOf(sym: String): String = when {
 fun fmtChangeSigned(v: Double): String =
     (if (v >= 0) "+" else "-") + fmt2(abs(v))
 
-/** 内容最大宽度（Header 与正文共用，保证左右对齐）。 */
-const val CONTENT_W = 1320f
+/** 内容最大宽度（Header 与正文共用，保证左右对齐；1920 居中、1440 完整、1280 不溢出）。 */
 
 /** 水平边距。 */
-const val PAD = 24f
 
 /** 整数千分位：3128 → "3,128"；986400000000 → "9,864亿"（配合亿单位使用）。 */
 fun fmtInt(v: Long): String {

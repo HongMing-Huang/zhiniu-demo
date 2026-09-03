@@ -48,7 +48,7 @@ object KLineChart {
     }
 
     /** 高低价区间（用于 Y 轴归一化）；空表返回 0..1。 */
-    fun priceBounds(bars: List<KLineBar>): Pair<Double, Double> {
+    fun priceBounds(bars: List<Candle>): Pair<Double, Double> {
         if (bars.isEmpty()) return 0.0 to 1.0
         val hi = bars.maxOf { it.high }
         val lo = bars.minOf { it.low }
@@ -68,7 +68,7 @@ object KLineChart {
      * 无 bars 时返回空 bundle（bounds 由调用方兜底 Mock，避免白屏）。
      */
     fun layout(
-        bars: List<KLineBar>,
+        bars: List<Candle>,
         width: Float,
         height: Float,
         padL: Float = 12f,
@@ -77,7 +77,7 @@ object KLineChart {
     ): List<CandleGeometry> = layoutWithBounds(bars, width, height, priceBounds(bars), padL, padR, bodyWidthFactor)
 
     private fun layoutWithBounds(
-        bars: List<KLineBar>,
+        bars: List<Candle>,
         width: Float,
         height: Float,
         bounds: Pair<Double, Double>,
@@ -110,7 +110,7 @@ object KLineChart {
     }
 
     /** 便捷聚合：几何 + 三条均线点位 + 价格区间（一次算好供绘制层用，蜡烛与均线共享同一 y 缩放）。 */
-    fun buildBundle(bars: List<KLineBar>, width: Float, height: Float): CandleGeometryBundle {
+    fun buildBundle(bars: List<Candle>, width: Float, height: Float): CandleGeometryBundle {
         val (lo, hi) = priceBounds(bars)
         val closes = bars.map { it.close }
         val yOf = { v: Double -> (height - ((v - lo) / (hi - lo).toFloat().coerceAtLeast(1e-9f)) * height).toFloat() }

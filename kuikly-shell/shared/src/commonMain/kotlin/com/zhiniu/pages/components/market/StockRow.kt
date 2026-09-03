@@ -1,18 +1,15 @@
-// 知牛 · 市场公共组件（components/market）
-// StockRow / StockTable / MiniSparkline / MarketOverviewCard / StockSearchOverlay / FavoriteButton
+// 知牛 · StockTable + StockRow（首页视觉中心；列比 24/12/11/11/16/15/11%）
+// 无外层 Card；行间 1px 分割线；hover surfaceHover 120ms；pressed surfaceSecondary。
 package com.zhiniu.pages.components.market
 
-import com.tencent.kuikly.core.base.Animation
-import com.tencent.kuikly.core.base.Border
-import com.tencent.kuikly.core.base.BorderStyle
 import com.tencent.kuikly.core.base.ViewContainer
+import com.tencent.kuikly.core.directives.vfor
+import com.tencent.kuikly.core.reactive.collection.ObservableList
 import com.tencent.kuikly.core.views.Canvas
 import com.tencent.kuikly.core.views.Text
-import com.tencent.kuikly.core.views.TextAlign
 import com.tencent.kuikly.core.views.View
-import com.zhiniu.domain.model.Quote
+import com.zhiniu.domain.model.StockQuote
 import com.zhiniu.pages.components.ANIM_THEME
-import com.zhiniu.pages.components.AppRadius
 import com.zhiniu.pages.components.AppTheme
 import com.zhiniu.pages.components.AppTypography
 import com.zhiniu.pages.components.NUM_FONT
@@ -22,70 +19,89 @@ import com.zhiniu.pages.components.cssClass
 import com.zhiniu.pages.components.drawSparkLine
 import com.zhiniu.pages.components.fmt2
 import com.zhiniu.pages.components.fmtAmount
+import com.zhiniu.pages.components.fmtChangeSigned
 import com.zhiniu.pages.components.fmtPct
 import com.zhiniu.pages.components.fmtSymbol
 
-/** 迷你走势图（Canvas）。 */
-fun ViewContainer<*, *>.MiniSparkline(values: List<Double>, isUp: Boolean, w: Float, h: Float) {
-    Canvas({
-        attr { width(w); height(h) }
-    }) { context, cw, ch ->
-        val colors = { AppTheme.colors }
-        drawSparkLine(context, values, colors().c(if (isUp) colors().up else colors().down), cw, ch)
+/**
+ * 行情表：表头 + 股票行（vfor）。
+ * 列：股票 flex(2.4) | 最新价 120 | 涨跌额 110 | 涨跌幅 110 | 今日走势 170 | 高/低 150 | 成交额 110。
+ */
+fun ViewContainer<*, *>.StockTable(
+    marketQuotes: () -> ObservableList<StockQuote>,
+    sparkOf: (StockQuote) -> List<Double>,
+    narrow: Boolean,
+    onRowClick: (StockQuote) -> Unit,
+) {
+    StockTableHeader(narrow)
+    vfor({ marketQuotes() }) { q ->
+        StockRow(q, sparkOf(q), narrow) { onRowClick(q) }
     }
 }
 
-/**
- * 行情表头列（百分比列宽由调用方以 flex 控制；此处保持文字对齐语义）。
- * @param width flex 权重
- */
-fun ViewContainer<*, *>.ThCell(label: String, weight: Float, align: TextAlign) {
-    val colors = { AppTheme.colors }
+/** 表头：42px / fs12 / textTertiary；点击表头排序由调用方通过外部 SortToolbar 控制。 */
+fun ViewContainer<*, *>.StockTableHeader(narrow: Boolean) {
+    val colors = AppTheme.colors
     View {
-        attr { flex(weight) }
-        Text {
-            attr {
-                fontSize(AppTypography.fs11)
-                color(colors().c(colors().textTertiary))
-                text(label)
-                when (align) {
-                    TextAlign.RIGHT -> textAlignRight()
-                    TextAlign.CENTER -> textAlignCenter()
-                    else -> textAlignLeft()
-                }
-            }
+        attr { flexDirectionRow(); alignItemsCenter(); height(42f) }
+        View { attr { flex(2.4f) }; ThLabel("股票", alignLeft = true) }
+        View { attr { width(120f) }; ThLabel("最新价", alignLeft = false) }
+        View { attr { width(110f) }; ThLabel("涨跌额", alignLeft = false) }
+        View { attr { width(110f) }; ThLabel("涨跌幅", alignLeft = false) }
+        View { attr { width(170f) }; ThLabel("今日走势", alignLeft = false) }
+        if (!narrow) {
+            View { attr { width(150f) }; ThLabel("高 / 低", alignLeft = false) }
+            View { attr { width(110f) }; ThLabel("成交额", alignLeft = false) }
         }
     }
-}
-
-/**
- * 唯一 StockRow：64px，六列（股票/最新价/涨跌幅/今日走势/最高最低/成交额）。
- * 底部 1px 分隔线内嵌（满足 vfor 单一孩子约束）。
- * @param narrow true 时隐藏 最高/最低 与 成交额 列（<1280 响应式）
- */
-fun ViewContainer<*, *>.StockRow(
-    q: Quote,
-    spark: List<Double>,
-    narrow: Boolean = false,
-    onClick: () -> Unit,
-) {
-    val colors = { AppTheme.colors }
     View {
         attr {
-            flexDirectionRow()
-            alignItemsCenter()
+            height(1f)
+            backgroundColor(colors.c(colors.border))
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+    }
+}
+
+private fun ViewContainer<*, *>.ThLabel(label: String, alignLeft: Boolean) {
+    val colors = AppTheme.colors
+    Text {
+        attr {
+            fontSize(AppTypography.fs12)
+            color(colors.c(colors.textTertiary))
+            text(label)
+            if (!alignLeft) textAlignRight() else textAlignLeft()
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+    }
+}
+
+/** 股票行：64px / 仅底部 1px 分割线 / hover surfaceHover 120ms / pressed surfaceSecondary。 */
+fun ViewContainer<*, *>.StockRow(
+    q: StockQuote,
+    spark: List<Double>,
+    narrow: Boolean,
+    onClick: () -> Unit,
+) {
+    val colors = AppTheme.colors
+    View {
+        attr {
+            flexDirectionRow(); alignItemsCenter()
             height(64f)
+            backgroundColor(colors.c(colors.surface))
+            highlightBackgroundColor(colors.c(colors.surfaceHover))
+            
             cssClass("zn-row zn-click")
-            highlightBackgroundColor(colors().ca(colors().textSecondary, 7))
+            animate(ANIM_THEME, value = AppTheme.isDark)
         }
         event { click { onClick() } }
-        // 股票（24%）
+        // 股票（名称 + 代码）
         View {
-            attr { flex(2f) }
+            attr { flex(2.4f) }
             Text {
                 attr {
-                    fontSize(AppTypography.fs14); fontWeightMedium()
-                    color(colors().c(colors().textPrimary))
+                    fontSize(AppTypography.fs14); fontWeightSemiBold()
+                    color(colors.c(colors.textPrimary))
                     text(q.name)
                     animate(ANIM_THEME, value = AppTheme.isDark)
                 }
@@ -93,104 +109,63 @@ fun ViewContainer<*, *>.StockRow(
             Text {
                 attr {
                     marginTop(3f)
-                    fontSize(AppTypography.fs11)
-                    color(colors().c(colors().textTertiary))
+                    fontSize(AppTypography.fs12)
+                    color(colors.c(colors.textTertiary))
                     text(fmtSymbol(q.symbol))
                     animate(ANIM_THEME, value = AppTheme.isDark)
                 }
             }
         }
-        // 最新价（12%）
-        ThCellValue(fmt2(q.price), 1f, TextAlign.RIGHT, { colors().textPrimary }, semibold = true)
-        // 涨跌幅（12%）
-        ThCellValue(fmtPct(q.changePercent), 1f, TextAlign.RIGHT, { if (q.isUp) colors().up else colors().down }, semibold = true)
-        // 今日走势（18%）
+        // 最新价
+        NumCell(fmt2(q.price), 120f, colors.textPrimary, semibold = true)
+        // 涨跌额
+        NumCell(fmtChangeSigned(q.change), 110f, if (q.isUp) colors.up else colors.down)
+        // 涨跌幅
+        NumCell(fmtPct(q.changePercent), 110f, if (q.isUp) colors.up else colors.down, semibold = true)
+        // 今日走势（84×28 sparkline）
         View {
-            attr { flex(1.5f); allCenter() }
-            MiniSparkline(spark, q.isUp, 96f, 28f)
+            attr { width(170f); allCenter() }
+            Canvas({
+                attr { width(84f); height(28f) }
+            }) { context, w, h ->
+                drawSparkLine(
+                    context, spark,
+                    colors.c(if (q.isUp) colors.up else colors.down),
+                    w, h,
+                )
+            }
         }
         if (!narrow) {
-            // 最高 / 最低（18%）
-            View {
-                attr { flex(1.5f); flexDirectionRow(); alignItemsCenter() }
-                Text {
-                    attr {
-                        fontSize(AppTypography.fs12)
-                        fontFamily(NUM_FONT)
-                        color(colors().c(colors().up))
-                        text(fmt2(q.high))
-                    }
-                }
-                Text {
-                    attr {
-                        marginLeft(4f); marginRight(4f)
-                        fontSize(AppTypography.fs11)
-                        color(colors().c(colors().textTertiary))
-                        text("/")
-                    }
-                }
-                Text {
-                    attr {
-                        fontSize(AppTypography.fs12)
-                        fontFamily(NUM_FONT)
-                        color(colors().c(colors().down))
-                        text(fmt2(q.low))
-                    }
-                }
-            }
-            // 成交额（16%）
-            ThCellValue(fmtAmount(q.amount), 1.3f, TextAlign.RIGHT, { colors().textSecondary })
+            NumCell(fmt2(q.high) + " / " + fmt2(q.low), 150f, colors.textSecondary)
+            NumCell(fmtAmount(q.amount), 110f, colors.textSecondary)
         }
-        // 行底分隔线
+        // 行底分割线（满足 vfor 单一孩子约束）
         View {
             attr {
                 absolutePosition(top = 63f, left = 0f, right = 0f)
                 height(1f)
-                backgroundColor(colors().c(colors().border))
+                backgroundColor(colors.c(colors.border))
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
         }
     }
 }
 
-private fun ViewContainer<*, *>.ThCellValue(
-    value: String,
-    weight: Float,
-    align: TextAlign,
-    colorHex: () -> String,
-    semibold: Boolean = false,
+private fun ViewContainer<*, *>.NumCell(
+    value: String, width: Float, colorHex: String, semibold: Boolean = false,
 ) {
-    val colors = { AppTheme.colors }
+    val colors = AppTheme.colors
     View {
-        attr { flex(weight) }
+        attr { width(width) }
         Text {
             attr {
                 fontSize(AppTypography.fs14)
                 fontFamily(NUM_FONT)
                 if (semibold) fontWeightSemiBold()
-                color(colors().c(colorHex()))
+                color(colors.c(colorHex))
                 text(value)
-                when (align) {
-                    TextAlign.RIGHT -> textAlignRight()
-                    TextAlign.CENTER -> textAlignCenter()
-                    else -> textAlignLeft()
-                }
+                textAlignRight()
             }
-        }
-    }
-}
-
-/** 表格头（与 StockRow 相同 flex 权重，保证列对齐）。 */
-fun ViewContainer<*, *>.StockTableHeader(narrow: Boolean = false) {
-    View {
-        attr { flexDirectionRow(); alignItemsCenter(); height(32f) }
-        ThCell("股票", 2f, TextAlign.LEFT)
-        ThCell("最新价", 1f, TextAlign.RIGHT)
-        ThCell("涨跌幅", 1f, TextAlign.RIGHT)
-        ThCell("今日走势", 1.5f, TextAlign.CENTER)
-        if (!narrow) {
-            ThCell("最高 / 最低", 1.5f, TextAlign.LEFT)
-            ThCell("成交额", 1.3f, TextAlign.RIGHT)
         }
     }
 }

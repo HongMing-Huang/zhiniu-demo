@@ -1,37 +1,34 @@
-/* 知牛 · Repository 接口与实现 */
+/* 知牛 · 行情仓储接口
+ * UI 只依赖本接口；当前由 MockMarketRepository 实现。
+ * 接入真实行情（新浪等）时仅需替换实现（见 docs/ARCHITECTURE.md 替换点）。
+ */
 package com.zhiniu.domain.repository
 
-import com.zhiniu.data.local.WatchlistStore
-import com.zhiniu.data.mock.MockDataSource
-import com.zhiniu.data.remote.SinaKlineApi
-import com.zhiniu.data.remote.SinaQuoteApi
-import com.zhiniu.domain.model.KLineBar
-import com.zhiniu.domain.model.Quote
+import com.zhiniu.domain.model.Candle
+import com.zhiniu.domain.model.MarketBreadth
+import com.zhiniu.domain.model.MarketIndex
+import com.zhiniu.domain.model.StockQuote
+import com.zhiniu.domain.model.Timeframe
 
-/** 行情仓储：真实(新浪) → Mock 兜底。 */
 interface MarketRepository {
-    suspend fun quotes(symbols: List<String>): List<Quote>
-    suspend fun kline(symbol: String, scale: Int = 240, datalen: Int = 180): List<KLineBar>
-    val watchlist: WatchlistStore
-}
+    /** 全部股票池（市场表）。 */
+    fun stockQuotes(): List<StockQuote>
 
-class SinaMarketRepository(
-    private val quoteApi: SinaQuoteApi,
-    private val klineApi: SinaKlineApi,
-    override val watchlist: WatchlistStore,
-    private val mock: MockDataSource = MockDataSource(),
-) : MarketRepository {
+    /** 主要指数（Market Pulse）。 */
+    fun indices(): List<MarketIndex>
 
-    override suspend fun quotes(symbols: List<String>): List<Quote> = runCatching {
-        quoteApi.fetch(*symbols.toTypedArray())
-    }.getOrElse {
-        // 网络/解析失败 → Mock 兜底（演示绝不空屏）
-        mock.quotes().filter { it.symbol in symbols }
-    }
+    /** 市场宽度（涨跌家数 / 成交额）。 */
+    fun breadth(): MarketBreadth
 
-    override suspend fun kline(symbol: String, scale: Int, datalen: Int): List<KLineBar> =
-        runCatching { klineApi.fetch(symbol, scale, datalen) }
-            .getOrElse {
-                mock.kline(symbol)
-            }
+    /** 按 symbol 查个股；不存在返回 null。 */
+    fun quoteOf(symbol: String): StockQuote?
+
+    /** 指定周期 K 线（分时/日K/周K/月K），确定性数据。 */
+    fun candles(symbol: String, timeframe: Timeframe): List<Candle>
+
+    /** 当日迷你走势（表格 sparkline），确定性。 */
+    fun spark(symbol: String): List<Double>
+
+    /** 按 名称/拼音/代码/代码+市场后缀 匹配。 */
+    fun search(query: String): List<StockQuote>
 }

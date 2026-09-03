@@ -76,7 +76,7 @@ fun ViewContainer<*, *>.SegmentedTabs(
             View {
                 attr {
                     height(height)
-                    borderRadius(AppRadius.r6)
+                    borderRadius(AppRadius.radius6)
                     marginRight(8f)
                     padding(left = 12f, right = 12f)
                     allCenter()

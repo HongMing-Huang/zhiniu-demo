@@ -1,37 +1,16 @@
-/* 知牛 · AI 分析输出模型（对齐技术方案 §6.4 输出 Schema）*/
+/* 知牛 · AI 个股洞察模型（AiInsightDrawer 内容源；确定性 Mock 生成） */
 package com.zhiniu.domain.model
 
 import kotlinx.serialization.Serializable
 
-/** 涨跌/趋势枚举。 */
-@Serializable
-enum class Trend { UP, DOWN, SIDEWAYS }
-
-/** 结构化信号。 */
-@Serializable
-data class AiSignal(val type: String, val detail: String)
-
-/** 结构化风险。 */
-@Serializable
-data class AiRisk(val type: String, val level: String)
-
-/** 可跳转/内嵌的卡片载荷。 */
-@Serializable
-data class AiCard(
-    val type: String,          // CHART | JUMP
-    val title: String,
-    val page: String? = null,  // 跳转目标页名
-    val args: Map<String, String> = emptyMap(),
-    val chart: String? = null, // 预留：迷你走势引用
-)
-
-/** AI 诊股 / 问答的结构化结论。 */
+/** 个股综合 AI 解读。定位为「信息解释 / 研究辅助」，禁止荐股式结论。 */
 @Serializable
 data class AiInsight(
-    val summary: String,
-    val score: Int = 0,
-    val trend: Trend = Trend.SIDEWAYS,
-    val signals: List<AiSignal> = emptyList(),
-    val risks: List<AiRisk> = emptyList(),
-    val cards: List<AiCard> = emptyList(),
+    val symbol: String,
+    val verdict: String,      // 综合状态：中性偏强 / 中性 / 中性偏弱
+    val trend: String,        // 趋势解读
+    val volume: String,       // 量能解读
+    val indicator: String,    // 指标信号（RSI/MA 等）
+    val risk: String,         // 风险提示
+    val followUps: List<String> = emptyList(), // 追问建议
 )
