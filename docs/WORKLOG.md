@@ -10,7 +10,8 @@
 
 | 时间    | 类别     | 改动                                                                                                                                    | 验证                                                    |
 | ----- | ------ | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| 18:00 | design | 按钮图标插槽：PrimaryButton/SecondaryButton/GhostButton 支持前置 icon；接入详情「加自选⭐/AI 分析🤖/查看完整分析🤖」、AiBlocks「查看详情📈」 | 编译通过 + 部署 v6 |
+| 18:05 | ui     | 自选交互闭环：详情页改用 FavoriteButton（点击切换「加自选⇄已自选」星形填充+文案），首页新增「自选」Tab 真实过滤（Watchlist 驱动）                                                      | 编译通过 + 部署 v7                                          |
+| 18:00 | design | 按钮图标插槽：PrimaryButton/SecondaryButton/GhostButton 支持前置 icon；接入详情「加自选⭐/AI 分析🤖/查看完整分析🤖」、AiBlocks「查看详情📈」                               | 编译通过 + 部署 v6                                          |
 | 17:55 | agent  | TradingAgents 研究落地：AiResearchPage 新增「角色视图」Tab（分析/多空对抗/风控，2px AI 色指示器 + 切换引导消息）；ui-redesign.md 记录研究结论与迁移点                              | 编译通过 + 部署 v5                                          |
 | 17:50 | design | 图标系统扩充：TDesign 官方 1000 图标复核，新增 6 个 PNG（calendar/check/filter-sort/error-triangle/chat-message/data-display），IconKind 扩至 19；接入排序按钮与会话行 | 编译通过；6 图标 HTTP 200                                    |
 | 17:45 | chart  | K 线规范对齐股票软件：时间轴首/中/末 3 标签、蜡烛/量柱/MACD 宽度改 slot\*0.7 自适应（原固定 6-9）                                                                       | 编译通过                                                  |

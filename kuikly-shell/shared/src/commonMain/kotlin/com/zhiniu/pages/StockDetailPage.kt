@@ -72,6 +72,8 @@ internal class StockDetailPage : AppBasePage() {
     internal var detailLoading by observable(true)
     internal var isAiPanelVisible by observable(false)
     internal var aiDraft by observable("")
+    /** 自选状态（响应式，点击后按钮即反馈）。 */
+    internal var watchlisted by observable(false)
     internal val aiChat by observableList<AiPanelChatLine>()
     /** K线视口起点（用于 Pan）。 */
     internal var klineOffset by observable(0)
@@ -115,6 +117,7 @@ internal class StockDetailPage : AppBasePage() {
 
     override fun created() {
         super.created()
+        watchlisted = selectedSymbol()?.let { Watchlist.contains(it) } ?: false
         setTimeout(280) { detailLoading = false }
     }
 
@@ -219,7 +222,8 @@ private fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.z
             }
         }
         View { attr { flex(1f) } }
-        SecondaryButton("加自选", 34f, icon = IconKind.STAR) {
+        FavoriteButton(active = { host.watchlisted }, height = 34f) {
+            host.watchlisted = !host.watchlisted
             com.zhiniu.data.local.Watchlist.toggle(q.symbol)
         }
         View { attr { width(8f) } }

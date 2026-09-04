@@ -64,6 +64,7 @@ internal class MarketPage : AppBasePage() {
     }
 
     private fun StockQuote.inTab(tab: String): Boolean = when (tab) {
+        "自选" -> com.zhiniu.data.local.Watchlist.contains(symbol)
         "沪市" -> symbol.startsWith("sh")
         "深市" -> symbol.startsWith("sz")
         "创业板" -> symbol.startsWith("sz30")
