@@ -399,6 +399,19 @@ private fun drawIntradayLine(
     leftPad: Float, rightPad: Float, priceTop: Float, priceBottom: Float,
     xOf: (Int) -> Float, yOf: (Double) -> Float, colors: AppColors,
 ) {
+    // 均价线（累计 VWAP，黄/橙）：分时标配第二线
+    var cumVol = 0.0; var cumAmt = 0.0
+    val avg = ArrayList<Double>(bars.size)
+    bars.forEach {
+        cumVol += it.volume; cumAmt += it.close * it.volume
+        avg.add(if (cumVol > 0.0) cumAmt / cumVol else it.close)
+    }
+    context.beginPath(); context.strokeStyle(colors.c(colors.ma5)); context.lineWidth(1.2f)
+    avg.forEachIndexed { i, v ->
+        if (i == 0) context.moveTo(xOf(i), yOf(v)) else context.lineTo(xOf(i), yOf(v))
+    }
+    context.stroke()
+    // 价格线
     val lineColor = colors.c(colors.textPrimary)
     context.beginPath(); context.strokeStyle(lineColor); context.lineWidth(1.4f)
     bars.forEachIndexed { i, b ->
