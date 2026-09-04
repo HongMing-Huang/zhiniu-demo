@@ -116,12 +116,15 @@ cd kuikly-shell && env -u NODE_OPTIONS JAVA_HOME=/Users/c14h14n3/Desktop/demo/zh
 # 2) 完整构建 + 部署
 ./scripts/build.sh
 
-# 3) 启动服务
-(cd web-8083 && python3 -m http.server 8083 &) && (cd web-host && python3 -m http.server 8082 &)
+# 3) 启动服务（H5 单端口主链路：bundle 同源 web-host/，8083 仅兼容旧链）
+(cd web-host && python3 -m http.server 8082 &)
 
 # 4) 浏览器验收：打开
 #    http://127.0.0.1:8082/index.html?page_name=MarketList&use_spa=1
-#    检查 MarketPage / StockDetailPage / AiResearchPage 三屏 + 搜索浮层 + 主题切换 + 行跳转
+#    检查 MarketPage / StockDetailPage / AiResearchPage 三屏 + 搜索浮层 + 设置面板 + 行跳转
+#    注意：index.html 必须保持「nativevue2.js → kuiklyBundlesReady → h5App.js」同源顺序，
+#    缺 ready 置位或跨端口引用会导致白屏/乱码（官方 h5App 宿主依赖该标志启动）。
+#    修订部署链路必须重跑 scripts/build.sh（会把 bundle 拷贝进 web-host/）。
 ```
 四分辨率验收：1440×900 Light/Dark · 1920×1080 Light · 1280×800 Light（浏览器 DevTools 设备模拟）。
 
