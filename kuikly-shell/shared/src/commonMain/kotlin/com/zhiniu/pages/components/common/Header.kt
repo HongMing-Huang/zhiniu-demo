@@ -51,16 +51,44 @@ fun ViewContainer<*, *>.AppHeader(
                 flexDirectionRow(); alignItemsCenter()
                 padding(left = 32f, right = 32f)
             }
-            // Logo
-            Text {
-                attr {
-                    fontSize(AppTypography.fs20); fontWeightSemiBold()
-                    color(colors.c(colors.textPrimary))
-                    text("知牛")
-                    animate(ANIM_THEME, value = AppTheme.isDark)
+            // Logo：品牌占位块（描边方块 Z，素材后续替换）+ 文字
+            View {
+                attr { flexDirectionRow(); alignItemsCenter() }
+                // 品牌占位：22×22 描边圆角方块 + 字母 Z（tint 单色；用户提供素材后替换为 Image）
+                View {
+                    attr {
+                        width(22f); height(22f)
+                        borderRadius(allBorderRadius = 6f)
+                        border(
+                            com.tencent.kuikly.core.base.Border(
+                                1.2f,
+                                com.tencent.kuikly.core.base.BorderStyle.SOLID,
+                                colors.c(colors.textPrimary),
+                            )
+                        )
+                        alignItemsCenter(); allCenter()
+                        backgroundColor(colors.c(if (AppTheme.isDark) colors.surfaceRaised else colors.surface))
+                        animate(ANIM_THEME, value = AppTheme.isDark)
+                    }
+                    Text {
+                        attr {
+                            fontSize(AppTypography.fs13); fontWeightSemiBold()
+                            color(colors.c(colors.textPrimary))
+                            text("Z")
+                        }
+                    }
+                }
+                View { attr { width(10f) } }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs20); fontWeightSemiBold()
+                        color(colors.c(colors.textPrimary))
+                        text("知牛")
+                        animate(ANIM_THEME, value = AppTheme.isDark)
+                    }
                 }
             }
-            View { attr { width(36f) } }
+            View { attr { width(28f) } }
             // 导航
             HeaderNav("市场", activeNav == "市场", onClick = onNavMarket)
             HeaderNav("AI研究", activeNav == "AI研究", onClick = onNavAiResearch)

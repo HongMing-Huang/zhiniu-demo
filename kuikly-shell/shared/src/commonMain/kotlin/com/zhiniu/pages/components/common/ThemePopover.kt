@@ -69,6 +69,30 @@ fun ViewContainer<*, *>.ThemePopover(
             ThemeOption(ThemeMode.SYSTEM, onPicked = onClose)
             ThemeOption(ThemeMode.LIGHT, onPicked = onClose)
             ThemeOption(ThemeMode.DARK, onPicked = onClose)
+            // 分割 + 免责声明（设置占位：后续接数据源/模型说明）
+            View {
+                attr {
+                    marginTop(6f); height(1f)
+                    backgroundColor(colors.c(colors.border))
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+            }
+            Text {
+                attr {
+                    marginLeft(14f); marginTop(8f)
+                    fontSize(AppTypography.fs12)
+                    color(colors.c(colors.textSecondary))
+                    text("免责声明")
+                }
+            }
+            Text {
+                attr {
+                    marginLeft(14f); marginRight(14f); marginTop(3f); marginBottom(8f)
+                    fontSize(AppTypography.fs11); lineHeight(16f)
+                    color(colors.c(colors.textTertiary))
+                    text("行情与 AI 输出均为演示数据，不构成投资建议。")
+                }
+            }
         }
     }
 }

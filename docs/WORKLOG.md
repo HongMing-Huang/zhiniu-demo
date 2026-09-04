@@ -10,6 +10,7 @@
 
 | 时间 | 类别 | 改动 | 验证 |
 |---|---|---|---|
+| 17:10 | ui | UI 精修 4 处：①Header 品牌占位（22px 描边方块 Z + 知牛）；②AI 消息头改用 aiAccent #D9FF43；③ThemePopover 扩展免责声明分组（设置占位）；④详情页 AI 分析按钮改 aiAccent 描边强调 | 编译通过 + 浏览器验证（Z logo ✓、AI 按钮 rgb(217,255,67) ✓、免责声明 ✓） |
 | 17:05 | ui | 三屏浏览器验收：MarketPage（涨红/跌绿 token 生效 #F04F5F/#16B364）、StockDetail（K线 tab+五档+Canvas 899×520）、AiResearch（AI 问候+推荐问题）、主题切换（Light/Dark） | 全部通过；index.html js 引用加 ?v=2 刷新缓存 |
 | 14:40 | git | 推送全部提交至 `HongMing-Huang/zhiniu-demo` 远程仓库（已建仓） | gh 推送成功，origin/main 最新 |
 | 14:35 | docs | 新增 `docs/WORKLOG.md`（变更日志规范）；完善 `AGENTS.md`：§0 工作日志、GitHub 仓库信息、Kuikly 2.25.0、验证流程修正（移除不存在的 v4_final.js）、§9.1 Git 提交规范 | 文档已同步 |

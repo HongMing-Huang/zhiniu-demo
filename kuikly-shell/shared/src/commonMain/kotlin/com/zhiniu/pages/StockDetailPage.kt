@@ -223,8 +223,28 @@ private fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.z
             com.zhiniu.data.local.Watchlist.toggle(q.symbol)
         }
         View { attr { width(8f) } }
-        PrimaryButton("AI分析", 34f) {
-            host.isAiPanelVisible = !host.isAiPanelVisible
+        // AI 分析：aiAccent 描边按钮（AI 强调仅此一处小面积点缀）
+        View {
+            attr {
+                height(34f); padding(left = 14f, right = 14f)
+                borderRadius(AppRadius.radius6)
+                flexDirectionRow(); alignItemsCenter(); allCenter()
+                border(
+                    Border(1f, BorderStyle.SOLID, colors.c(colors.aiAccent))
+                )
+                backgroundColor(colors.ca(colors.aiAccent, 10))
+                highlightBackgroundColor(colors.ca(colors.aiAccent, 20))
+                cssClass("zn-click")
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+            event { click { host.isAiPanelVisible = !host.isAiPanelVisible } }
+            Text {
+                attr {
+                    fontSize(AppTypography.fs14); fontWeightSemiBold()
+                    color(colors.c(colors.aiAccent))
+                    text("AI 分析")
+                }
+            }
         }
     }
     // 第二行：大价格 + 涨跌
