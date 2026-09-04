@@ -58,6 +58,7 @@ import com.zhiniu.pages.components.fmtSymbol
 import com.zhiniu.pages.components.fmtVolHand
 import com.zhiniu.pages.components.ai.AiInsightPanel
 import com.zhiniu.pages.components.ai.AiPanelChatLine
+import com.zhiniu.pages.components.market.Level2Panel
 import com.zhiniu.data.local.Watchlist
 
 @Page("StockDetail", supportInLocal = true)
@@ -478,7 +479,7 @@ private fun ViewContainer<*, *>.ChartWorkspace(host: StockDetailPage, q: com.zhi
     }
 }
 
-// ---------- Rail：KeyData + AiQuickInsight ----------
+// ---------- Rail：Level2（五档） + KeyData + AiQuickInsight ----------
 private fun ViewContainer<*, *>.RailQuickInsight(host: StockDetailPage, q: com.zhiniu.domain.model.StockQuote) {
     val colors = AppTheme.colors
     val facts = com.zhiniu.pages.components.factsOf(q)
@@ -491,20 +492,31 @@ private fun ViewContainer<*, *>.RailQuickInsight(host: StockDetailPage, q: com.z
             backgroundColor(colors.c(colors.surface))
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
-        // 关键数据
+        // 五档盘口（卖五~买五，股票软件核心区）
+        Level2Panel(q)
+        View { attr { height(8f) } }
+        Divider()
+        View { attr { height(8f) } }
+        // 关键数据（2 列紧凑网格）
         View {
-            attr { padding(top = 14f, left = 16f, right = 16f) }
+            attr { padding(left = 16f, right = 16f) }
             SectionHeader("关键数据")
-            View { attr { height(8f) } }
-            RailMetric("市盈率", com.zhiniu.pages.components.fmt2(facts.pe))
-            RailMetric("市净率", com.zhiniu.pages.components.fmt2(facts.pb))
-            RailMetric("总市值", facts.marketCap)
-            RailMetric("量比", com.zhiniu.pages.components.fmt2(facts.volumeRatio))
+            View { attr { height(6f) } }
+            View {
+                attr { flexDirectionRow() }
+                View { attr { flex(1f) }; RailMetric("市盈率", com.zhiniu.pages.components.fmt2(facts.pe)) }
+                View { attr { flex(1f) }; RailMetric("市净率", com.zhiniu.pages.components.fmt2(facts.pb)) }
+            }
+            View {
+                attr { flexDirectionRow() }
+                View { attr { flex(1f) }; RailMetric("总市值", facts.marketCap) }
+                View { attr { flex(1f) }; RailMetric("量比", com.zhiniu.pages.components.fmt2(facts.volumeRatio)) }
+            }
         }
         View { attr { height(8f) } }
         Divider()
         View { attr { height(8f) } }
-        // AI 快速解读
+        // AI 快速解读（知牛入口）
         View {
             attr { padding(left = 16f, right = 16f); flex(1f) }
             SectionHeader("AI 快速解读")
@@ -521,14 +533,6 @@ private fun ViewContainer<*, *>.RailQuickInsight(host: StockDetailPage, q: com.z
             RailMetric("趋势", if (insight.trend.length > 16) insight.trend.substring(0, 16) + "…" else insight.trend)
             RailMetric("量能", if (insight.volume.length > 16) insight.volume.substring(0, 16) + "…" else insight.volume)
             RailMetric("动量", insight.indicator.split("。").firstOrNull() ?: "—")
-            View { attr { height(8f) } }
-            Text {
-                attr {
-                    fontSize(AppTypography.fs12)
-                    color(colors.c(colors.textTertiary))
-                    text("关注 " + insight.followUps.firstOrNull()?.take(8) ?: "MA20 支撑")
-                }
-            }
             View { attr { flex(1f) } }
             View {
                 attr {

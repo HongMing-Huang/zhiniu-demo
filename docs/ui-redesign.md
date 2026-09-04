@@ -174,6 +174,8 @@
 
 - 字体：数字统一 `NUM_FONT` 等宽栈（Table/QuoteMetric/MarketPulse/ChartToolbar 已接入）。
 
+- **五档盘口**（2026-09-04 新增 `Level2Panel`，对齐委托盘口）：详情页 Rail 顶部「卖五~卖一 ｜ 最新价+涨跌 ｜ 买一~买五」，卖绿买红、量右对齐 + 半透明相对量条，挂单量按 symbol 种子确定性模拟（`seededVol`），真实行情接入后由 Repository 替换。
+
 ## 10. 待用户确认的 2 项
 
 - A. 涨跌色/AI 色按 §1.2 修订表统一？（推荐：是）
