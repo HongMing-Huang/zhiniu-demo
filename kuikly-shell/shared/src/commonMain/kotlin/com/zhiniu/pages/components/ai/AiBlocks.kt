@@ -133,8 +133,10 @@ fun ViewContainer<*, *>.AiStockCard(
                 }
             }
             View { attr { height(10f) } }
-            // 查看详情 →
+            // 查看详情
             View { attr { flexDirectionRow(); alignItemsCenter() }
+                Icon(IconKind.CHART, 13f) { colors.textSecondary }
+                View { attr { width(5f) } }
                 Text {
                     attr {
                         fontSize(AppTypography.fs12); fontWeightSemiBold()

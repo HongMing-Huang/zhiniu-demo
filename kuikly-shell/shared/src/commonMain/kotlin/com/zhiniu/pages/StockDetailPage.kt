@@ -219,7 +219,7 @@ private fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.z
             }
         }
         View { attr { flex(1f) } }
-        SecondaryButton("加自选", 34f) {
+        SecondaryButton("加自选", 34f, icon = IconKind.STAR) {
             com.zhiniu.data.local.Watchlist.toggle(q.symbol)
         }
         View { attr { width(8f) } }
@@ -238,6 +238,8 @@ private fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.z
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
             event { click { host.isAiPanelVisible = !host.isAiPanelVisible } }
+            Icon(IconKind.AI, 14f) { colors.aiAccent }
+            View { attr { width(6f) } }
             Text {
                 attr {
                     fontSize(AppTypography.fs14); fontWeightSemiBold()
@@ -524,6 +526,8 @@ private fun ViewContainer<*, *>.RailQuickInsight(host: StockDetailPage, q: com.z
                     cssClass("zn-click")
                 }
                 event { click { host.isAiPanelVisible = true } }
+                Icon(IconKind.AI, 13f) { colors.aiAccent }
+                View { attr { width(6f) } }
                 Text {
                     attr {
                         fontSize(AppTypography.fs13); fontWeightMedium()

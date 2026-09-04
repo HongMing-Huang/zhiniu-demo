@@ -114,7 +114,7 @@ fun ViewContainer<*, *>.EmptyState(
         }
         if (actionLabel != null && onAction != null) {
             View { attr { height(14f) } }
-            GhostButton(actionLabel, 34f, onAction)
+            GhostButton(actionLabel, 34f, onClick = onAction)
         }
     }
 }

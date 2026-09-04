@@ -18,8 +18,13 @@ import com.zhiniu.pages.components.c
 import com.zhiniu.pages.components.ca
 import com.zhiniu.pages.components.cssClass
 
-/** 主按钮：textPrimary 实色 + 反色文字。 */
-fun ViewContainer<*, *>.PrimaryButton(label: String, height: Float = 36f, onClick: () -> Unit) {
+/** 主按钮：textPrimary 实色 + 反色文字（可选前置图标）。 */
+fun ViewContainer<*, *>.PrimaryButton(
+    label: String,
+    height: Float = 36f,
+    icon: IconKind? = null,
+    onClick: () -> Unit,
+) {
     val colors = AppTheme.colors
     View {
         attr {
@@ -33,6 +38,10 @@ fun ViewContainer<*, *>.PrimaryButton(label: String, height: Float = 36f, onClic
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
         event { click { onClick() } }
+        if (icon != null) {
+            Icon(icon, 14f) { colors.surface }
+            View { attr { width(6f) } }
+        }
         Text {
             attr {
                 fontSize(AppTypography.fs14); fontWeightSemiBold()
@@ -43,8 +52,13 @@ fun ViewContainer<*, *>.PrimaryButton(label: String, height: Float = 36f, onClic
     }
 }
 
-/** 次按钮：surface 底 + 1px border。 */
-fun ViewContainer<*, *>.SecondaryButton(label: String, height: Float = 36f, onClick: () -> Unit) {
+/** 次按钮：surface 底 + 1px border（可选前置图标）。 */
+fun ViewContainer<*, *>.SecondaryButton(
+    label: String,
+    height: Float = 36f,
+    icon: IconKind? = null,
+    onClick: () -> Unit,
+) {
     val colors = AppTheme.colors
     View {
         attr {
@@ -59,6 +73,10 @@ fun ViewContainer<*, *>.SecondaryButton(label: String, height: Float = 36f, onCl
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
         event { click { onClick() } }
+        if (icon != null) {
+            Icon(icon, 14f) { colors.textSecondary }
+            View { attr { width(6f) } }
+        }
         Text {
             attr {
                 fontSize(AppTypography.fs14)
@@ -69,8 +87,13 @@ fun ViewContainer<*, *>.SecondaryButton(label: String, height: Float = 36f, onCl
     }
 }
 
-/** 幽灵按钮：透明 + 弱文字。 */
-fun ViewContainer<*, *>.GhostButton(label: String, height: Float = 34f, onClick: () -> Unit) {
+/** 幽灵按钮：透明 + 弱文字（可选前置图标）。 */
+fun ViewContainer<*, *>.GhostButton(
+    label: String,
+    height: Float = 34f,
+    icon: IconKind? = null,
+    onClick: () -> Unit,
+) {
     val colors = AppTheme.colors
     View {
         attr {
@@ -84,6 +107,10 @@ fun ViewContainer<*, *>.GhostButton(label: String, height: Float = 34f, onClick:
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
         event { click { onClick() } }
+        if (icon != null) {
+            Icon(icon, 13f) { colors.textSecondary }
+            View { attr { width(6f) } }
+        }
         Text {
             attr {
                 fontSize(AppTypography.fs13)
