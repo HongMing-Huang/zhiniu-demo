@@ -191,12 +191,20 @@ private fun ViewContainer<*, *>.detailContent(host: StockDetailPage, q: com.zhin
         View {
             attr { flexDirectionRow(); alignItemsCenter(); height(40f) }
             DetailTab("概览", host.detailTab == "概览") { host.detailTab = "概览" }
+            DetailTab("资金", host.detailTab == "资金") { host.detailTab = "资金" }
+            DetailTab("财务", host.detailTab == "财务") { host.detailTab = "财务" }
+            DetailTab("新闻", host.detailTab == "新闻") { host.detailTab = "新闻" }
             DetailTab("AI解读", host.detailTab == "AI解读") { host.detailTab = "AI解读" }
         }
         Divider()
         View { attr { height(16f) } }
-        vif({ host.detailTab == "概览" }) { overviewTab(q) }
-        velse { aiTab(host, q) }
+        when (host.detailTab) {
+            "资金" -> fundsTab(q)
+            "财务" -> financeTab(q)
+            "新闻" -> newsTab(q)
+            "AI解读" -> aiTab(host, q)
+            else -> overviewTab(q)
+        }
     }
 }
 
@@ -637,6 +645,167 @@ private fun ViewContainer<*, *>.aiTab(host: StockDetailPage, q: com.zhiniu.domai
         RailMetricFull("量能", insight.volume)
         RailMetricFull("技术信号", insight.indicator)
         RailMetricFull("风险", insight.risk, risk = true)
+    }
+}
+
+private fun ViewContainer<*, *>.fundsTab(q: com.zhiniu.domain.model.StockQuote) {
+    val colors = AppTheme.colors
+    val up = q.isUp
+    View {
+        attr {
+            backgroundColor(colors.c(colors.surface))
+            border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+            borderRadius(AppRadius.radius8)
+            padding(16f)
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+        SectionHeader("资金流向（今日）")
+        View { attr { height(10f) } }
+        // 四行资金：主力/超大/大/中/小单，正负随当日方向
+        listOf(
+            "主力净流入" to (q.amount * 0.076), "超大单净流入" to (q.amount * 0.041),
+            "大单净流入" to (q.amount * 0.035), "中单净流入" to (q.amount * 0.012),
+            "小单净流入" to (q.amount * 0.006),
+        ).forEach { (label, v) ->
+            val colorHex = if (up) colors.up else colors.down
+            val signed = if (up) v else -v
+            View {
+                attr { flexDirectionRow(); marginTop(12f) }
+                Text {
+                    attr {
+                        flex(1f); fontSize(AppTypography.fs13)
+                        color(colors.c(colors.textSecondary))
+                        text(label)
+                    }
+                }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs13); fontWeightMedium(); fontFamily(NUM_FONT)
+                        color(colors.c(colorHex))
+                        text((if (signed >= 0) "+" else "-") + com.zhiniu.pages.components.fmtAmount(kotlin.math.abs(signed)))
+                    }
+                }
+            }
+        }
+        View { attr { height(14f) } }
+        Divider()
+        View { attr { height(10f) } }
+        Text {
+            attr {
+                fontSize(AppTypography.fs12); lineHeight(19f)
+                color(colors.c(colors.textTertiary))
+                text("演示数据，实时资金流将在接入真实行情后展示。")
+            }
+        }
+    }
+}
+
+private fun ViewContainer<*, *>.financeTab(q: com.zhiniu.domain.model.StockQuote) {
+    val colors = AppTheme.colors
+    val facts = com.zhiniu.pages.components.factsOf(q)
+    View {
+        attr {
+            backgroundColor(colors.c(colors.surface))
+            border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+            borderRadius(AppRadius.radius8)
+            padding(16f)
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+        SectionHeader("财务概览")
+        View { attr { height(12f) } }
+        View { attr { flexDirectionRow() }
+            View { attr { flex(1f) }; QuoteMetric("市盈率", com.zhiniu.pages.components.fmt2(facts.pe)) }
+            View { attr { flex(1f) }; QuoteMetric("市净率", com.zhiniu.pages.components.fmt2(facts.pb)) }
+            View { attr { flex(1f) }; QuoteMetric("总市值", facts.marketCap) }
+        }
+        View { attr { height(14f) } }
+        Divider()
+        View { attr { height(12f) } }
+        listOf(
+            "营业收入（年）" to (q.amount * 42.0), "归母净利润（年）" to (q.amount * 6.4),
+            "毛利率" to 0.68, "资产负债率" to 0.31,
+        ).forEach { (label, v) ->
+            View {
+                attr { flexDirectionRow(); marginTop(12f) }
+                Text {
+                    attr {
+                        flex(1f); fontSize(AppTypography.fs13)
+                        color(colors.c(colors.textSecondary))
+                        text(label)
+                    }
+                }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs13); fontWeightMedium(); fontFamily(NUM_FONT)
+                        color(colors.c(colors.textPrimary))
+                        text(if (v <= 1.0) com.zhiniu.pages.components.fmt2(v * 100.0) + "%" else com.zhiniu.pages.components.fmtAmount(v))
+                    }
+                }
+            }
+        }
+        View { attr { height(14f) } }
+        Divider()
+        View { attr { height(10f) } }
+        Text {
+            attr {
+                fontSize(AppTypography.fs12); lineHeight(19f)
+                color(colors.c(colors.textTertiary))
+                text("演示财务数据，接入真实财报后展示。")
+            }
+        }
+    }
+}
+
+private fun ViewContainer<*, *>.newsTab(q: com.zhiniu.domain.model.StockQuote) {
+    val colors = AppTheme.colors
+    View {
+        attr {
+            backgroundColor(colors.c(colors.surface))
+            border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+            borderRadius(AppRadius.radius8)
+            padding(16f)
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+        SectionHeader("相关资讯")
+        View { attr { height(10f) } }
+        listOf(
+            "今日 09:12" to (q.name + "：白酒板块午后走强，机构关注提价预期"),
+            "昨日 16:40" to (q.name + "：主力资金净流入居前，北向加仓"),
+            "昨日 11:25" to ("行业研报：消费复苏带动" + q.name + "需求回暖"),
+            "08-28 20:15" to (q.name + "：中报披露在即，市场关注毛利率变化"),
+            "08-28 14:30" to ("A股收评：三大指数涨跌互现，" + q.name + "逆势上行"),
+        ).forEach { (time, title) ->
+            View {
+                attr { marginTop(12f) }
+                View { attr { flexDirectionRow(); alignItemsCenter() }
+                    Text {
+                        attr {
+                            fontSize(AppTypography.fs13); fontWeightSemiBold()
+                            color(colors.c(colors.textPrimary))
+                            text(title)
+                        }
+                    }
+                }
+                Text {
+                    attr {
+                        marginTop(3f)
+                        fontSize(AppTypography.fs11)
+                        color(colors.c(colors.textTertiary))
+                        text(time)
+                    }
+                }
+            }
+        }
+        View { attr { height(14f) } }
+        Divider()
+        View { attr { height(10f) } }
+        Text {
+            attr {
+                fontSize(AppTypography.fs12); lineHeight(19f)
+                color(colors.c(colors.textTertiary))
+                text("演示资讯，接入真实新闻后展示。")
+            }
+        }
     }
 }
 
