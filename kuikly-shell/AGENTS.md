@@ -5,11 +5,19 @@
 
 ---
 
+## 0. 工作日志（每次改动必记，防止记忆混乱）
+
+- **唯一记录文件**：`docs/WORKLOG.md`（仓库根 `zhiniu/docs/WORKLOG.md`）。所有 Agent 每次实质改动后**必须**在顶部追加一行。
+- 行格式：`YYYY-MM-DD HH:mm | 类别 | 改动描述 | 验证结果`；类别 ∈ {ui / build / data / agent / docs / design / git / chore}。
+- 禁止重复写研究/设计文档（已有 `docs/ui-redesign.md` / `AGENTS.md` / 各设计文档），只做增量记录。
+- 每轮结束时用 `git status` 核对，确保 WORKLOG 与本轮提交一致。
+
 ## 1. 项目性质
 
 - **赛题**：腾讯 Kuikly × 自选 AI Coding Skill Demo（Web H5 优先，H5 启动：<http://127.0.0.1:8082/index.html?page_name=MarketList&use_spa=1>）
-- **技术栈**：Kuikly DSL（**非** Compose DSL）、Kotlin 2.1.21、Multiplatform commonMain + jsMain、H5 SPA via `use_spa=1`
-- **当前阶段**：纯 Mock 数据；UI/交互/演示链路完整为第一目标，真实 API 仅替换 Repository（不修改 UI）
+- **GitHub**：`HongMing-Huang/zhiniu-demo`（private，origin=main，2026-09-04 建立）；代码管理一律走该仓库
+- **技术栈**：Kuikly DSL（**非** Compose DSL）、Kotlin 2.1.21、**Kuikly 2.25.0-2.1.21**、Multiplatform commonMain + jsMain、H5 SPA via `use_spa=1`
+- **当前阶段**：Mock 数据为主 + 真实接入研究已完成（见 `docs/ui-redesign.md` §5-6）；UI 精修与数据接入为进行中
 
 ## 2. 赛题硬约束（不可违反）
 
@@ -111,10 +119,17 @@ cd kuikly-shell && env -u NODE_OPTIONS JAVA_HOME=/Users/c14h14n3/Desktop/demo/zh
 # 3) 启动服务
 (cd web-8083 && python3 -m http.server 8083 &) && (cd web-host && python3 -m http.server 8082 &)
 
-# 4) 四分辨率截图
-node v4_final.js
+# 4) 浏览器验收：打开
+#    http://127.0.0.1:8082/index.html?page_name=MarketList&use_spa=1
+#    检查 MarketPage / StockDetailPage / AiResearchPage 三屏 + 搜索浮层 + 主题切换 + 行跳转
 ```
-四分辨率验收：1440×900 Light/Dark · 1920×1080 Light · 1280×800 Light。
+四分辨率验收：1440×900 Light/Dark · 1920×1080 Light · 1280×800 Light（浏览器 DevTools 设备模拟）。
+
+## 9.1 Git 提交规范
+- 提交前先 `git status` + 更新 `docs/WORKLOG.md`（§0）。
+- Commit message：单行标题 ≤ 72 字符，`type(scope): 描述`（type ∈ feat/fix/docs/design/build/chore/refactor）。
+- 每轮只提交有验证结果的改动；禁止把"未编译/未跑"的代码入库。
+- 推送：`git push origin main`（仓库 `HongMing-Huang/zhiniu-demo`）。
 
 ## 10. 禁止事项
 - 一次性重写整个项目（按 Phase 0→1→2→3→4→5 推进，每阶段运行 + 截图检查）
