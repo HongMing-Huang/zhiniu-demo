@@ -174,7 +174,7 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
                     }
                 }
                 View { attr { width(4f) } }
-                Icon(IconKind.CHEVRON_DOWN, 10f) { colors.textTertiary }
+                Icon(if (host.sortMode == "默认排序") IconKind.FILTER_SORT else IconKind.CHEVRON_DOWN, 11f) { colors.textTertiary }
             }
             View { attr { width(8f) } }
             // 筛选：激活时图标转主色，列表仅显示上涨

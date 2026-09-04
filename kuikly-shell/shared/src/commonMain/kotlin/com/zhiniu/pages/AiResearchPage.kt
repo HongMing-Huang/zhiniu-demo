@@ -52,6 +52,8 @@ internal class AiResearchPage : AppBasePage() {
 
     internal var draft by observable("")
     internal var currentSessionId by observable("s1")
+    // TradingAgents 借鉴：角色视图（分析师 / 多空对抗 / 风控）
+    internal var roleView by observable("分析")
     internal val chatSessions by observableList<ChatSession>()
     internal val messages by observableList<AiChatMessage>()
     private var seq = 0
@@ -108,6 +110,16 @@ internal class AiResearchPage : AppBasePage() {
         val id = "s${++seq + 100}"
         chatSessions.add(0, ChatSession(id, "新会话", "刚刚"))
         selectSession(id)
+    }
+
+    /** 角色视图切换：按 TradingAgents 多角色语义追加一条 AI 引导。 */
+    internal fun selectRoleView(view: String) {
+        val hint = when (view) {
+            "多空对抗" -> "已切换到「多空对抗」：由多/空两方研究员就同一标的进行辩论，随后汇总结论。"
+            "风控" -> "已切换到「风控」：评估波动、量能与回撤风险，给出仓位与风控建议。"
+            else -> "已切换到「分析」：综合基本面、技术面与情绪给出个股分析。"
+        }
+        messages.add(AiChatMessage("ai", blocks = listOf(AiBlock.Text(hint))))
     }
 
     override fun body(): ViewBuilder = {
@@ -178,6 +190,12 @@ private fun ViewContainer<*, *>.sessionColumn(host: AiResearchPage) {
                         animate(ANIM_THEME, value = AppTheme.isDark)
                     }
                     event { click { host.selectSession(session.id) } }
+                    Icon(
+                        IconKind.CHAT, 14f,
+                    ) {
+                        if (session.id == host.currentSessionId) colors.textPrimary else colors.textTertiary
+                    }
+                    View { attr { width(8f) } }
                     Text {
                         attr {
                             fontSize(AppTypography.fs13)
@@ -206,6 +224,30 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
         attr {
             flex(1f); flexDirectionColumn()
             backgroundColor(colors.c(colors.pageBg))
+        }
+        // 角色视图切换（TradingAgents 启发：Analyst / 辩论 / 风控）
+        View {
+            attr {
+                height(40f); flexDirectionRow(); alignItemsCenter()
+                padding(left = 32f)
+                borderBottom(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+            listOf("分析", "多空对抗", "风控").forEach { view ->
+                RoleTab(label = view, active = host.roleView == view) {
+                    host.roleView = view
+                    host.selectRoleView(view)
+                }
+            }
+            View { attr { flex(1f) } }
+            Text {
+                attr {
+                    marginRight(32f)
+                    fontSize(AppTypography.fs11)
+                    color(colors.c(colors.textTertiary))
+                    text("角色分工参考", )
+                }
+            }
         }
         List {
             attr { flex(1f) }
@@ -283,6 +325,38 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
                 Icon(IconKind.SEND, 16f) {
                     if (host.draft.isBlank()) colors.textTertiary else colors.surface
                 }
+            }
+        }
+    }
+}
+
+/** 角色视图 Tab：文字 + 2px 底部指示器（TradingAgents 角色分工：Analyst/辩论/风控）。 */
+private fun ViewContainer<*, *>.RoleTab(label: String, active: Boolean, onClick: () -> Unit) {
+    val colors = AppTheme.colors
+    View {
+        attr {
+            height(40f); padding(left = 4f, right = 4f); marginRight(20f)
+            flexDirectionColumn(); alignItemsCenter(); justifyContentCenter()
+            cssClass("zn-click")
+        }
+        event { click { onClick() } }
+        Text {
+            attr {
+                fontSize(AppTypography.fs13)
+                fontWeight600()
+                color(colors.c(if (active) colors.textPrimary else colors.textSecondary))
+                text(label)
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+        }
+        View { attr { height(4f) } }
+        View {
+            attr {
+                height(2f); width(16f)
+                borderRadius(allBorderRadius = 1f)
+                backgroundColor(colors.c(colors.aiAccent))
+                opacity(if (active) 1f else 0f)
+                animate(ANIM_THEME, value = AppTheme.isDark)
             }
         }
     }

@@ -97,6 +97,37 @@
 5. GitHub：用户建空仓或提供 PAT → 关联 origin 推送（当前代码已本地提交）
 6. 素材替换（用户提供后逐位替换占位）
 
-## 8. 待用户确认的 2 项
+## 8. TradingAgents 研究结论（2026-09-04，借鉴到知牛智能体）
+
+> 来源：<https://github.com/TauricResearch/TradingAgents>（Structured-Graph/Backtesting v0.3.x，LangGraph）。
+
+- **多角色分工**：Analyst Team（Fundamentals / Sentiment / News / Technical）→ Researcher Team（多空对抗辩论）→ Trader（决策）→ Risk Mgmt（风控评估）→ Portfolio Manager（最终批准）。
+- **对知牛的迁移点**（不照搬全量，赛题内做成 3 屏内的增强）：
+  1. `AiResearchPage` 聊天气泡可加「视图切换」：分析（默认）/ 多空对抗 / 风控结论 —— 结构化 5 类 AiBlock 已具备承载。
+  2. `AiInsightDrawer`（个股侧）输出 4 个维度块：基本面 / 技术面(MA·RSI·MACD) / 情绪(新闻) / 风险 —— 对应 Analyst 分队；追加「多空摘要」与「交易计划」占位。
+  3. 后端 `gateway.chat_completions_orchestrated` 已有 tools（quote/kline/financials/news/screen/compare/alert），可让任一角色调用真实数据，构成 Agent 工具闭环。
+- **实现边界**：本轮仅 UI 结构预留（视图切换 Tab + 区块容器），Agent 编排留在「数据接入 + Agent 端到端」阶段。
+
+## 9. 图标与 K 线规范核对（2026-09-04 落地）
+
+- **图标**：TDesign 官方 1000 图标复核（`Tencent/tdesign-icons` develop）。新增 6 个（PNG 80×80 白描边透明底，与现有规格一致）：
+  `calendar` / `check` / `filter-sort` / `error-triangle` / `chat-message` / `data-display`；`IconKind` 扩至 19 个。
+  已接入：排序按钮（默认排序→filter-sort，涨幅/跌幅→chevron-down）、会话列表行（chat-message，选中高亮）。
+- **K 线规范核对**（对照 OKX / 富途 / Webull）：
+  | 项 | 股票软件标准 | 当前 | 结论 |
+  |---|---|---|---|
+  | 涨跌色 | A股 红涨绿跌 | up=#F04F5F down=#16B364 | ✅ |
+  | 蜡烛+影线 | 实体+上下影线 | ✅ 已有 | ✅ |
+  | 时间轴 | ≥3 个标签（首/中/末） | 曾仅首/末 | ✅ 已补中值 |
+  | 蜡烛宽度 | 随 slot 自适应 ~0.7 | 曾固定 6-9 | ✅ 改 slot*0.7 |
+  | 量柱/MACD柱 | 与蜡烛同宽比 | 同步 0.7 | ✅ |
+  | MA5/10/20 | 主图叠加 | ✅ 已有 | ✅ |
+  | 成交量副图 | 红涨绿跌半透明 | ✅ 已有 | ✅ |
+  | MACD/RSI | 副图可选 | ✅ 已有 | ✅ |
+  | 十字线+OHLC | hover 十字+左上信息块 | ✅ 已有 | ✅ |
+  | 分时 | 折线+昨收基准 | ✅ 已有 | ✅ |
+- 字体：数字统一 `NUM_FONT` 等宽栈（Table/QuoteMetric/MarketPulse/ChartToolbar 已接入）。
+
+## 10. 待用户确认的 2 项
 - A. 涨跌色/AI 色按 §1.2 修订表统一？（推荐：是）
 - B. 「真实数据」H5 采用 §5 的 JSONP 桥接方案（推荐）还是先启用 Python 后端 /quote/*？

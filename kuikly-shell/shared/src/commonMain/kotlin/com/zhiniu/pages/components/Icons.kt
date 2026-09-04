@@ -22,7 +22,13 @@ enum class IconKind(val asset: String) {
     MORE("icons/more.png"),
     CHART("icons/chart.png"),
     CHEVRON_DOWN("icons/chevron_down.png"),
-    CHEVRON_UP("icons/chevron_up.png");
+    CHEVRON_UP("icons/chevron_up.png"),
+    CALENDAR("icons/calendar.png"),
+    CHECK("icons/check.png"),
+    FILTER_SORT("icons/filter-sort.png"),
+    ERROR("icons/error-triangle.png"),
+    CHAT("icons/chat-message.png"),
+    DATA("icons/data-display.png");
 }
 
 /**

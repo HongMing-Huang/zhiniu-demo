@@ -102,11 +102,16 @@ fun drawKLineChart(
     context.lineTo(w - rightPad, volTop)
     context.stroke()
 
-    // X 轴时间标签（首 / 末）
+    // X 轴时间标签（首 / 中 / 末）
     context.font(9f)
     context.textAlign(TextAlign.CENTER)
     context.fillStyle(axisColor)
-    listOf(0, n - 1).distinct().forEach { i ->
+    val axisIdx = when (n) {
+        1 -> listOf(0)
+        2 -> listOf(0, 1)
+        else -> listOf(0, n / 2, n - 1)
+    }
+    axisIdx.forEach { i ->
         val label = visBars[i].day.ifBlank { "" }
         if (label.isNotEmpty()) {
             context.fillText(label, xOf(i).coerceIn(leftPad, w - rightPad), h - 5f)
@@ -124,7 +129,7 @@ fun drawKLineChart(
             drawMaLine(context, sma(visBars.map { it.close }, 20), colors.c(colors.ma20), { xOf(it) }, { yOf(it) })
         }
         // 蜡烛
-        val bw = (slot * 0.6f).coerceIn(6f, 9f)
+        val bw = (slot * 0.7f).coerceIn(4f, 10f)
         val gap = slot - bw
         visBars.forEachIndexed { i, b ->
             val x = xOf(i)
@@ -152,17 +157,17 @@ fun drawKLineChart(
     // 成交量副图
     val maxVol = visBars.maxOf { it.volume }.coerceAtLeast(1)
     val volBaseY = h - 6f
+    val volW = (slot * 0.7f).coerceIn(4f, 10f)
     visBars.forEachIndexed { i, b ->
         val up = b.close >= b.open
         val bh = (b.volume.toDouble() / maxVol * (volBaseY - volTop - 6f)).toFloat()
         val x = xOf(i)
-        val bw = (slot * 0.6f).coerceIn(6f, 9f)
         context.fillStyle(if (up) colors.ca(colors.up, 55) else colors.ca(colors.down, 55))
         context.beginPath()
-        context.moveTo(x - bw / 2f, volBaseY)
-        context.lineTo(x + bw / 2f, volBaseY)
-        context.lineTo(x + bw / 2f, volBaseY - bh)
-        context.lineTo(x - bw / 2f, volBaseY - bh)
+        context.moveTo(x - volW / 2f, volBaseY)
+        context.lineTo(x + volW / 2f, volBaseY)
+        context.lineTo(x + volW / 2f, volBaseY - bh)
+        context.lineTo(x - volW / 2f, volBaseY - bh)
         context.closePath()
         context.fill()
     }
@@ -329,7 +334,7 @@ private fun drawMacdPane(
     context.moveTo(leftPad, y(0.0)); context.lineTo(w - rightPad, y(0.0))
     context.stroke()
     bars.forEachIndexed { i, _ ->
-        val v = hist[i]; val x = xOf(i); val bw = (slot * 0.55f).coerceIn(5f, 9f)
+        val v = hist[i]; val x = xOf(i); val bw = (slot * 0.7f).coerceIn(4f, 10f)
         context.fillStyle(colors.ca(if (v >= 0) colors.up else colors.down, 55))
         context.beginPath()
         context.moveTo(x - bw / 2f, y(v)); context.lineTo(x + bw / 2f, y(v))
