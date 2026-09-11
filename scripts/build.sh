@@ -2,13 +2,13 @@
 # 知牛 · 构建并部署 H5 bundle + 本地图标资源
 # 产物：kuikly-shell/shared/build/kotlin-webpack/js/productionExecutable/nativevue2.js → web-host（同源主入口）+ web-8083
 #       kuikly-shell/shared/src/commonMain/assets/common/icons/ → web-host/assets/common/icons/
-set -e
+set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 
 export JAVA_HOME="${JAVA_HOME:-/Users/c14h14n3/Desktop/demo/zhiniu/.toolchains/jdk-17.0.20.1+1/Contents/Home}"
 
-echo "==> [1/3] 图标资源（同步到 web-host）"
+echo "==> [1/3] 静态资源（图标 + 字体，同步到 web-host）"
 SRC_ICONS="$ROOT/kuikly-shell/shared/src/commonMain/assets/common/icons"
 DST_ICONS="$ROOT/web-host/assets/common/icons"
 if [ -d "$SRC_ICONS" ]; then
@@ -17,6 +17,15 @@ if [ -d "$SRC_ICONS" ]; then
   echo "  图标数量: $(ls $DST_ICONS | wc -l | tr -d ' ')"
 else
   echo "  ⚠ 缺失 $SRC_ICONS（先跑 scripts/icons_build.sh + icons_render.js）"
+fi
+SRC_FONTS="$ROOT/kuikly-shell/shared/src/commonMain/assets/common/fonts"
+DST_FONTS="$ROOT/web-host/assets/common/fonts"
+if [ -d "$SRC_FONTS" ]; then
+  mkdir -p "$DST_FONTS"
+  rsync -a --delete "$SRC_FONTS/" "$DST_FONTS/"
+  echo "  字体数量: $(ls $DST_FONTS | wc -l | tr -d ' ')"
+else
+  echo "  ⚠ 缺失 $SRC_FONTS（等宽数字字体，见 docs/typography.md）"
 fi
 
 echo "==> [2/3] jsBrowserProductionWebpack"

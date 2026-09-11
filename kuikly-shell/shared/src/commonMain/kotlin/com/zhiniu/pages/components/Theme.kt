@@ -29,8 +29,6 @@ object AppTypography {
     const val fs13 = 13f
     const val fs12 = 12f
     const val fs11 = 11f
-    /** 数字等宽视觉（H5 生效，原生端优雅降级）。 */
-    const val NUM_FONT = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
 }
 
 object AppSpacing {
@@ -56,25 +54,25 @@ const val PAD = 32f
 
 // ---------- 颜色 Token ----------
 open class AppColors(
-    val pageBg: String,           // App Background
-    val surface: String,           // Surface
-    val surfaceSecondary: String,  // Secondary / Skeleton / Toolbar bg
-    val surfaceHover: String,      // Row / Button hover
-    val elevated: String,          // Popover / 浮层表面
-    val border: String,
-    val borderStrong: String,
-    val textPrimary: String,
-    val textSecondary: String,
-    val textTertiary: String,      // 命名保留以兼容旧调用（语义 = Text Muted）
-    val up: String,
-    val down: String,
-    val flat: String,
-    val ma5: String, val ma10: String, val ma20: String,
-    val dif: String, val dea: String, val rsi: String,
-    val chartBg: String, val chartGrid: String, val axisText: String,
-    val crosshair: String,         // Crosshair 虚线
-    val aiAccent: String = "#D9FF43", // AI 高亮色（仅在 AI 区域，绿黄荧光）
-    val surfaceRaised: String = surface, // Surface Raised（Dark 用）
+    open val pageBg: String,           // App Background
+    open val surface: String,           // Surface
+    open val surfaceSecondary: String,  // Secondary / Skeleton / Toolbar bg
+    open val surfaceHover: String,      // Row / Button hover
+    open val elevated: String,          // Popover / 浮层表面
+    open val border: String,
+    open val borderStrong: String,
+    open val textPrimary: String,
+    open val textSecondary: String,
+    open val textTertiary: String,      // 命名保留以兼容旧调用（语义 = Text Muted）
+    open val up: String,
+    open val down: String,
+    open val flat: String,
+    open val ma5: String, open val ma10: String, open val ma20: String,
+    open val dif: String, open val dea: String, open val rsi: String,
+    open val chartBg: String, open val chartGrid: String, open val axisText: String,
+    open val crosshair: String,         // Crosshair 虚线
+    open val aiAccent: String = "#D9FF43", // AI 高亮色（仅在 AI 区域，绿黄荧光）
+    open val surfaceRaised: String = surface, // Surface Raised（Dark 用）
 )
 
 /** Light —— 中性白（AppBg #FFFFFF，绝非整页灰底）。 */
@@ -132,12 +130,53 @@ object DarkColors : AppColors(
     crosshair = "#3A4148",
 )
 
+/**
+ * 稳定的动态调色板代理。
+ *
+ * 组件通常会在声明阶段缓存 `AppTheme.colors`。代理本身保持不变，所有语义色 getter
+ * 则在属性重新求值时读取当前主题，避免切换主题后出现浅/深色调色板混用。
+ */
+private object AdaptiveColors : AppColors(
+    pageBg = "", surface = "", surfaceSecondary = "", surfaceHover = "", elevated = "",
+    border = "", borderStrong = "", textPrimary = "", textSecondary = "", textTertiary = "",
+    up = "", down = "", flat = "", ma5 = "", ma10 = "", ma20 = "", dif = "", dea = "",
+    rsi = "", chartBg = "", chartGrid = "", axisText = "", crosshair = "", aiAccent = "",
+    surfaceRaised = "",
+) {
+    private val active: AppColors get() = if (AppTheme.isDark) DarkColors else LightColors
+    override val pageBg get() = active.pageBg
+    override val surface get() = active.surface
+    override val surfaceSecondary get() = active.surfaceSecondary
+    override val surfaceHover get() = active.surfaceHover
+    override val elevated get() = active.elevated
+    override val border get() = active.border
+    override val borderStrong get() = active.borderStrong
+    override val textPrimary get() = active.textPrimary
+    override val textSecondary get() = active.textSecondary
+    override val textTertiary get() = active.textTertiary
+    override val up get() = active.up
+    override val down get() = active.down
+    override val flat get() = active.flat
+    override val ma5 get() = active.ma5
+    override val ma10 get() = active.ma10
+    override val ma20 get() = active.ma20
+    override val dif get() = active.dif
+    override val dea get() = active.dea
+    override val rsi get() = active.rsi
+    override val chartBg get() = active.chartBg
+    override val chartGrid get() = active.chartGrid
+    override val axisText get() = active.axisText
+    override val crosshair get() = active.crosshair
+    override val aiAccent get() = active.aiAccent
+    override val surfaceRaised get() = active.surfaceRaised
+}
+
 /** 全局主题控制器（单例）。 */
 object AppTheme {
     var mode by observable(ThemeMode.SYSTEM)
     private var systemDark by observable(false)
     var isDark by observable(false)
-    val colors: AppColors get() = if (isDark) DarkColors else LightColors
+    val colors: AppColors get() = AdaptiveColors
 
     fun start() {
         systemDark = systemPrefersDark()

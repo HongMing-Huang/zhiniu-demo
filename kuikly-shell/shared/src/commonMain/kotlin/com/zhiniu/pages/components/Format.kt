@@ -4,8 +4,14 @@ package com.zhiniu.pages.components
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** 数字等宽视觉：用等宽字体栈（H5 生效，原生端优雅降级）。 */
-const val NUM_FONT = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
+/**
+ * 数字等宽字体（Kuikly 官方各端字体接入，规范见 docs/typography.md）：
+ * - H5：web-host/index.html 以同名 @font-face 注册，字体就绪后才拉起渲染宿主（官方 h5-custom-font 指引）
+ * - Android：KRFontAdapter 从 assets/fonts/<名称>.ttf 加载（官方 IKRFontAdapter）
+ * - iOS：KRFontHandler 从共享资源目录按「文件名 = 字体名」加载（官方 KRFontModule 约定）
+ * - 未注册到字体的端由系统默认字体优雅降级，布局不受影响。
+ */
+const val NUM_FONT = "JetBrainsMono-Regular"
 
 /** 108.5 → "108.50"；-1 → "-0.01" 防御。 */
 fun fmt2(v: Double): String {
@@ -73,6 +79,16 @@ fun fmtVolHand(v: Long): String {
         v >= 100_000_000 -> fmt2(v / 100_000_000.0) + "亿手"
         v >= 10_000 -> fmt2(v / 10_000.0) + "万手"
         else -> fmtInt(v) + "手"
+    }
+}
+
+/** 总市值（元）→ "1.59万亿" / "2278亿"；null → "—"（A 股口径，与成交额的 T 单位区分）。 */
+fun fmtMarketCap(v: Double?): String {
+    if (v == null || v <= 0.0) return "—"
+    return when {
+        v >= 1e12 -> fmt2(v / 1e12) + "万亿"
+        v >= 1e8 -> kotlin.math.round(v / 1e8).toLong().toString() + "亿"
+        else -> fmt2(v / 1e4) + "万"
     }
 }
 

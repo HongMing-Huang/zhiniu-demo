@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>知牛 · ZhiNiu 行情</title>
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="icon" href="data:," />
+    <link rel="preload" href="assets/common/fonts/JetBrainsMono-Regular.ttf?v=1" as="font" type="font/ttf" crossorigin>
+</head>
+<style>
+    /* 官方 H5 自定义字体接入（docs/DevGuide/h5-custom-font.md）：
+       字体族名与 commonMain 的 NUM_FONT / Android IKRFontAdapter / iOS KRFontHandler 保持一致。 */
+    @font-face {
+        font-family: 'JetBrainsMono-Regular';
+        src: url('assets/common/fonts/JetBrainsMono-Regular.ttf?v=1') format('truetype');
+        font-display: block;
+    }
+
+    * { margin: 0; padding: 0; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+    html { background: #FFFFFF; overflow-x: hidden; }
+    html[data-theme="dark"] { background: #0B0D0F; }
+    body {
+        overflow: hidden; overflow-x: hidden;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
+        "Helvetica Neue", "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+        background: #FFFFFF;
+    }
+    html[data-theme="dark"] body { background: #0B0D0F; }
+    input:focus { outline: none; }
+
+    /* 主题钩子：行 hover + 滚动条 */
+    :root {
+        --zn-hover: #F7F8FA;
+        --zn-scroll: rgba(0, 0, 0, 0.14);
+        --zn-scroll-hover: rgba(0, 0, 0, 0.24);
+    }
+    html[data-theme="dark"] {
+        --zn-hover: #1B2026;
+        --zn-scroll: rgba(255, 255, 255, 0.12);
+        --zn-scroll-hover: rgba(255, 255, 255, 0.24);
+    }
+    .zn-row, .zn-iconbtn, .zn-pop { transition: background-color 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out; }
+    .zn-row:hover { background-color: var(--zn-hover) !important; }
+    .zn-iconbtn:hover { background-color: var(--zn-hover) !important; }
+    .zn-click { cursor: pointer; }
+    /* Kuikly H5 的子 Text/Image 会吞掉父 View 的 click；统一把命中交给按钮容器。 */
+    .zn-click > * { pointer-events: none !important; }
+    .zn-chart { cursor: crosshair; touch-action: none; }
+
+    #root ::-webkit-scrollbar { width: 8px; height: 8px; }
+    #root ::-webkit-scrollbar-thumb { background: var(--zn-scroll); border-radius: 4px; }
+    #root ::-webkit-scrollbar-thumb:hover { background: var(--zn-scroll-hover); }
+    #root ::-webkit-scrollbar-track { background: transparent; }
+    #root ::-webkit-scrollbar-corner { background: transparent; }
+
+    #root input { border: none; background: transparent; }
+    #root input::placeholder { color: inherit; opacity: 0.9; }
+
+    #root > div {
+        position: fixed !important; left: 0 !important; top: 0 !important;
+        width: 100vw !important; height: 100vh !important;
+    }
+    #root div { -webkit-user-select: none; user-select: none; }
+    #root input { -webkit-user-select: text; user-select: text; }
+</style>
+<body>
+<div id="root"></div>
+<!--
+  启动链路（同源单端口 8082，无需 8083）：
+  1. nativevue2.js  = Kuikly 内核 + 全部业务（Kotlin/JS UMD，jsBrowserProductionWebpack 产物）
+  2. 置 kuiklyBundlesReady  → h5App.js 渲染宿主据此进入 init（读取 ?page_name= 路由）
+  3. h5App.js        = 官方渲染宿主（KuiklyWebRenderViewDelegator）
+  三者均同步阻塞加载，保证 DOMContentLoaded 时全局就绪。
+  TODO: 未来接入官方 EnhancedBundleLoader + bundles/manifest 按页动态加载，可获按需分包。
+-->
+<script type="text/javascript" src="nativevue2.js?v=17"></script>
+<script type="text/javascript">
+    /* 单 bundle 模式：全量内核已由 nativevue2.js 提供，直接放行宿主启动 */
+    window.kuiklyBundlesReady = true;
+
+    /* Kuikly 通用 View 尚未暴露 wheel：宿主层映射到同一组可见缩放控制。 */
+    document.addEventListener("wheel", function (event) {
+        var chart = event.target && event.target.closest ? event.target.closest(".zn-chart") : null;
+        if (!chart) return;
+        event.preventDefault();
+        chart.dispatchEvent(new MouseEvent("click", {
+            bubbles: true,
+            clientX: event.clientX,
+            clientY: event.clientY
+        }));
+        var selector = event.deltaY < 0 ? ".zn-chart-zoom-in" : ".zn-chart-zoom-out";
+        var control = document.querySelector(selector);
+        if (control) control.click();
+    }, { passive: false });
+</script>
+<script type="text/javascript">
+    /* 官方 H5 自定义字体流程：@font-face 异步加载，必须在字体就绪后再拉起渲染宿主，
+       否则 Kuikly 首次文本量测用默认字体度量，等宽数字会显示不全（官方 h5-custom-font.md）。
+       1.5s 兜底：字体缺失或缓慢时按现状启动，不阻塞首屏。 */
+    (function () {
+        function boot() {
+            if (window.__znHostBooted) return;
+            window.__znHostBooted = true;
+            var s = document.createElement('script');
+            s.src = 'h5App.js';
+            document.body.appendChild(s);
+        }
+        if (document.fonts && document.fonts.load) {
+            Promise.race([
+                Promise.all([
+                    document.fonts.load('16px "JetBrainsMono-Regular"'),
+                    document.fonts.load('bold 16px "JetBrainsMono-Regular"')
+                ]),
+                new Promise(function (resolve) { setTimeout(resolve, 1500); })
+            ]).then(boot, boot);
+        } else {
+            boot();
+        }
+    })();
+</script>
+</body>
+</html>
