@@ -6,23 +6,20 @@ package com.zhiniu.pages
 import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.reactive.handler.observable
 import com.tencent.kuikly.core.reactive.handler.observableList
-import com.tencent.kuikly.core.views.View
 import com.zhiniu.base.BasePager
 import com.zhiniu.base.closeCurrentPage
 import com.zhiniu.base.openAiResearchPage
 import com.zhiniu.base.openMarketPage
 import com.zhiniu.base.openStockDetail
 import com.zhiniu.data.mock.MarketStore
+import com.zhiniu.data.remote.GatewayMarketClient
 import com.zhiniu.domain.model.StockQuote
 import com.zhiniu.domain.repository.MarketRepository
-import com.zhiniu.pages.components.ANIM_THEME
 import com.zhiniu.pages.components.AppTheme
-import com.zhiniu.pages.components.CONTENT_W
-import com.zhiniu.pages.components.PAD
-import com.zhiniu.pages.components.c
 import com.zhiniu.pages.components.common.AppHeader
 import com.zhiniu.pages.components.common.StockSearchOverlay
 import com.zhiniu.pages.components.common.ThemePopover
+import com.tencent.kuikly.core.coroutines.launch
 
 /** 页面公共基类（所有一级页面继承）。 */
 internal abstract class AppBasePage : BasePager() {
@@ -35,6 +32,8 @@ internal abstract class AppBasePage : BasePager() {
     internal val searchHot by observableList<StockQuote>()
     internal val searchResults by observableList<StockQuote>()
     internal var isThemePopoverVisible by observable(false)
+    internal var gatewayOnline by observable(false)
+    internal var agentReady by observable(false)
 
     /** 内容宽（全部显式 Float，避开 Comparable 重载歧义）。 */
     internal fun contentWidth(): Float {
@@ -45,15 +44,21 @@ internal abstract class AppBasePage : BasePager() {
     }
     internal fun isNarrow(): Boolean {
         val vw: Float = pageData.activityWidth
-        return vw < 1280f
+        return vw <= 1280f
     }
+    /** 760px 以下切换为单列/精简布局，覆盖常见手机横竖屏与窄窗口。 */
+    internal fun isCompact(): Boolean = pageData.activityWidth <= 760f
+    internal fun isMedium(): Boolean = pageData.activityWidth <= 1024f
+    internal fun safeTopInset(): Float = pageData.safeAreaInsets.top.coerceAtLeast(0f)
+    internal fun safeBottomInset(): Float = pageData.safeAreaInsets.bottom.coerceAtLeast(0f)
+    internal fun searchOverlayWidth(): Float = if (isCompact()) (pageData.activityWidth - 32f).coerceAtLeast(280f) else 520f
+    internal fun settingsOverlayWidth(): Float = if (isCompact()) (pageData.activityWidth - 32f).coerceAtLeast(280f) else 304f
     internal fun overlayLeft(width: Float): Float {
         val vw: Float = pageData.activityWidth
-        val cw: Float = 1360f
-        val pad: Float = 32f
-        val extra: Float = if (vw.compareTo(cw) > 0) (vw - cw) / 2f else 0f
-        val rightEdge: Float = vw + extra - pad
-        return rightEdge - width
+        val cw: Float = kotlin.math.min(vw, 1360f)
+        val pad: Float = if (vw <= 760f) 16f else 32f
+        val contentLeft: Float = (vw - cw) / 2f
+        return (contentLeft + cw - pad - width).coerceAtLeast(pad)
     }
 
     internal fun refreshSearchResults() { searchResults.diffUpdate(repo.search(searchQuery)) }
@@ -74,6 +79,14 @@ internal abstract class AppBasePage : BasePager() {
 
     override fun created() {
         super.created(); AppTheme.start(); initSearch()
+        // 真机/局域网联调：?gateway=http://192.168.x.x:8000 覆盖默认本机网关（非法值忽略）
+        pageData.params.optString("gateway", "").takeIf { it.isNotBlank() }?.let { GatewayMarketClient.baseUrl = it }
+        lifecycleScope.launch {
+            runCatching { GatewayMarketClient.health() }.onSuccess { status ->
+                gatewayOnline = status.online
+                agentReady = status.agentReady
+            }
+        }
     }
 }
 
@@ -82,6 +95,7 @@ internal fun ViewContainer<*, *>.renderCommonOverlays(host: AppBasePage, activeN
     AppHeader(
         activeNav = activeNav,
         contentWidth = host.contentWidth(),
+        topInset = host.safeTopInset(),
         onNavMarket = { host.navMarket() },
         onNavAiResearch = { host.navAiResearch() },
         onSearch = { host.isSearchVisible = true },
@@ -93,7 +107,9 @@ internal fun ViewContainer<*, *>.renderCommonOverlays(host: AppBasePage, activeN
         recent = { host.searchRecent },
         hot = { host.searchHot },
         results = { host.searchResults },
-        left = host.overlayLeft(520f),
+        left = host.overlayLeft(host.searchOverlayWidth()),
+        width = host.searchOverlayWidth(),
+        topInset = host.safeTopInset(),
         onQueryChange = { t -> host.searchQuery = t; host.refreshSearchResults() },
         onPick = { q ->
             host.rememberSearch(q.symbol); host.searchQuery = ""; host.isSearchVisible = false
@@ -103,15 +119,11 @@ internal fun ViewContainer<*, *>.renderCommonOverlays(host: AppBasePage, activeN
     )
     ThemePopover(
         visible = { host.isThemePopoverVisible },
-        left = host.overlayLeft(220f),
+        left = host.overlayLeft(host.settingsOverlayWidth()),
+        width = host.settingsOverlayWidth(),
+        topInset = host.safeTopInset(),
+        gatewayOnline = { host.gatewayOnline },
+        agentReady = { host.agentReady },
         onClose = { host.isThemePopoverVisible = false },
     )
-    // 全局底色（覆盖 host 灰）
-    View {
-        attr {
-            absolutePositionAllZero()
-            backgroundColor(AppTheme.colors.c(AppTheme.colors.pageBg))
-            animate(ANIM_THEME, value = AppTheme.isDark)
-        }
-    }
 }

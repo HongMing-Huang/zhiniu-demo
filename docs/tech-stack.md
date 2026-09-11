@@ -1,8 +1,7 @@
 # 知牛 ZhiNiu · 技术栈定稿
 
-> 文档版本：v1.0（定稿，2026-08-22）
-> 目的：回答「技术栈到底怎么用、选什么」。逐层定稿，标注真实来源/版本与已落地/待验证。
-> 总原则：**前端 Kuikly + 多用公内置组件，后端轻量网关，全真实 API，图标用公共资源不自绘 SVG**。
+> 文档版本：v1.1（2026-09-11 按工程实态修订）。目的：回答「技术栈到底怎么用、选什么」。
+> 总原则：**前端 Kuikly + 多用官方内置组件，后端轻量网关，全真实 API，图标字体用公共开源资源**。
 
 ---
 
@@ -10,16 +9,15 @@
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ 前端 shared/commonMain（Kotlin 2.2 · K2）· Kuikly 自研 DSL      │
-│  Pager/@Page · 内置组件 List/Text/View/Carousel/Tab/Dialog      │
-│  StateFlow 四态 · Koin DI · Ktor3 Client · kotlinx.serialization│
-│  SQLDelight(自选/会话) · Canvas 自绘 K线 · Material Symbols 字体  │
+│ 前端 shared/commonMain（Kotlin 2.1.21）· Kuikly 自研 DSL       │
+│  Pager/@Page · 内置组件 List/Text/View/Canvas/RichText         │
+│  observable 状态 · Ktor 2 Client · kotlinx.serialization       │
+│  Canvas 自绘 K线 · TDesign 图标 PNG · JetBrains Mono 数字字体  │
 └──────────────┬───────────────────────────────────────────────┘
-               │ POST /v1/chat/completions（OpenAI 兼容，SSE）
+               │ /quote/* /news/* /agent/research（OpenAI 兼容，SSE）
 ┌──────────────▼───────────────────────────────────────────────┐
-│ 后端 backend/（Python · FastAPI · openai SDK）· LLM 网关          │
-│  DeepSeek(api.deepseek.com) · GLM(open.bigmodel.cn) ·           │
-│  混元(api.hunyuan.cloud.tencent.com/v1) · 降级链               │
+│ 后端 backend/（Python · FastAPI · openai SDK）· 数据+LLM 网关   │
+│  新浪行情 · 东方财富资讯 · DeepSeek/GLM/混元可选 · 降级链        │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -32,16 +30,17 @@
 | **前端框架** | **Kuikly**（KMP 跨端，原生渲染） | 一套 Kotlin 六端；minic 90% 代码在 commonMain；优先内置组件 | GitHub `Tencent-TDS/KuiklyUI`（3.4k★）；官方 kuiklyDSL.mdc | ✅ 已选 |
 | **UI DSL** | **Kuikly 自研 DSL**（主） | `@Page`/`Pager`/`body():ViewBuilder`/`attr{}`；Compose DSL 仅作对齐备用 | kuikly.tds.qq.com/ComposeDSL/allApi.html | ✅ 已选 |
 | **组件** | **Kuikly 内置组件**优先 | `List/Carousel/Tab/Dialog/Input/Button/Canvas/AI Chat`；社区 `KuiklyMarkdown`(流式)/`KuiklyTableView`(表格) | `docs/kuikly-common-assets.md` | ✅ 已选 |
-| **HTTP（客户端）** | **Ktor Client** | commonMain 用 Ktor 3（OkHttp/Darwin engine），ContentNegotiation + kotlinx-json；`ignoreUnknownKeys` | Ktor 3.4.0（JetBrains 2026-01） | ✅ 已选 |
-| **JSON** | **kotlinx.serialization** | `@Serializable` DTO 反序列化 | Kotlin 2.x 内置 | ✅ 已选 |
-| **状态管理** | **Kuikly 原生 `observable`/`observableList`** | 页面 `attr{}` 内用 `vfor/vif/vbind`；聊天流式 `Flow<StreamChunk>` | kuiklyDSL.mdc | ✅ 已选（2026-08-22 由 StateFlow 调整为框架原生） |
-| **DI** | **Koin（for KMP）** | 单入口 `App.kt` 注入；network/repository/viewModel 分模块 | Koin 官方 KMP 支持 | ✅ 已选 |
-| **本地存储** | **SQLDelight** | `.sq` 定义表 → 生成类型安全接口；AndroidSqliteDriver/NativeSqliteDriver | SQLDelight；ADR-005 | ✅ 已选 |
-| **K 线** | **Kuikly `Canvas` 自绘**（统一，不用 Vico） | 封装 `CandlestickChart` 组合组件；**Vico 为标准 Compose 库，与 Kuikly 非标准 Compose 集成未验证，弃用** | `docs/kuikly-common-assets.md` §2 | ✅ 定（替代原 Vico） |
-| **图标** | **Google Material Symbols 字体**（主） | 字体渲染跨渲染层通用；不自绘 SVG | fonts.google.com/icons；`docs/kuikly-common-assets.md` §3 | ✅ 定 |
-| **后端网关** | **Python · FastAPI · openai SDK** | 对前端暴露 OpenAI 兼容 `/v1/chat/completions`；复用官方 SDK 换 base_url/key；多厂商降级 | D1=A；`backend/` 已合并 main | ✅ 已落地 |
-| **LLM 多模型** | **DeepSeek / GLM / 腾讯混元** | 三厂商均 OpenAI 兼容；统一别名 `zhiniu/quick·think·flash`；密钥只在服务端 | 官方文档核实，见 `docs/backend-llm-gateway-design.md` §2 | ✅ 已落地 |
-| **行情数据** | **新浪 hq.sinajs.cn（P0）+ 新浪 K 线 + 降级** | 免 Key、覆盖广；`Referer: finance.sina.com.cn`；降级 Tushare→AKShare→Mock | 技术方案 §6.1 | ✅ 已选 |
+| **HTTP（客户端）** | **Ktor Client** | commonMain 用 Ktor 2.3.12（OkHttp/Darwin/Js engine），ContentNegotiation + kotlinx-json；`ignoreUnknownKeys` | `shared/build.gradle.kts` 实测版本 | ✅ 已落地 |
+| **JSON** | **kotlinx.serialization** | `@Serializable` DTO 反序列化 | Kotlin 2.x 内置 | ✅ 已落地 |
+| **状态管理** | **Kuikly 原生 `observable`/`observableList`** | 页面 `attr{}` 内用 `vfor/vif/vbind`；聊天流式增量渲染 | kuiklyDSL.mdc | ✅ 已落地 |
+| **本地存储** | **内存单例（演示口径）** | `Watchlist`/会话状态为进程内单例；不引入 SQLDelight，避免演示环境额外生成步骤 | 代码实态 | ✅ 已定 |
+| **DI** | **不使用 DI 框架** | 页面级 direct access；`MarketStore` 单例为唯一替换点（AGENTS §10 禁复杂 DI 容器） | kuikly-shell/AGENTS.md | ✅ 已定 |
+| **K 线** | **Kuikly `Canvas` 自绘** | 蜡烛/量柱/MA/MACD/RSI/十字线/缩放全部自绘；**Vico 为标准 Compose 库，与 Kuikly 非标准 Compose 集成未验证，弃用** | ADR-004 | ✅ 已落地 |
+| **图标** | **Tencent TDesign Icons（本地 PNG 预着色）** | `Tencent/tdesign-icons` 官方资源，本地中性灰透明底 PNG 跨端渲染，不自绘 SVG | ADR-006；`scripts/icons_build.sh` | ✅ 已落地 |
+| **字体** | **系统 Sans + JetBrains Mono（OFL）** | 数字等宽按 KuiklyUI 官方机制三端注册（Android IKRFontAdapter / iOS KRFontHandler / H5 @font-face） | `docs/typography.md` | ✅ 已落地 |
+| **后端网关** | **Python · FastAPI · openai SDK** | 对前端暴露行情/资讯/研究接口 + OpenAI 兼容 LLM 代理；复用官方 SDK 换 base_url/key；多厂商降级 | D1=A | ✅ 已落地 |
+| **LLM 多模型** | **OpenAI 兼容协议多厂商可选** | DeepSeek / GLM / 混元均可经 base_url+key 接入；密钥只在服务端；不可用时明确「规则降级 · 未伪装模型」 | `docs/backend-llm-gateway-design.md` | ✅ 已落地 |
+| **行情数据** | **新浪 hq.sinajs.cn（P0）+ 东方财富资讯 + 降级** | 免 Key、覆盖广；GBK/Referer 由后端统一处理；降级链 缓存→Mock | `docs/api-matrix.md` | ✅ 已落地 |
 | **性能/异步** | **Kotlin 协程 + Flow** | 全网异步，流式响应，不阻塞渲染 | Kotlin 2.x | ✅ 已选 |
 
 ---

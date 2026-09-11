@@ -24,32 +24,42 @@ import com.zhiniu.pages.components.fmtPct
 /**
  * Market Pulse 紧凑行情带：高度 92px，1px 上下边线，5 列等高。
  * 列：3 指数 + 市场宽度 + 两市成交额；中间用 1px 竖线分隔。
- * @param narrow 窄屏 (<1280) 隐藏"两市成交额"列。
+ * @param narrow 窄屏 (<=1280) 隐藏"两市成交额"列。
  */
 fun ViewContainer<*, *>.MarketPulse(
     indices: List<MarketIndex>,
     breadth: MarketBreadth,
     narrow: Boolean,
+    compact: Boolean = false,
 ) {
     val colors = AppTheme.colors
     View {
         attr {
-            height(AppSpacing.pulse)
-            flexDirectionRow(); alignItemsStretch()
+            height(if (compact) 148f else AppSpacing.pulse)
+            flexDirectionColumn(); alignItemsStretch()
             backgroundColor(colors.c(colors.surface))
             borderTop(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
             borderBottom(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
-        indices.forEachIndexed { i, idx ->
-            if (i > 0) VerticalDivider()
-            IndexColumn(idx)
+        View {
+            attr { height(AppSpacing.pulse); flexDirectionRow(); alignItemsStretch() }
+            indices.forEachIndexed { i, idx ->
+                if (i > 0) VerticalDivider()
+                IndexColumn(idx, compact)
+            }
+            if (!compact) {
+                VerticalDivider()
+                BreadthColumn(breadth)
+                if (!narrow) {
+                    VerticalDivider()
+                    AmountColumn(breadth)
+                }
+            }
         }
-        VerticalDivider()
-        BreadthColumn(breadth)
-        if (!narrow) {
-            VerticalDivider()
-            AmountColumn(breadth)
+        if (compact) {
+            View { attr { height(1f); backgroundColor(colors.c(colors.border)) } }
+            CompactBreadthRow(breadth)
         }
     }
 }
@@ -65,12 +75,12 @@ private fun ViewContainer<*, *>.VerticalDivider() {
     }
 }
 
-private fun ViewContainer<*, *>.IndexColumn(idx: MarketIndex) {
+private fun ViewContainer<*, *>.IndexColumn(idx: MarketIndex, compact: Boolean) {
     val colors = AppTheme.colors
     View {
         attr {
             flex(1f)
-            padding(top = 14f, left = 22f, right = 14f, bottom = 14f)
+            padding(top = 14f, left = if (compact) 10f else 22f, right = if (compact) 8f else 14f, bottom = 14f)
         }
         Text {
             attr {
@@ -85,17 +95,17 @@ private fun ViewContainer<*, *>.IndexColumn(idx: MarketIndex) {
             attr { flexDirectionRow(); alignItemsCenter() }
             Text {
                 attr {
-                    fontSize(AppTypography.fs18); fontWeightSemiBold()
+                    fontSize(if (compact) AppTypography.fs14 else AppTypography.fs18); fontWeightSemiBold()
                     fontFamily(NUM_FONT)
                     color(colors.c(colors.textPrimary))
                     text(fmt2(idx.price))
                     animate(ANIM_THEME, value = AppTheme.isDark)
                 }
             }
-            View { attr { width(10f) } }
+            View { attr { width(if (compact) 5f else 10f) } }
             Text {
                 attr {
-                    fontSize(AppTypography.fs13); fontWeightSemiBold()
+                    fontSize(if (compact) AppTypography.fs11 else AppTypography.fs13); fontWeightSemiBold()
                     fontFamily(NUM_FONT)
                     color(colors.c(if (idx.isUp) colors.up else colors.down))
                     text(fmtPct(idx.changePercent))
@@ -105,14 +115,41 @@ private fun ViewContainer<*, *>.IndexColumn(idx: MarketIndex) {
         }
         View { attr { height(4f) } }
         // 22-26px 高 mini sparkline
-        Canvas({
-            attr { width(110f); height(24f) }
-        }) { context, w, h ->
-            drawSparkLine(
-                context, idx.spark,
-                colors.c(if (idx.isUp) colors.up else colors.down),
-                w, h,
-            )
+        if (!compact) {
+            Canvas({ attr { width(110f); height(24f) } }) { context, w, h ->
+                drawSparkLine(context, idx.spark, colors.c(if (idx.isUp) colors.up else colors.down), w, h)
+            }
+        }
+    }
+}
+
+private fun ViewContainer<*, *>.CompactBreadthRow(breadth: MarketBreadth) {
+    val colors = AppTheme.colors
+    View {
+        attr {
+            height(55f); flexDirectionRow(); alignItemsCenter()
+            padding(left = 10f, right = 10f)
+        }
+        Text { attr { fontSize(AppTypography.fs12); color(colors.c(colors.textSecondary)); text("市场宽度") } }
+        Text {
+            attr {
+                marginLeft(10f); fontSize(AppTypography.fs14); fontWeightSemiBold(); fontFamily(NUM_FONT)
+                color(colors.c(colors.up)); text(fmtInt(breadth.upCount))
+            }
+        }
+        Text { attr { marginLeft(4f); marginRight(4f); fontSize(AppTypography.fs12); color(colors.c(colors.textTertiary)); text("/") } }
+        Text {
+            attr {
+                fontSize(AppTypography.fs14); fontWeightSemiBold(); fontFamily(NUM_FONT)
+                color(colors.c(colors.down)); text(fmtInt(breadth.downCount))
+            }
+        }
+        View { attr { flex(1f) } }
+        Text {
+            attr {
+                fontSize(AppTypography.fs12); color(colors.c(colors.textSecondary))
+                text("上涨 " + fmt2(breadth.upRatio * 100.0) + "% · " + breadth.status)
+            }
         }
     }
 }

@@ -7,11 +7,14 @@ import com.tencent.kuikly.core.base.Animation
 import com.tencent.kuikly.core.base.Border
 import com.tencent.kuikly.core.base.BorderStyle
 import com.tencent.kuikly.core.base.ViewContainer
+import com.tencent.kuikly.core.base.ViewRef
 import com.tencent.kuikly.core.directives.vif
 import com.tencent.kuikly.core.directives.vfor
 import com.tencent.kuikly.core.reactive.collection.ObservableList
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
+import com.tencent.kuikly.core.views.InputView
+import com.tencent.kuikly.core.views.List
 import com.zhiniu.domain.model.AiInsight
 import com.zhiniu.domain.model.StockQuote
 import com.zhiniu.pages.components.ANIM_THEME
@@ -28,6 +31,7 @@ import com.zhiniu.pages.components.fmt2
 import com.zhiniu.pages.components.fmtSymbol
 import com.zhiniu.pages.components.common.AppInput
 import com.zhiniu.pages.components.common.Divider
+import com.zhiniu.pages.components.common.PrimaryButton
 
 /** 追问问答行。 */
 data class AiPanelChatLine(val role: String, val text: String)
@@ -37,6 +41,7 @@ data class AiPanelChatLine(val role: String, val text: String)
  */
 fun ViewContainer<*, *>.AiInsightPanel(
     width: Float,
+    height: Float = 0f,
     quote: () -> StockQuote?,
     insight: () -> AiInsight?,
     followUpText: () -> String,
@@ -49,6 +54,7 @@ fun ViewContainer<*, *>.AiInsightPanel(
     View {
         attr {
             width(width)
+            if (height > 0f) height(height)
             flexDirectionColumn()
             backgroundColor(colors.c(colors.surface))
             borderLeft(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
@@ -77,11 +83,13 @@ fun ViewContainer<*, *>.AiInsightPanel(
                     allCenter(); cssClass("zn-iconbtn zn-click")
                 }
                 event { click { onClose() } }
-                Icon(IconKind.CLOSE, 15f) { colors.textSecondary }
+                Icon(IconKind.CLOSE, 15f)
             }
         }
-        // 股票名 + 代码
-        vif({ quote() != null && insight() != null }) {
+        // 内容独立滚动，避免 Follow-up 与问答被固定 Composer 裁切。
+        List {
+            attr { flex(1f) }
+            vif({ quote() != null && insight() != null }) {
             val q = quote()!!
             val view = insight()!!
             View {
@@ -158,7 +166,7 @@ fun ViewContainer<*, *>.AiInsightPanel(
                             event { click { onFollowUpSend(q) } }
                             Text {
                                 attr {
-                                    fontSize(AppTypography.fs12)
+                                    fontSize(AppTypography.fs12); lines(1)
                                     color(colors.c(colors.textSecondary))
                                     text(q)
                                 }
@@ -212,8 +220,11 @@ fun ViewContainer<*, *>.AiInsightPanel(
                     }
                 }
             }
+            View { attr { height(14f) } }
+        }
         }
         // Composer (固定底部 42-44)
+        var composerRef: ViewRef<InputView>? = null
         View {
             attr {
                 flexDirectionRow(); alignItemsCenter()
@@ -226,27 +237,22 @@ fun ViewContainer<*, *>.AiInsightPanel(
                 text = followUpText(),
                 height = 36f,
                 onTextChange = onFollowUpChange,
-                onReturn = { onFollowUpSend(followUpText()) },
+                onReturn = {
+                    val question = followUpText()
+                    if (question.isNotBlank()) {
+                        onFollowUpSend(question)
+                        composerRef?.view?.setText("")
+                    }
+                },
+                onRef = { composerRef = it },
             )
             View { attr { width(8f) } }
-            // 圆形 34 发送
-            View {
-                attr {
-                    width(34f); height(34f)
-                    borderRadius(allBorderRadius = 17f)
-                    allCenter()
-                    backgroundColor(colors.c(if (followUpText().isBlank()) colors.surfaceSecondary else colors.textPrimary))
-                    cssClass("zn-click")
-                    animate(ANIM_THEME, value = AppTheme.isDark)
-                }
-                event { click {
-                    if (followUpText().isNotBlank()) onFollowUpSend(followUpText())
-                } }
-                Icon(
-                    IconKind.SEND, 16f,
-                ) {
-                    if (followUpText().isBlank()) colors.textTertiary else colors.surface
-                }
+            PrimaryButton("发送", height = 36f, icon = IconKind.SEND) {
+                    val question = followUpText()
+                    if (question.isNotBlank()) {
+                        onFollowUpSend(question)
+                        composerRef?.view?.setText("")
+                    }
             }
         }
     }

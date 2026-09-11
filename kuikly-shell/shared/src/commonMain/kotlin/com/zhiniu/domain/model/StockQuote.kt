@@ -3,6 +3,50 @@ package com.zhiniu.domain.model
 
 import kotlinx.serialization.Serializable
 
+@Serializable
+data class OrderBookLevel(
+    val price: Double,
+    val volumeShares: Long,
+)
+
+@Serializable
+data class FundFlowSnapshot(
+    val asOf: String = "",
+    val mainNetInflow: Double? = null,
+    val smallNetInflow: Double? = null,
+    val mediumNetInflow: Double? = null,
+    val largeNetInflow: Double? = null,
+    val superLargeNetInflow: Double? = null,
+)
+
+@Serializable
+data class StockFundamentals(
+    val symbol: String,
+    val name: String = "",
+    val industry: String = "",
+    val region: String = "",
+    val concepts: List<String> = emptyList(),
+    val pe: Double? = null,
+    val pb: Double? = null,
+    val turnoverRate: Double? = null,
+    val amplitude: Double? = null,
+    val marketCap: Double? = null,
+    val floatMarketCap: Double? = null,
+    val reportDate: String = "",
+    val reportType: String = "",
+    val revenue: Double? = null,
+    val netProfit: Double? = null,
+    val roe: Double? = null,
+    val grossMargin: Double? = null,
+    val revenueYoY: Double? = null,
+    val netProfitYoY: Double? = null,
+    val moneyFlow: FundFlowSnapshot = FundFlowSnapshot(),
+    val source: String = "",
+    val provider: String = "",
+    val isStale: Boolean = false,
+    val available: Boolean = false,
+)
+
 /** 单只股票实时报价（含演示用拼音字段，供搜索匹配）。 */
 @Serializable
 data class StockQuote(
@@ -16,10 +60,18 @@ data class StockQuote(
     val low: Double,
     val buy1: Double = 0.0,
     val sell1: Double = 0.0,
+    val bids: List<OrderBookLevel> = emptyList(),
+    val asks: List<OrderBookLevel> = emptyList(),
     val volume: Long,            // 手
     val amount: Double,          // 元
+    val marketCap: Double? = null,     // 总市值（元），东财 ulist 补充；缺失显示 —
+    val turnoverRate: Double? = null,  // 换手率 %
+    val volumeRatio: Double? = null,   // 量比
     val date: String = "",
     val time: String = "",
+    val source: String = "知牛离线快照",
+    val provider: String = "offline-snapshot",
+    val isStale: Boolean = true,
 ) {
     val change: Double get() = price - prevClose
     val changePercent: Double

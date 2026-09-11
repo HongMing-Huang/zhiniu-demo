@@ -14,8 +14,20 @@ import kotlin.math.sin
 
 class MockMarketRepository : MarketRepository {
 
+    private val liveQuoteOverrides = mutableMapOf<String, StockQuote>()
+
+    /** 将网关返回的最新报价合并进同步仓储，让搜索、详情与 AI 共用同一份价格。 */
+    fun applyLiveQuotes(quotes: List<StockQuote>) {
+        val base = baseStockQuotes().associateBy { it.symbol }
+        quotes.forEach { q ->
+            liveQuoteOverrides[q.symbol] = if (q.pinyin.isBlank()) q.copy(pinyin = base[q.symbol]?.pinyin.orEmpty()) else q
+        }
+    }
+
     // ---------------- 股票池（12 只，覆盖 沪市/深市/创业板/科创板） ----------------
-    override fun stockQuotes(): List<StockQuote> = listOf(
+    override fun stockQuotes(): List<StockQuote> = baseStockQuotes().map { liveQuoteOverrides[it.symbol] ?: it }
+
+    private fun baseStockQuotes(): List<StockQuote> = listOf(
         q("sh600519", "贵州茅台", "maotai", 1292.83, 1291.50, 1289.40, 1295.00, 1270.01, 715_000L, 431.0e8),
         q("sz300750", "宁德时代", "ningde", 196.80, 193.50, 195.00, 198.00, 193.10, 882_000L, 173.0e8),
         q("sz000001", "平安银行", "pinganyinhang", 11.30, 11.15, 11.20, 11.38, 11.12, 1_120_000L, 12.6e8),

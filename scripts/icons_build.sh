@@ -15,6 +15,7 @@ search|ai-search
 back|arrow-left
 chevron_down|chevron-down
 chevron_up|chevron-up
+chevron_right|chevron-right
 star|collection
 star_filled|collection-filled
 filter|filter

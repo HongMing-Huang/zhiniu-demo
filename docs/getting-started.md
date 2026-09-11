@@ -1,6 +1,6 @@
 # 知牛 ZhiNiu · 快速开始
 
-> 版本：v0.1（2026-08-22）。环境要求来自 Kuikly 官方环境搭建页（kuikly.tds.qq.com/QuickStart/env-setup.html）。
+> 版本：v1.1（2026-09-11，与工程实态对齐）。主演示端为 **Web H5**（零 Android 依赖），原生端为 Kuikly 官方壳工程。
 
 ---
 
@@ -8,56 +8,101 @@
 
 | 工具 | 版本 | 用途 |
 |:--|:--|:--|
-| JDK | **17** | Gradle 构建（Android Studio ≥2024.2.1 需手动把 Gradle JDK 切到 17） |
-| Android Studio | ≥ 2024.2.1 | 前端壳工程 + Kuikly 插件 |
-| Kuikly Android Studio 插件 | ≥ 1.1.0（含鸿蒙） | 生成 Kuikly 工程/ComposeView/Pager |
-| Python | 3.10+ | 后端 LLM 网关 |
-| （可选）Xcode / DevEco | — | iOS / 鸿蒙端 |
+| JDK | **17**（Gradle 构建必需；系统默认 JDK 25 太新会失败） | 前端构建 |
+| Python | 3.10+ | 后端数据 / LLM 网关 |
+| Xcode Command Line Tools / Android Studio / DevEco 5.1+ | — | 仅对应原生端需要 |
+
+> 本仓库自带隔离工具链：`.toolchains/jdk-17.0.20.1+1`。`scripts/build.sh` 会自动使用；
+> 手动跑 gradle 时请 `JAVA_HOME=$(pwd)/.toolchains/jdk-17.0.20.1+1/Contents/Home`。
+> 另需 `env -u NODE_OPTIONS`（本机 NODE_OPTIONS 的 `--use-system-ca` 会被 Kotlin 内置 Node 拒绝）。
 
 ---
 
-## 1. 后端 LLM 网关（先跑这个）
+## 1. 后端网关（建议先跑）
 
 ```bash
 cd backend
-python -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env          # 填 DeepSeek/智谱/混元 Key（可选，缺失走 Mock）
+cp .env.example .env      # 可选：填 OpenAI 兼容厂商 Key；缺 Key 自动「规则降级」
 uvicorn app.main:app --port 8000
 ```
 
-自检：`curl http://localhost:8000/healthz` → 各厂商 `key_configured`。
+自检：
+
+```bash
+curl http://127.0.0.1:8000/healthz
+# {"status":"ok","services":{"market":{"status":"ready","provider":"sina+eastmoney"},"agent":{...}}}
+```
+
+单测：`.venv/bin/python -m unittest discover -s tests`（当前 53/53 通过）。
+
+不启动后端也可运行前端——行情/资讯保留内置确定性快照，研究回复标注「规则降级」。
 
 ---
 
-## 2. 前端（Kuikly）
+## 2. 前端 H5（主演示端）
 
-推荐用**官方脚手架**生成 gradle（手写坐标易错）：
+```bash
+./scripts/build.sh                       # 图标+字体同步 → jsBrowserProductionWebpack → 部署 web-host/
+(cd web-host && python3 -m http.server 8082 --bind 127.0.0.1)
+```
 
-- **方式 A（推荐）**：Android Studio `File → New → New Project → Kuikly Project Template`
-- 方式 B（CLI）：`npx create-kuikly-app create zhiniu --package com.zhiniu --dsl kuikly`
+打开：<http://127.0.0.1:8082/index.html?page_name=MarketList&use_spa=1>
 
-将仓库 `shared/src/commonMain/kotlin/com/zhiniu/`（pages/viewmodel/domain/data/di）内的源码并入生成的 `shared` 模块，`HomePage` 为 Hello 页，随后在 Android Studio 运行 `androidApp`。
-
-环境访问：`GET /v1/chat/completions` 走 `http://localhost:8000`；行情走新浪 `hq.sinajs.cn`。
+- 路由：`page_name=MarketList / StockDetail（配 symbol=）/ AiResearch`
+- 注意：`index.html` 的启动链是「nativevue2.js → 字体就绪 → h5App.js」；
+  H5 自定义字体须在加载完成后再拉起渲染宿主（官方 h5-custom-font 指引），否则等宽数字会显示不全。
+- 四分辨率 + 深/浅色为固定验收口径：1280×800 / 1440×900 / 1920×1080。
 
 ---
 
-## 3. 运行顺序与三种数据模式
+## 3. Android
 
-| 场景 | 设置 | 效果 |
+```bash
+cd kuikly-shell
+env -u NODE_OPTIONS JAVA_HOME=<JDK17路径> ./gradlew :androidApp:installDebug
+```
+
+- 壳工程为 Kuikly 官方结构：`KuiklyRenderActivity` + 全套官方适配器
+  （Image / **Font** / Router / Thread / Log / UncaughtException）。
+- 网关地址默认 `http://127.0.0.1:8000`，真机联调在 H5 可用 `?gateway=` 参数覆盖；
+  原生端访问电脑网关请用局域网 IP。
+
+## 4. iOS
+
+```bash
+cd kuikly-shell/iosApp
+pod install --repo-update
+open iosApp.xcworkspace      # Xcode 选 iosApp target 直接 Run
+```
+
+- 共享 framework 经 CocoaPods（`shared/build.gradle.kts` cocoapods 配置）；
+- 自定义字体走官方 `KRFontHandler`（`+load` 自动注册），字体文件随 shared 资源打包。
+
+## 5. 鸿蒙
+
+- DevEco Studio 5.1+ 打开 `kuikly-shell`（使用 `settings.ohos.gradle.kts` / `build.ohos.gradle.kts`），
+  构建 `ohosApp`；字体当前为系统降级态。
+
+---
+
+## 6. 三种数据模式
+
+| 场景 | 条件 | 效果 |
 |:--|:--|:--|
-| 完整真数据 | .env 填 3 厂 Key + 有网 | 新浪行情 + 多模型 AI |
-| 仅行情真 | 只填新浪（无 Key） | 行情真、AI 走 Mock |
-| 完全离线 | 无网 | 全部走 `data/mock/` 兜底 |
+| 完整真数据 | 后端在跑 + LLM Key 已配 | 真实行情/资讯 + 多 Agent LLM 辩论归纳 |
+| 仅行情真 | 后端在跑、无 Key | 行情/资讯真实；研究回复标注「规则降级 · 未伪装模型」 |
+| 完全离线 | 不启动后端 | 内置确定性 Mock，全部功能可演示 |
 
 ---
 
-## 4. 常见问题
+## 7. 常见问题
 
-- **Gradle 依赖失败**：把工程 Gradle 版本切到 **7.5.1**（Kuikly 兼容），低版本需在 `settings.gradle.kts` 加 `enableFeaturePreview("VERSION_CATALOGS")`。
-- **前端编译必须 JDK17**：本机若为 Java 25，需在 Android Studio 把 Gradle JDK 切到 **17**（Kuikly 官方环境要求 JDK17 + Gradle 7.5.1），否则 Gradle sync 失败。
-- **iOS 不装环境**：注释 `shared/build.gradle.kts` 中 iOS 相关 target。
-- **新浪乱码**：接口 GBK，需按 GBK 解码。
+- **Gradle 编译失败**：确认 JDK 17 + `env -u NODE_OPTIONS`（见 §0）。
+- **H5 白屏 / 乱码**：`index.html` 启动链三步缺一不可；改过部署链路必须重跑 `scripts/build.sh`。
+- **等宽数字变成系统字体**：字体 404 时 1.5s 后兜底启动；检查 `web-host/assets/common/fonts/` 是否存在（build.sh 自动同步）。
+- **行情乱码**：新浪接口为 GBK 编码，解码在后端统一处理，前端不要直连。
+- **`:shared:jsNodeTest` 内部编译器错误**：`IrSimpleFunctionSymbolImpl is already bound`，为当前 Kuikly/Kotlin 工具链已知问题（clean 后仍复现），与业务代码无关。
 
-详见 `docs/api-matrix.md`（字段/端点）与 `docs/tech-stack.md`（选型）。
+详见 [docs/api-matrix.md](docs/api-matrix.md)（字段/端点/降级链）与 [docs/tech-stack.md](docs/tech-stack.md)（选型）。

@@ -15,7 +15,7 @@
 
 - 主题：Light / Dark / System，180ms 过渡，token 语义化（`AppColors` 单点改色）
 
-- 图标：TDesign 13 个线性 PNG，`Image + tint`，native 与 web-host 双端落地
+- 图标：TDesign 20 个线性 PNG，使用本地中性灰预着色资源，native 与 web-host 双端落地
 
 - 交互：行 hover(CSS 120ms)、按钮按压 `highlightBackgroundColor`、Tab 160ms、浮层 160–200ms
 
@@ -37,7 +37,7 @@
 
 ### 1.3 结构性短板（用户反馈「界面没做好」的根因候选）
 
-1. **品牌/终端感弱**：Header 仅文字「知牛」，无字母 logo 标记与精修间距 → 素材占位（见 §4）。
+1. **品牌/终端感弱**：Header 采用文字「知牛」；正式 Logo 未提供前不绘制伪造图形资产，避免把临时字母块误当品牌标识。
 2. **首屏密度与对齐**：标题「市场」区 72px 高但后续 Pulse/Table 与 OKX 的紧凑对齐还有差距；数字未全量等宽字体对齐（`NUM_FONT` 已定义未全量接入）。
 3. **详情页行情区**：报价头数据横排后，二级数据(今开/最高/最低…) 行高与 Tab 层级需对齐成熟券商；K 线图 560 高 OK，但十字线与周期切换提示未完善。
 4. **设置只有主题**：无入口面板承载「模型/免责/数据源」等 → 计划 ThemePopover 扩为通用 SettingPopover 或独立浮层（遵守 3+3 页面约束，不建独立页）。
@@ -85,13 +85,13 @@
 
   - 除主 CTA 与 AI 入口外，按钮一律「surface 底 + 1px border」，无投影
 
-- Logo/素材缺失时：一律**中性占位块**（字母 W/B 灰底字或 1px 描边圆角块），不引入彩色圆头像。
+- Logo/素材缺失时：保持纯文字或省略图片位，不用字母方块、手绘图形或 Emoji 冒充正式资产。
 
 ## 4. 素材清单（占位 → 待用户提供）
 
 | 位           | 占位方案                            | 待提供素材                  |
 | ----------- | ------------------------------- | ---------------------- |
-| Header 品牌标记 | 文字「知牛」旁 16px 描边方块内字母 Z（tint 单色） | 品牌 logo 图（可透明 PNG/SVG） |
+| Header 品牌标记 | 纯文字「知牛」，不伪造 Logo | 品牌 logo 图（可透明 PNG/SVG） |
 | 个股无 Logo    | 行内股票名首字灰底块（W / N 等）             | 个股 logo 集或放弃 logo      |
 | AI 研究页配图    | 中性几何（ChartPainter 折线块），不用图      | AI 配图/横幅               |
 | 搜索空态        | EmptyState 文本 + 图标              | 插画素材（可选）               |
@@ -116,15 +116,15 @@
 
 ## 6. Agent（知牛智能体）端到端设计要点（研究输出）
 
-- 后端（已具雏形）：`/v1/chat/completions` 支持 SSE + function-calling（tools：quote/kline/financials/news/screen/compare/alert，`gateway.chat_completions_orchestrated`），多模型路由 + 用量统计 `/analytics/usage` 已存在。
+- 后端（主链路已实现）：`/v1/chat/completions` 支持 SSE + function-calling；工具复用真实行情/K 线/资讯数据源；`POST /agent/research` 返回四类可审计证据与第五阶段模型归纳，模型不可用时明确标记规则降级；`/agent/research/stream` 提供类型化阶段与显式终止事件。
 
 - 端到端缺口：
 
-  1. 前端 AI 研究页/详情抽屉目前纯 Mock（`MockAiService`）；需新增 `RemoteAiService` 走真实网关（本地 8000）。
+  1. AI 研究页已通过 `GatewayMarketClient.research` 接入真实研究网关，并渲染阶段、来源、RSI/MA20、资讯数量、风险与时效；网关失败才退回 `MockAiService` 快照。
   2. 消息状态机（Streaming/工具卡片/失败重试）在 `AiInsightPanel`/`AiResearchPage` 收敛。
   3. 工具结果可视化：quote→报价块、kline→迷你图、news→列表块（复用 AiBlocks）。
 
-- 依赖：需启动并配置 Python 后端（`.env` 填 Key 或 Mock 模式）。若无 Key，后端走 Mock LLM，仍可验证端到端链路。
+- 依赖：需启动 Python 后端；`.env` 配置模型 Key 后启用真实模型归纳。无可用模型或上游失败时，研究结果保留真实数据证据并显示“规则降级 · 未伪装模型”。
 
 - 会话历史持久化：`data/local` 现有 Watchlist 模式扩展 ChatSession。
 
@@ -149,9 +149,18 @@
   2. `AiInsightDrawer`（个股侧）输出 4 个维度块：基本面 / 技术面(MA·RSI·MACD) / 情绪(新闻) / 风险 —— 对应 Analyst 分队；追加「多空摘要」与「交易计划」占位。
   3. 后端 `gateway.chat_completions_orchestrated` 已有 tools（quote/kline/financials/news/screen/compare/alert），可让任一角色调用真实数据，构成 Agent 工具闭环。
 
-- **实现边界**：本轮仅 UI 结构预留（视图切换 Tab + 区块容器），Agent 编排留在「数据接入 + Agent 端到端」阶段。
+- **实现边界更新**：视图切换 Tab、研究进度、真实证据卡与 JSON 端到端链路已落地；后端类型化 SSE 契约已就绪，下一步是多端流解析与真实模型归纳回答联调。
 
-## 9. 图标与 K 线规范核对（2026-09-04 落地）
+## 9. 2026-09-10 交易终端与数据架构复核
+
+- Browser 实看 OKX Spot 桌面交易页：品牌固定左上；左侧市场列表、中央标的/K 线、右侧盘口形成稳定三栏；周期、指标、显示、设置、全屏等控制贴近图表，不散落为大卡片。
+- OKX 官方帮助进一步确认工作区可折叠、可全屏、布局可定制，多图同步符号/周期/十字线/日期。TradingView Advanced Charts、ChartIQ、Quantower 官方资料共同支持滚轮缩放、拖拽平移、捏合、十字线 OHLCV、键盘替代与“回到最新”控件。
+- GitHub 官方仓库复核：`Tencent-TDS/KuiklyUI` 提供 `activityWidth/activityHeight`、`safeAreaInsets`、pinch 等跨端依据；`Tencent/tdesign-icons` 作为唯一图标源；`TauricResearch/TradingAgents` 与 `OpenBB-finance/OpenBB` 支持“角色编排 + provider/router/fetcher”架构。
+- 数据策略：当前新浪行情/K 线与东方财富资讯都经 FastAPI provider boundary，前端不直接处理 Referer/GBK/JSONP；所有资讯带来源、链接、发布时间、provider 与 stale 标记。
+- 合规边界：AKShare 明示数据仅供研究且上游接口可能移除；`TradingAgents-CN` 的 `app/`/`frontend/` 标注专有授权，故仅借鉴公开架构，不复制相关代码。
+- 多端检查：断点统一为 compact ≤720、medium ≤1024、narrow ≤1280、desktop；弹层定位修正为相对最大内容区右缘。模拟器不在本轮启动。
+
+## 10. 图标与 K 线规范核对（2026-09-04 落地）
 
 - **图标**：TDesign 官方 1000 图标复核（`Tencent/tdesign-icons` develop）。新增 6 个（PNG 80×80 白描边透明底，与现有规格一致）：
   `calendar` / `check` / `filter-sort` / `error-triangle` / `chat-message` / `data-display`；`IconKind` 扩至 19 个。
@@ -174,11 +183,19 @@
 
 - 字体：数字统一 `NUM_FONT` 等宽栈（Table/QuoteMetric/MarketPulse/ChartToolbar 已接入）。
 
-- **五档盘口**（2026-09-04 新增 `Level2Panel`，对齐委托盘口）：详情页 Rail 顶部「卖五~卖一 ｜ 最新价+涨跌 ｜ 买一~买五」，卖绿买红、量右对齐 + 半透明相对量条，挂单量按 symbol 种子确定性模拟（`seededVol`），真实行情接入后由 Repository 替换。
+- **五档盘口**（2026-09-04 新增 `Level2Panel`，对齐委托盘口）：详情页 Rail 顶部「卖五~~卖一 ｜ 最新价+涨跌 ｜ 买一~~买五」，卖绿买红、量右对齐 + 半透明相对量条，挂单量按 symbol 种子确定性模拟（`seededVol`），真实行情接入后由 Repository 替换。
 
-## 10. 待用户确认的 2 项
+## 11. 待用户确认的 2 项
 
 - A. 涨跌色/AI 色按 §1.2 修订表统一？（推荐：是）
 
 - B. 「真实数据」H5 采用 §5 的 JSONP 桥接方案（推荐）还是先启用 Python 后端 /quote/\*？
 
+## 12. 2026-09-11 二次审计：图表优先与可验证 Agent
+
+- OKX 官方把图表、订单/持仓面板显隐和工作区保存作为一套布局能力；交易设置集中管理主题、涨跌颜色、操作按钮与页面布局。对应实现不再把盘口、关键数据和 AI 长文同时堆进 28% 右栏，而改成“盘口 / 数据 / AI”原位切换；在 ≤1024px 时图表与侧栏上下排列，优先保住完整 K 线。
+- 设置面板把三条稀疏主题菜单改为一个分段控件；行情与 Agent 状态来自 /healthz，静态说明不再伪装成可点击配置。
+- GitHub 参考边界：TradingAgents 用多角色图编排表达研究流程；OpenBB 用 provider/registry 分离数据能力；FinRobot 强调确定性计算、模型叙述、结果溯源。知牛只借鉴公开架构，不复制界面或业务代码。
+- 研究管线增加第五阶段“归纳 Agent”：行情/K 线/资讯仍由代码计算；配置模型时做 JSON 归纳，否则明确标为 deterministic_fallback。
+
+资料：OKX Chart Trading Layout、OKX Trading Settings、OKX Candlestick Settings、TauricResearch/TradingAgents、OpenBB-finance/OpenBB、AI4Finance-Foundation/FinRobot。

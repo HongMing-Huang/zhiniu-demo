@@ -1,15 +1,18 @@
 /* 知牛 · MarketPage（首页）：Market Pulse + 行情 Table
- * 标题区 72px → Market Pulse 92px → 28px 间距 → 工具条（自选/全部/沪市/深市/创业板/科创板 + 排序/筛选/搜索）
+ * 标题区 72px → Market Pulse 92px → 28px 间距 → 工具条（自选/全部/沪市/深市/创业板/科创板/人气榜/涨幅榜 + 排序/筛选/字段/搜索）
  * → Divider → 行情表（视觉中心）。
+ * 课题映射：多列表切换（人气榜=东财真实排名，涨幅榜=全市场涨幅排序）；自定义字段选择（字段芯片，含总市值/成交量）。
  */
 package com.zhiniu.pages
 
 import com.tencent.kuikly.core.annotations.Page
+import com.tencent.kuikly.core.base.attr.AccessibilityRole
 import com.tencent.kuikly.core.base.Border
 import com.tencent.kuikly.core.base.BorderStyle
 import com.tencent.kuikly.core.base.ViewBuilder
 import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.directives.velse
+import com.tencent.kuikly.core.directives.velseif
 import com.tencent.kuikly.core.directives.vif
 import com.tencent.kuikly.core.reactive.handler.observable
 import com.tencent.kuikly.core.reactive.handler.observableList
@@ -17,6 +20,7 @@ import com.tencent.kuikly.core.timer.setTimeout
 import com.tencent.kuikly.core.views.List
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
+import com.zhiniu.data.remote.GatewayMarketClient
 import com.zhiniu.domain.model.StockQuote
 import com.zhiniu.pages.components.ANIM_THEME
 import com.zhiniu.pages.components.AppSpacing
@@ -30,9 +34,18 @@ import com.zhiniu.pages.components.ca
 import com.zhiniu.pages.components.cssClass
 import com.zhiniu.pages.components.common.EmptyState
 import com.zhiniu.pages.components.common.IconButton
+import com.zhiniu.pages.components.common.SecondaryButton
 import com.zhiniu.pages.components.common.SkeletonBar
 import com.zhiniu.pages.components.market.MarketPulse
+import com.zhiniu.pages.components.market.RankRow
+import com.zhiniu.pages.components.market.RankTable
+import com.zhiniu.pages.components.market.StockColumns
 import com.zhiniu.pages.components.market.StockTable
+import com.tencent.kuikly.core.coroutines.launch
+
+private const val TAB_POPULAR = "人气榜"
+private const val TAB_GAINERS = "涨幅榜"
+private val MARKET_TABS = listOf("自选", "全部", "沪市", "深市", "创业板", "科创板", TAB_POPULAR, TAB_GAINERS)
 
 @Page("MarketList", supportInLocal = true)
 internal class MarketPage : AppBasePage() {
@@ -43,17 +56,66 @@ internal class MarketPage : AppBasePage() {
     internal var filterUpOnly by observable(false)
     internal var marketLoading by observable(true)
     internal val marketQuotes by observableList<StockQuote>()
+    internal val marketUniverse by observableList<StockQuote>()
+    internal var marketSource by observable("本地快照")
+    // 自定义字段：可见列集合；tableEpoch 翻转驱动表格重建（列结构在构建期决定）
+    internal var visibleColumns by observable(StockColumns.DEFAULT)
+    internal var tableEpoch by observable(0)
+    internal var isColumnPickerVisible by observable(false)
+    // 榜单 Tab（人气榜 / 涨幅榜）
+    internal val rankRows by observableList<RankRow>()
+    internal var rankLoading by observable(false)
+    internal var rankSource by observable("")
 
     override fun created() {
         super.created()
+        marketUniverse.diffUpdate(repo.stockQuotes())
         setTimeout(280) {
             marketLoading = false
             refreshRows()
         }
+        refreshLiveQuotes()
+    }
+
+    internal fun isRankTab(): Boolean = selectedMarket == TAB_POPULAR || selectedMarket == TAB_GAINERS
+
+    internal fun refreshLiveQuotes() {
+        marketSource = "同步中…"
+        lifecycleScope.launch {
+            runCatching { GatewayMarketClient.quotes(repo.stockQuotes().map { it.symbol }) }
+                .onSuccess { live ->
+                    if (live.isNotEmpty()) {
+                        com.zhiniu.data.mock.MarketStore.applyLiveQuotes(live)
+                        val local = repo.stockQuotes().associateBy { it.symbol }
+                        marketUniverse.diffUpdate(live.map { q -> q.copy(pinyin = local[q.symbol]?.pinyin.orEmpty()) })
+                        marketSource = "实时行情"
+                        marketLoading = false
+                        refreshRows()
+                    } else {
+                        marketSource = "本地快照 · 可重试"
+                    }
+                }
+                .onFailure { marketSource = "本地快照 · 可重试" }
+        }
+        if (selectedMarket == TAB_POPULAR) loadPopularity()
     }
 
     internal fun refreshRows() {
-        var rows = repo.stockQuotes().filter { it.inTab(selectedMarket) }
+        when (selectedMarket) {
+            TAB_GAINERS -> {
+                rankRows.diffUpdate(
+                    marketUniverse.sortedByDescending { it.changePercent }.take(20)
+                        .mapIndexed { i, q -> RankRow(i + 1, q.symbol, q.name, q.price, q.changePercent) }
+                )
+                rankSource = if (marketSource == "实时行情") "涨幅榜 · 实时行情" else "涨幅榜 · 本地快照"
+                return
+            }
+            TAB_POPULAR -> {
+                if (rankRows.isEmpty() || !rankSource.startsWith(TAB_POPULAR)) loadPopularity()
+                return
+            }
+        }
+        var rows = marketUniverse.filter { it.inTab(selectedMarket) }
         if (filterUpOnly) rows = rows.filter { it.isUp }
         rows = when (sortMode) {
             "涨幅" -> rows.sortedByDescending { it.changePercent }
@@ -61,6 +123,28 @@ internal class MarketPage : AppBasePage() {
             else -> rows
         }
         marketQuotes.diffUpdate(rows)
+    }
+
+    /** 东财人气榜：真实排名 + 新浪实时增强；网关不可用时保留空态提示，不伪造榜单。 */
+    internal fun loadPopularity() {
+        rankLoading = true
+        rankSource = "人气榜 · 同步中…"
+        lifecycleScope.launch {
+            val result = runCatching { GatewayMarketClient.popularity(20) }.getOrNull()
+            rankLoading = false
+            if (result == null || result.stocks.isEmpty()) {
+                rankRows.diffUpdate(emptyList())
+                rankSource = "人气榜 · 网关不可用"
+                return@launch
+            }
+            rankRows.diffUpdate(result.stocks.map { RankRow(it.rank, it.symbol, it.name, it.price, it.changePercent) })
+            rankSource = if (result.isStale) "人气榜 · 本地快照" else "人气榜 · 东方财富"
+        }
+    }
+
+    internal fun toggleColumn(key: String) {
+        visibleColumns = if (key in visibleColumns) visibleColumns - key else visibleColumns + key
+        tableEpoch += 1
     }
 
     private fun StockQuote.inTab(tab: String): Boolean = when (tab) {
@@ -86,14 +170,14 @@ internal class MarketPage : AppBasePage() {
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
             marketContent(this@MarketPage)
-            View { attr { height(48f) } }
+            View { attr { height(48f + this@MarketPage.safeBottomInset()) } }
         }
     }
 }
 
 private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
     val colors = AppTheme.colors
-    val pad: Float = PAD
+    val pad: Float = if (host.isCompact()) 16f else PAD
         val aw: Float = host.pageData.activityWidth
         val extra: Float = if (aw > 1360f) (aw - 1360f) / 2f else 0f
         val sidePad: Float = pad + extra
@@ -116,7 +200,10 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
                 attr {
                     fontSize(AppTypography.fs12)
                     color(colors.c(colors.textTertiary))
-                    text("Demo 行情 · 14:32 更新")
+                    text(
+                        if (host.isRankTab()) host.rankSource
+                        else host.marketSource + " · " + (host.marketUniverse.firstOrNull()?.time?.take(5)?.ifBlank { "最近更新" } ?: "最近更新")
+                    )
                 }
             }
         }
@@ -134,63 +221,97 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
             indices = host.repo.indices(),
             breadth = host.repo.breadth(),
             narrow = host.isNarrow(),
+            compact = host.isCompact(),
         )
         // ---- 工具条 28px 间距 ----
         View { attr { height(28f) } }
         View {
-            attr { flexDirectionRow(); alignItemsCenter() }
-            // Tabs（自选/全部/沪市/深市/创业板/科创板）—— 不用官方 Tabs，简单 View+Text
-            val tabs = listOf("自选", "全部", "沪市", "深市", "创业板", "科创板")
-            tabs.forEach { t ->
-                MarketTab(label = t, active = host.selectedMarket == t) {
-                    host.selectedMarket = t
-                    host.refreshRows()
-                }
-            }
-            View { attr { flex(1f) } }
-            // 排序：默认 / 涨幅 / 跌幅（label + ⌄）
+            attr { flexDirectionColumn() }
             View {
-                attr {
-                    height(34f); padding(left = 10f, right = 8f)
-                    borderRadius(6f)
-                    flexDirectionRow(); alignItemsCenter()
-                    backgroundColor(colors.c(colors.surfaceSecondary))
-                    border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
-                    cssClass("zn-click")
-                    animate(ANIM_THEME, value = AppTheme.isDark)
-                }
-                event { click {
-                    host.sortMode = when (host.sortMode) {
-                        "默认排序" -> "涨幅"
-                        "涨幅" -> "跌幅"
-                        else -> "默认排序"
+                attr { flexDirectionRow(); alignItemsCenter(); flexWrapWrap() }
+                MARKET_TABS.forEach { t ->
+                    MarketTab(t, { host.selectedMarket == t }, host.isCompact()) {
+                        host.selectedMarket = t
+                        host.isColumnPickerVisible = false
+                        host.refreshRows()
                     }
-                    host.refreshRows()
-                } }
-                Text {
+                }
+            }
+            if (host.isCompact()) View { attr { height(8f) } }
+            View {
+                attr { flexDirectionRow(); alignItemsCenter() }
+                if (!host.isCompact()) View { attr { flex(1f) } }
+                // 排序 / 只看上涨 / 字段：榜单 Tab 下隐藏（排名为榜单固有顺序）
+                vif({ !host.isRankTab() }) {
+                    View {
+                        attr { flexDirectionRow(); alignItemsCenter() }
+                        View {
+                            attr {
+                                height(34f); padding(left = 10f, right = 8f)
+                                borderRadius(6f); flexDirectionRow(); alignItemsCenter()
+                                backgroundColor(colors.c(colors.surfaceSecondary))
+                                border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+                                accessibility("排序方式：${host.sortMode}")
+                                accessibilityRole(AccessibilityRole.BUTTON)
+                                accessibilityInfo(clickable = true, longClickable = false)
+                                cssClass("zn-click")
+                                animate(ANIM_THEME, value = AppTheme.isDark)
+                            }
+                            event { click {
+                                host.sortMode = when (host.sortMode) {
+                                    "默认排序" -> "涨幅"
+                                    "涨幅" -> "跌幅"
+                                    else -> "默认排序"
+                                }
+                                host.refreshRows()
+                            } }
+                            Text { attr { fontSize(AppTypography.fs13); lines(1); color(colors.c(colors.textPrimary)); text(host.sortMode) } }
+                            View { attr { width(4f) } }
+                            Icon(if (host.sortMode == "默认排序") IconKind.FILTER_SORT else IconKind.CHEVRON_DOWN, 11f)
+                        }
+                        View { attr { width(8f) } }
+                        IconButton(
+                            IconKind.FILTER, size = 14f, box = 34f, active = host.filterUpOnly,
+                            accessibilityLabel = if (host.filterUpOnly) "取消只看上涨" else "只看上涨",
+                        ) {
+                            host.filterUpOnly = !host.filterUpOnly
+                            host.refreshRows()
+                        }
+                        View { attr { width(8f) } }
+                        SecondaryButton("字段", height = 34f, icon = IconKind.MORE) {
+                            host.isColumnPickerVisible = !host.isColumnPickerVisible
+                        }
+                        View { attr { width(8f) } }
+                    }
+                }
+                IconButton(IconKind.SEARCH, size = 14f, box = 34f, accessibilityLabel = "搜索股票") {
+                    host.isSearchVisible = true
+                }
+                View { attr { width(8f) } }
+                SecondaryButton("刷新", height = 34f) { host.refreshLiveQuotes() }
+            }
+            // 字段选择器：内联芯片行（不是新浮层），勾选即生效
+            vif({ host.isColumnPickerVisible && !host.isRankTab() }) {
+                View {
                     attr {
-                        fontSize(AppTypography.fs13)
-                        color(colors.c(colors.textPrimary))
-                        text(host.sortMode)
+                        marginTop(10f); padding(top = 8f, bottom = 8f, left = 10f, right = 10f)
+                        flexDirectionRow(); alignItemsCenter(); flexWrapWrap()
+                        borderRadius(6f)
+                        backgroundColor(colors.c(colors.surface))
+                        border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+                        animate(ANIM_THEME, value = AppTheme.isDark)
+                    }
+                    Text {
+                        attr {
+                            fontSize(AppTypography.fs12); color(colors.c(colors.textTertiary))
+                            marginRight(10f); text("显示字段")
+                        }
+                    }
+                    StockColumns.ALL.forEach { key ->
+                        ColumnChip(key, { key in host.visibleColumns }) { host.toggleColumn(key) }
                     }
                 }
-                View { attr { width(4f) } }
-                Icon(if (host.sortMode == "默认排序") IconKind.FILTER_SORT else IconKind.CHEVRON_DOWN, 11f) { colors.textTertiary }
             }
-            View { attr { width(8f) } }
-            // 筛选：激活时图标转主色，列表仅显示上涨
-            IconButton(
-                IconKind.FILTER, size = 14f, box = 34f,
-                colorHex = { if (host.filterUpOnly) colors.textPrimary else null },
-            ) {
-                host.filterUpOnly = !host.filterUpOnly
-                host.refreshRows()
-            }
-            View { attr { width(8f) } }
-            // 搜索（IconButton 34）
-            IconButton(
-                IconKind.SEARCH, size = 14f, box = 34f,
-            ) { host.isSearchVisible = true }
         }
         View { attr { height(12f) } }
         // Divider
@@ -201,17 +322,26 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
         }
-        // ---- 行情表 ----
-        vif({ host.marketLoading }) {
+        // ---- 行情表 / 榜单表 ----
+        vif({ host.isRankTab() }) {
+            RankTable(rows = { host.rankRows }, compact = host.isCompact()) { host.openStock(it.symbol) }
+            vif({ host.rankLoading }) {
+                MarketSkeleton(rows = 6)
+            }
+            vif({ !host.rankLoading && host.rankRows.isEmpty() }) {
+                EmptyState(
+                    title = "榜单暂不可用",
+                    desc = "请启动本地网关后点击「刷新」重试",
+                )
+            }
+        }
+        velseif({ host.marketLoading }) {
             MarketSkeleton()
         }
         velse {
-            StockTable(
-                marketQuotes = { host.marketQuotes },
-                sparkOf = { host.repo.spark(it.symbol) },
-                narrow = host.isNarrow(),
-                onRowClick = { host.openStock(it.symbol) },
-            )
+            // 列结构在构建期决定：epoch 奇偶切换让表格随字段选择重建
+            vif({ host.tableEpoch % 2 == 0 }) { stockTable(host) }
+            velse { stockTable(host) }
             vif({ host.marketQuotes.isEmpty() }) {
                 EmptyState(
                     title = "没有符合条件的股票",
@@ -222,20 +352,34 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
     }
 }
 
-private fun ViewContainer<*, *>.MarketTab(label: String, active: Boolean, onClick: () -> Unit) {
+private fun ViewContainer<*, *>.stockTable(host: MarketPage) {
+    StockTable(
+        marketQuotes = { host.marketQuotes },
+        sparkOf = { host.repo.spark(it.symbol) },
+        narrow = host.isNarrow(),
+        compact = host.isCompact(),
+        columns = host.visibleColumns,
+        onRowClick = { host.openStock(it.symbol) },
+    )
+}
+
+private fun ViewContainer<*, *>.MarketTab(label: String, active: () -> Boolean, compact: Boolean, onClick: () -> Unit) {
     val colors = AppTheme.colors
     View {
         attr {
-            height(34f); padding(left = 4f, right = 4f); marginRight(20f)
+            height(34f); padding(left = 4f, right = 4f); marginRight(if (compact) 9f else 20f)
             flexDirectionColumn(); alignItemsCenter(); justifyContentCenter()
+            accessibility(label)
+            accessibilityRole(AccessibilityRole.BUTTON)
+            accessibilityInfo(clickable = true, longClickable = false)
             cssClass("zn-click")
         }
         event { click { onClick() } }
         Text {
             attr {
                 fontSize(AppTypography.fs14)
-                color(colors.c(if (active) colors.textPrimary else colors.textSecondary))
-                fontWeight600()
+                color(colors.c(if (active()) colors.textPrimary else colors.textSecondary))
+                fontWeight600(); lines(1)
                 text(label)
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
@@ -246,16 +390,42 @@ private fun ViewContainer<*, *>.MarketTab(label: String, active: Boolean, onClic
                 height(2f); width(16f)
                 borderRadius(allBorderRadius = 1f)
                 backgroundColor(colors.c(colors.textPrimary))
-                opacity(if (active) 1f else 0f)
+                opacity(if (active()) 1f else 0f)
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
         }
     }
 }
 
-private fun ViewContainer<*, *>.MarketSkeleton() {
+/** 字段芯片：26px 高，选中为深色实底 + 勾图标，未选为描边。 */
+private fun ViewContainer<*, *>.ColumnChip(label: String, active: () -> Boolean, onClick: () -> Unit) {
     val colors = AppTheme.colors
-    repeat(8) {
+    View {
+        attr {
+            height(26f); padding(left = 10f, right = 10f); marginRight(8f); marginTop(2f); marginBottom(2f)
+            borderRadius(13f); flexDirectionRow(); alignItemsCenter()
+            backgroundColor(colors.c(if (active()) colors.textPrimary else colors.surfaceSecondary))
+            border(Border(1f, BorderStyle.SOLID, colors.c(if (active()) colors.textPrimary else colors.border)))
+            accessibility(if (active()) "隐藏列 $label" else "显示列 $label")
+            accessibilityRole(AccessibilityRole.BUTTON)
+            accessibilityInfo(clickable = true, longClickable = false)
+            cssClass("zn-click")
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+        event { click { onClick() } }
+        Text {
+            attr {
+                fontSize(AppTypography.fs12); lines(1)
+                color(colors.c(if (active()) colors.surface else colors.textSecondary))
+                text(label)
+            }
+        }
+    }
+}
+
+private fun ViewContainer<*, *>.MarketSkeleton(rows: Int = 8) {
+    val colors = AppTheme.colors
+    repeat(rows) {
         View {
             attr { flexDirectionRow(); alignItemsCenter(); height(64f) }
             View { attr { flex(2.4f) }; SkeletonBar(140f, 12f) }

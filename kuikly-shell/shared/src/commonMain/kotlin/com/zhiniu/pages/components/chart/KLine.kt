@@ -48,7 +48,7 @@ fun drawKLineChart(
     viewCount: Int = autoVisibleCount(bars.size),
 ) {
     if (bars.size < 2 || w < 60f || h < 60f) return
-    val vc = viewCount.coerceIn(MIN_VISIBLE, bars.size)
+    val vc = viewCount.coerceIn(minOf(MIN_VISIBLE, bars.size), bars.size)
     val vs = clampViewStart(viewStart, bars.size, vc)
     val visBars = bars.subList(vs, vs + vc)
 

@@ -1,6 +1,6 @@
 // 知牛 · 五档盘口（Level2Panel：卖五→买五 + 中间最新价）
 // 对齐股票软件（同花顺/富途）经典盘口：卖盘绿、买盘红、量右对齐 + 相对量条。
-// 数据为确定性模拟（基于 symbol 种子），接入真实行情后由 Repository 替换。
+// 优先展示网关透传的新浪真实五档；仅在离线快照缺少档位时使用确定性兜底。
 package com.zhiniu.pages.components.market
 
 import com.tencent.kuikly.core.base.ViewContainer
@@ -24,9 +24,15 @@ fun ViewContainer<*, *>.Level2Panel(q: StockQuote) {
     val tick = 0.01
     val sellAnchor = if (q.sell1 > 0.0) q.sell1 else q.price + tick
     val buyAnchor = if (q.buy1 > 0.0) q.buy1 else q.price - tick
-    // 量：确定性模拟（symbol 种子），档位数越大挂单越少
-    val sellVols = (0 until 5).map { seededVol(q.symbol, 100 + it, it) }
-    val buyVols = (0 until 5).map { seededVol(q.symbol, 200 + it, it) }
+    val hasRealBook = q.asks.size >= 5 && q.bids.size >= 5
+    val sellPrices = if (hasRealBook) q.asks.take(5).reversed().map { it.price }
+        else (0 until 5).map { sellAnchor + (4 - it) * tick }
+    val buyPrices = if (hasRealBook) q.bids.take(5).map { it.price }
+        else (0 until 5).map { buyAnchor - it * tick }
+    val sellVols = if (hasRealBook) q.asks.take(5).reversed().map { sharesToHands(it.volumeShares) }
+        else (0 until 5).map { seededVol(q.symbol, 100 + it, it) }
+    val buyVols = if (hasRealBook) q.bids.take(5).map { sharesToHands(it.volumeShares) }
+        else (0 until 5).map { seededVol(q.symbol, 200 + it, it) }
     val maxVol = (sellVols + buyVols).maxOrNull()?.toFloat() ?: 1f
     View {
         attr {
@@ -38,7 +44,7 @@ fun ViewContainer<*, *>.Level2Panel(q: StockQuote) {
         // 卖盘（卖五 → 卖一）
         for (i in 0 until 5) {
             L2Row(
-                price = sellAnchor + (4 - i) * tick,
+                price = sellPrices[i],
                 volHand = sellVols[i],
                 ratio = sellVols[i].toFloat() / maxVol,
                 priceHex = colors.down,
@@ -79,7 +85,7 @@ fun ViewContainer<*, *>.Level2Panel(q: StockQuote) {
         // 买盘（买一 → 买五）
         for (i in 0 until 5) {
             L2Row(
-                price = buyAnchor - i * tick,
+                price = buyPrices[i],
                 volHand = buyVols[i],
                 ratio = buyVols[i].toFloat() / maxVol,
                 priceHex = colors.up,
@@ -88,6 +94,8 @@ fun ViewContainer<*, *>.Level2Panel(q: StockQuote) {
         }
     }
 }
+
+private fun sharesToHands(shares: Long): Long = if (shares <= 0L) 0L else (shares / 100L).coerceAtLeast(1L)
 
 /** 单档行：价格｜量（右对齐）+ 半透明量条（从行左填充比例）。 */
 private fun ViewContainer<*, *>.L2Row(

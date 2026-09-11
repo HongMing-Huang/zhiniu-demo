@@ -1,7 +1,8 @@
 // 知牛 · AppHeader（所有页面共用；导航切换走 SPA Router）
-// 64px / max-width 1440 / padding 0 32 / Logo 20/600 / 选中 2px 黑色 indicator（无背景块）。
+// 64px / max-width 1360 / padding 0 32 / Logo 20/600 / 选中 2px 黑色 indicator（无背景块）。
 package com.zhiniu.pages.components.common
 
+import com.tencent.kuikly.core.base.attr.AccessibilityRole
 import com.tencent.kuikly.core.base.Animation
 import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.views.Text
@@ -25,15 +26,18 @@ import com.zhiniu.pages.components.cssClass
 fun ViewContainer<*, *>.AppHeader(
     activeNav: String,
     contentWidth: Float,
+    topInset: Float = 0f,
     onNavMarket: () -> Unit,
     onNavAiResearch: () -> Unit,
     onSearch: () -> Unit,
     onTheme: () -> Unit,
 ) {
     val colors = AppTheme.colors
+    val compact = contentWidth <= 760f
+    val sidePad = if (compact) 16f else 32f
     View {
         attr {
-            height(AppSpacing.header)
+            height(AppSpacing.header + topInset)
             flexDirectionRow(); justifyContentCenter()
             backgroundColor(colors.c(colors.surface))
             border(
@@ -49,36 +53,11 @@ fun ViewContainer<*, *>.AppHeader(
             attr {
                 width(contentWidth)
                 flexDirectionRow(); alignItemsCenter()
-                padding(left = 32f, right = 32f)
+                padding(top = topInset, left = sidePad, right = sidePad)
             }
-            // Logo：品牌占位块（描边方块 Z，素材后续替换）+ 文字
+            // 品牌使用纯文字标识；未提供正式 Logo 前不绘制伪造图形资产。
             View {
                 attr { flexDirectionRow(); alignItemsCenter() }
-                // 品牌占位：22×22 描边圆角方块 + 字母 Z（tint 单色；用户提供素材后替换为 Image）
-                View {
-                    attr {
-                        width(22f); height(22f)
-                        borderRadius(allBorderRadius = 6f)
-                        border(
-                            com.tencent.kuikly.core.base.Border(
-                                1.2f,
-                                com.tencent.kuikly.core.base.BorderStyle.SOLID,
-                                colors.c(colors.textPrimary),
-                            )
-                        )
-                        alignItemsCenter(); allCenter()
-                        backgroundColor(colors.c(if (AppTheme.isDark) colors.surfaceRaised else colors.surface))
-                        animate(ANIM_THEME, value = AppTheme.isDark)
-                    }
-                    Text {
-                        attr {
-                            fontSize(AppTypography.fs13); fontWeightSemiBold()
-                            color(colors.c(colors.textPrimary))
-                            text("Z")
-                        }
-                    }
-                }
-                View { attr { width(10f) } }
                 Text {
                     attr {
                         fontSize(AppTypography.fs20); fontWeightSemiBold()
@@ -88,16 +67,15 @@ fun ViewContainer<*, *>.AppHeader(
                     }
                 }
             }
-            View { attr { width(28f) } }
+            View { attr { width(if (compact) 12f else 28f) } }
             // 导航
             HeaderNav("市场", activeNav == "市场", onClick = onNavMarket)
             HeaderNav("AI研究", activeNav == "AI研究", onClick = onNavAiResearch)
             View { attr { flex(1f) } }
             // 全局搜索（点击打开 Overlay）
-            SearchField(width = 240f, onClick = onSearch)
-            View { attr { width(10f) } }
-            // 主题
-            IconButton(IconKind.THEME, size = 18f, box = 36f, onClick = onTheme)
+            SearchField(width = if (compact) 120f else 240f, onClick = onSearch)
+            View { attr { width(if (compact) 8f else 10f) } }
+            SecondaryButton("设置", height = 36f, icon = IconKind.THEME, onClick = onTheme)
         }
     }
 }
@@ -107,9 +85,12 @@ private fun ViewContainer<*, *>.HeaderNav(label: String, active: Boolean, onClic
     val colors = AppTheme.colors
     View {
         attr {
+            width(if (label == "AI研究") 72f else 58f)
             height(AppSpacing.header)
-            padding(left = 14f, right = 14f)
             alignSelfStretch()
+            accessibility(label)
+            accessibilityRole(AccessibilityRole.BUTTON)
+            accessibilityInfo(clickable = true, longClickable = false)
             cssClass("zn-click")
             highlightBackgroundColor(colors.ca(colors.textSecondary, 6))
         }
@@ -118,8 +99,9 @@ private fun ViewContainer<*, *>.HeaderNav(label: String, active: Boolean, onClic
             attr { flexDirectionColumn(); alignItemsCenter(); justifyContentCenter(); flex(1f) }
             Text {
                 attr {
+                    width(if (label == "AI研究") 48f else 32f); textAlignCenter()
                     fontSize(AppTypography.fs14)
-                    fontWeight600()
+                    fontWeight600(); lines(1); textOverFlowClip()
                     color(colors.c(if (active) colors.textPrimary else colors.textSecondary))
                     text(label)
                     animate(ANIM_THEME, value = AppTheme.isDark)

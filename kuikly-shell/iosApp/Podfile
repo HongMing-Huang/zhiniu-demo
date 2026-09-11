@@ -4,7 +4,8 @@ source 'https://cdn.cocoapods.org/'
 target 'iosApp' do
   # Do NOT use use_frameworks! — matches official Kuikly project setup
   pod 'shared', :path => '../shared'
-  pod 'OpenKuiklyIOSRender', :git => 'https://github.com/Tencent-TDS/KuiklyUI.git', :tag => '2.16.0'
+  # 渲染层必须与 shared 的 Kuikly core 版本一致（buildSrc KotlinBuildVar.KUIKLY_VERSION = 2.25.0）
+  pod 'OpenKuiklyIOSRender', :git => 'https://github.com/Tencent-TDS/KuiklyUI.git', :tag => '2.25.0'
   pod 'SDWebImage'
 end
 

@@ -2,6 +2,7 @@
 // 风格：克制、黑色 Primary，无大圆角；动画 100ms 背景。
 package com.zhiniu.pages.components.common
 
+import com.tencent.kuikly.core.base.attr.AccessibilityRole
 import com.tencent.kuikly.core.base.Animation
 import com.tencent.kuikly.core.base.Border
 import com.tencent.kuikly.core.base.BorderStyle
@@ -33,18 +34,21 @@ fun ViewContainer<*, *>.PrimaryButton(
             borderRadius(AppRadius.radius6)
             backgroundColor(colors.c(colors.textPrimary))
             highlightBackgroundColor(colors.ca(colors.textSecondary, 18))
-            alignItemsCenter(); allCenter()
+            flexDirectionRow(); alignItemsCenter(); allCenter()
+            accessibility(label)
+            accessibilityRole(AccessibilityRole.BUTTON)
+            accessibilityInfo(clickable = true, longClickable = false)
             cssClass("zn-click")
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
         event { click { onClick() } }
         if (icon != null) {
-            Icon(icon, 14f) { colors.surface }
+            Icon(icon, 14f)
             View { attr { width(6f) } }
         }
         Text {
             attr {
-                fontSize(AppTypography.fs14); fontWeightSemiBold()
+                fontSize(AppTypography.fs14); fontWeightSemiBold(); lines(1)
                 color(colors.c(colors.surface))
                 text(label)
             }
@@ -68,18 +72,21 @@ fun ViewContainer<*, *>.SecondaryButton(
             backgroundColor(colors.c(colors.surface))
             border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
             highlightBackgroundColor(colors.ca(colors.textSecondary, 10))
-            alignItemsCenter(); allCenter()
+            flexDirectionRow(); alignItemsCenter(); allCenter()
+            accessibility(label)
+            accessibilityRole(AccessibilityRole.BUTTON)
+            accessibilityInfo(clickable = true, longClickable = false)
             cssClass("zn-click")
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
         event { click { onClick() } }
         if (icon != null) {
-            Icon(icon, 14f) { colors.textSecondary }
+            Icon(icon, 14f)
             View { attr { width(6f) } }
         }
         Text {
             attr {
-                fontSize(AppTypography.fs14)
+                fontSize(AppTypography.fs14); lines(1)
                 color(colors.c(colors.textPrimary))
                 text(label)
             }
@@ -102,18 +109,21 @@ fun ViewContainer<*, *>.GhostButton(
             borderRadius(AppRadius.radius6)
             backgroundColor(colors.c(colors.surface))
             highlightBackgroundColor(colors.ca(colors.textSecondary, 8))
-            alignItemsCenter(); allCenter()
+            flexDirectionRow(); alignItemsCenter(); allCenter()
+            accessibility(label)
+            accessibilityRole(AccessibilityRole.BUTTON)
+            accessibilityInfo(clickable = true, longClickable = false)
             cssClass("zn-click")
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
         event { click { onClick() } }
         if (icon != null) {
-            Icon(icon, 13f) { colors.textSecondary }
+            Icon(icon, 13f)
             View { attr { width(6f) } }
         }
         Text {
             attr {
-                fontSize(AppTypography.fs13)
+                fontSize(AppTypography.fs13); lines(1)
                 color(colors.c(colors.textSecondary))
                 text(label)
             }
@@ -126,23 +136,29 @@ fun ViewContainer<*, *>.IconButton(
     kind: IconKind,
     size: Float = 18f,
     box: Float = 36f,
-    colorHex: () -> String? = { null },
+    active: Boolean = false,
+    accessibilityLabel: String = kind.name,
     onClick: () -> Unit,
 ) {
     val colors = AppTheme.colors
-    val finalColor = colorHex() ?: colors.textSecondary
     View {
         attr {
             width(box); height(box)
             borderRadius(AppRadius.radius6)
             allCenter()
-            backgroundColor(com.tencent.kuikly.core.base.Color.TRANSPARENT)
+            backgroundColor(
+                if (active) colors.c(colors.surfaceHover)
+                else com.tencent.kuikly.core.base.Color.TRANSPARENT
+            )
             highlightBackgroundColor(colors.ca(colors.textSecondary, 12))
+            accessibility(accessibilityLabel)
+            accessibilityRole(AccessibilityRole.BUTTON)
+            accessibilityInfo(clickable = true, longClickable = false)
             cssClass("zn-iconbtn zn-click")
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
         event { click { onClick() } }
-        Icon(kind, size) { finalColor }
+        Icon(kind, size)
     }
 }
 
@@ -166,20 +182,18 @@ fun ViewContainer<*, *>.FavoriteButton(active: () -> Boolean, height: Float = 34
                 )
             )
             highlightBackgroundColor(colors.ca(colors.textSecondary, 8))
+            accessibility(if (isActive) "移出自选" else "加入自选")
+            accessibilityRole(AccessibilityRole.BUTTON)
+            accessibilityInfo(clickable = true, longClickable = false)
             cssClass("zn-click")
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
         event { click { onToggle() } }
-        Icon(
-            IconKind.STAR,
-            14f,
-        ) {
-            if (isActive) colors.textPrimary else colors.textTertiary
-        }
+        Icon(if (isActive) IconKind.STAR_FILLED else IconKind.STAR, 14f)
         View { attr { width(6f) } }
         Text {
             attr {
-                fontSize(AppTypography.fs13)
+                fontSize(AppTypography.fs13); lines(1)
                 color(colors.c(if (isActive) colors.textPrimary else colors.textSecondary))
                 text(if (isActive) "已自选" else "加自选")
             }

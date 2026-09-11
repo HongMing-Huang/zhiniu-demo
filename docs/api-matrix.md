@@ -79,18 +79,29 @@
 | `GET /healthz` | 存活 + 各厂商 Key 配置自检 |
 | `GET /quote/realtime` | 实时行情代理（新浪主源，Referer+GBK+CORS 在代理层处理） |
 | `GET /quote/kline` | K 线代理（新浪 getKLineData，scale/datalen） |
+| `GET /news/list` | 个股/关键词资讯聚合（TTL、stale、离线快照降级） |
+| `GET /news/detail` | 按已归一化 `news_id` 读取详情，不接受任意 URL |
+| `POST /agent/research` | 行情、技术面、资讯、风险四阶段证据 + 第五阶段模型归纳；模型不可用时显式规则降级 |
+| `POST /agent/research/stream` | 类型化研究 SSE：开始、五阶段完成、结果、显式成功/失败终止帧 |
 
 ### 3.1 网关内部接口契约（行情代理）
 
 - **GET /quote/realtime**
   - 入参：`codes`（逗号分隔的带前缀代码，如 `sh600519,sz000001`）
-  - 出参：`{ code: {symbol,name,open,prevClose,price,high,low,buy1,sell1,volume(手),amount(万元),bids[[价,量]×5],asks[[价,量]×5],date,time} }`
+  - 出参：`{ code: {symbol,name,open,prevClose,price,high,low,buy1,sell1,volume(手),amount(元),bids[[价,量]×5],asks[[价,量]×5],date,time} }`
   - 缓存：实时 TTL=3s；新浪失败 → stale 近况 → Mock JSON 兜底；命中 stale 时响应头 `X-Gateway-Stale: true`
   - 字段来源：新浪 `hq_str_<code>` 索引 0~31，GBK 解码转 UTF-8
 - **GET /quote/kline**
   - 入参：`symbol`、`scale`(默认240日线)、`datalen`(默认120，≤1023)
   - 出参：`{ symbol, name, scale, data:[{day,open,high,low,close,volume}] }`
   - 缓存：日线(scale≥240)隔夜过期，分钟线 scale 秒级 TTL；失败 → stale → Mock 兜底
+
+### 3.2 资讯与研究 Agent
+
+- 资讯适配参考 AKShare `stock_news_em` 的公开实现，不引入 pandas/AKShare 运行时；标准库解析固定上游 JSONP，并保留 `provider/source/url/publishedAt/isStale`。
+- 上游结果缓存 120 秒；失败优先返回 stale 缓存，再返回明确标注的 `offline-snapshot`。数据源必须可替换。
+- `POST /agent/research` 并行聚合行情、120 根 K 线与资讯，先输出四类可审计证据，再由统一模型网关完成第五阶段结构化归纳；上游模型不可用时返回 `deterministic_fallback`，绝不把规则文案伪装成模型回答。
+- `/agent/research/stream` 复用同一结果构建器；事件含 `runId/type/final`，正常以 `run_finished(final=true)`、异常以 `run_error(final=true)` 收束，客户端无需猜测流是否结束。
 
 ---
 

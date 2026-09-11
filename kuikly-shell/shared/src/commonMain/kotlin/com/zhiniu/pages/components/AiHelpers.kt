@@ -1,4 +1,4 @@
-/* 知牛 · 公共 AI 块级助手（AiMessageHeader / DemoDataNote） */
+/* 知牛 · 公共 AI 块级助手（AiMessageHeader） */
 package com.zhiniu.pages.components
 
 import com.tencent.kuikly.core.base.ViewContainer
@@ -11,7 +11,7 @@ fun ViewContainer<*, *>.AiMessageHeader(label: String) {
     val colors = AppTheme.colors
     View {
         attr { flexDirectionRow(); alignItemsCenter() }
-        Icon(IconKind.AI, 13f) { colors.aiAccent }
+        Icon(IconKind.AI, 13f)
         Text {
             attr {
                 marginLeft(6f)
@@ -20,17 +20,6 @@ fun ViewContainer<*, *>.AiMessageHeader(label: String) {
                 text(label)
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
-        }
-    }
-}
-
-/** AI 回复底部"以上为 Demo 行情 ..."标注。 */
-fun ViewContainer<*, *>.DemoDataNote() {
-    Text {
-        attr {
-            fontSize(AppTypography.fs11)
-            color(AppTheme.colors.c(AppTheme.colors.textTertiary))
-            text("以上为 Demo 行情与 AI 演示输出，不构成投资建议")
         }
     }
 }

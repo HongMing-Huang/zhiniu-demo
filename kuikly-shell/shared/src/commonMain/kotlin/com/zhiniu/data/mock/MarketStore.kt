@@ -8,7 +8,11 @@ import com.zhiniu.domain.repository.MarketRepository
 
 object MarketStore {
     /** 行情仓储：当前为 Mock 确定性实现。 */
-    val repository: MarketRepository = MockMarketRepository()
+    val repository = MockMarketRepository()
+
+    fun applyLiveQuotes(quotes: List<com.zhiniu.domain.model.StockQuote>) {
+        repository.applyLiveQuotes(quotes)
+    }
 
     /** AI 服务：当前为 Mock 确定性实现。 */
     val aiService: AiService = MockAiService(repository)

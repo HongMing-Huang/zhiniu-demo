@@ -41,6 +41,8 @@ fun ViewContainer<*, *>.StockSearchOverlay(
     hot: () -> ObservableList<StockQuote>,
     results: () -> ObservableList<StockQuote>,
     left: Float,
+    width: Float = 520f,
+    topInset: Float = 0f,
     onQueryChange: (String) -> Unit,
     onPick: (StockQuote) -> Unit,
     onClose: () -> Unit,
@@ -60,8 +62,8 @@ fun ViewContainer<*, *>.StockSearchOverlay(
     // 面板
     View {
         attr {
-            absolutePosition(top = 72f, left = left)
-            width(520f)
+            absolutePosition(top = 72f + topInset, left = left)
+            width(width)
             zIndex(15)
             touchEnable(visible())
             opacity(if (visible()) 1f else 0f)
@@ -87,7 +89,7 @@ fun ViewContainer<*, *>.StockSearchOverlay(
                         )
                     )
                 }
-                Icon(IconKind.SEARCH, 16f) { AppTheme.colors.textTertiary }
+                Icon(IconKind.SEARCH, 16f)
                 View { attr { width(10f) } }
                 Input {
                     attr {

@@ -11,9 +11,10 @@
 ```mermaid
 flowchart LR
     User([散户 / 评委]) --> App[知牛 App（Kuikly 六端）]
-    App --> Sina[新浪行情 API]
-    App --> Gate[LLM 网关 backend]
+    App --> Gate[FastAPI 数据与 LLM 网关]
     App --> TS[Tushare Pro ➕ 可选]
+    Gate --> Sina[新浪行情]
+    Gate --> EM[东方财富资讯聚合]
     Gate --> DS[DeepSeek]
     Gate --> GLM[GLM 智谱]
     Gate --> HY[腾讯混元]
@@ -28,15 +29,17 @@ flowchart LR
         D[data: remote·local·mock]
     end
     subgraph Back["backend FastAPI"]
-        GW[/v1/chat/completions/]
+        GW[/v1/chat/completions + agent/research/]
+        DATA[/quote/* + news/*/]
         PG[providers 配置]
     end
-    Front --OpenAI 兼容方言（SSE）--> Back
+    Front --统一 HTTP / SSE--> Back
     Back --> DS[api.deepseek.com]
     Back --> GLM[open.bigmodel.cn]
     Back --> HY[api.hunyuan.cloud.tencent.com/v1]
-    Front --> Sina[hq.sinajs.cn]
-    Front --> SQL[SQLDelight 本地]
+    DATA --> Sina[hq.sinajs.cn / quotes.sina.cn]
+    DATA --> EM[search-api-web.eastmoney.com]
+    Front --> MEM[进程内单例\nWatchlist / 会话（演示口径）]
 ```
 
 ### L3 shared 内部组件
@@ -53,10 +56,13 @@ flowchart LR
 |:--|:--|:--|
 | ADR-001 | 选 Kuikly 而非 Flutter/RN（生产案例+鸿蒙支持） | ✅ |
 | ADR-002 | 行情主源选新浪（免 Key+覆盖广） | ✅ |
-| ADR-003 | LLM 主选：网关多模型（DeepSeek 默认 quick）而非直连混元 | ✅（更新） |
+| ADR-003 | LLM 经自建 FastAPI 网关、OpenAI 兼容协议多厂商可选（DeepSeek/GLM/混元），不可用时明确规则降级 | ✅（更新） |
 | ADR-004 | K 线：统一 Kuikly Canvas 自绘（弃 Vico） | ✅（更新） |
-| ADR-005 | 本地存储选 SQLDelight（KMP 原生） | ✅ |
-| ADR-006 | 图标用公共资源（Google Material Symbols 字体），不自绘 SVG | ✅ |
+| ADR-005 | 本地存储不引入 SQLDelight，演示口径用进程内单例（Watchlist/会话） | ✅（更新） |
+| ADR-006 | 图标统一用 Tencent TDesign 官方资源，本地 PNG 预着色跨端渲染 | ✅ |
+| ADR-007 | 行情与资讯只经后端数据源边界，结果带来源与 stale 语义 | ✅ |
+| ADR-008 | 数字字体按 KuiklyUI 官方机制三端注册（Android IKRFontAdapter / iOS KRFontHandler / H5 @font-face），未注册端优雅降级 | ✅ |
+| ADR-009 | AI 回复渲染：自研 commonMain Markdown 解析器（单测覆盖）+ 官方 RichText/Span，与结构化证据卡混排 | ✅ |
 
 ### ADR-003（更新）：LLM 经网关、多模型
 

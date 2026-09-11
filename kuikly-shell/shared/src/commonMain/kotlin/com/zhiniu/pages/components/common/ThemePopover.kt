@@ -1,5 +1,5 @@
 // 知牛 · 设置浮层（SettingsPopover：外观 / 数据源 / 模型 / 免责声明）
-// 宽 220，160ms opacity+translateY。数据源与模型为演示态（接入中标识），保留视觉占位。
+// 宽 288，160ms opacity+translateY。显示外观、数据源、模型与风险提示。
 package com.zhiniu.pages.components.common
 
 import com.tencent.kuikly.core.base.Animation
@@ -8,21 +8,30 @@ import com.tencent.kuikly.core.base.BorderStyle
 import com.tencent.kuikly.core.base.Color
 import com.tencent.kuikly.core.base.Translate
 import com.tencent.kuikly.core.base.ViewContainer
+import com.tencent.kuikly.core.base.attr.AccessibilityRole
+import com.tencent.kuikly.core.directives.velse
+import com.tencent.kuikly.core.directives.vif
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
 import com.zhiniu.pages.components.ANIM_THEME
 import com.zhiniu.pages.components.AppRadius
 import com.zhiniu.pages.components.AppTheme
 import com.zhiniu.pages.components.AppTypography
+import com.zhiniu.pages.components.Icon
+import com.zhiniu.pages.components.IconKind
 import com.zhiniu.pages.components.ThemeMode
 import com.zhiniu.pages.components.c
 import com.zhiniu.pages.components.ca
 import com.zhiniu.pages.components.cssClass
 
-/** 设置浮层（外观切换 + 数据源/模型演示态 + 免责声明）。 */
+/** 设置浮层（外观切换 + 数据源/模型状态 + 免责声明）。 */
 fun ViewContainer<*, *>.ThemePopover(
     visible: () -> Boolean,
     left: Float,
+    width: Float = 304f,
+    topInset: Float = 0f,
+    gatewayOnline: () -> Boolean,
+    agentReady: () -> Boolean,
     onClose: () -> Unit,
 ) {
     val colors = AppTheme.colors
@@ -41,8 +50,8 @@ fun ViewContainer<*, *>.ThemePopover(
     // 面板
     View {
         attr {
-            absolutePosition(top = 56f, left = left)
-            width(220f)
+            absolutePosition(top = 56f + topInset, left = left)
+            width(width)
             zIndex(15)
             touchEnable(visible())
             opacity(if (visible()) 1f else 0f)
@@ -54,25 +63,50 @@ fun ViewContainer<*, *>.ThemePopover(
                 backgroundColor(colors.c(colors.elevated))
                 border(Border(1f, BorderStyle.SOLID, colors.c(colors.borderStrong)))
                 borderRadius(AppRadius.radius8)
-                padding(top = 4f, bottom = 4f)
+                padding(top = 8f, bottom = 10f)
                 cssClass("zn-pop")
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
+            View {
+                attr { height(38f); flexDirectionRow(); alignItemsCenter(); padding(left = 14f, right = 14f) }
+                Icon(IconKind.THEME, 17f)
+                View { attr { width(9f) } }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs14); fontWeightSemiBold()
+                        color(colors.c(colors.textPrimary)); text("设置")
+                    }
+                }
+            }
+            View { attr { height(1f); backgroundColor(colors.c(colors.border)); animate(ANIM_THEME, value = AppTheme.isDark) } }
             // —— 外观 ——
             GroupLabel("外观")
-            ThemeOption(ThemeMode.SYSTEM, onPicked = onClose)
-            ThemeOption(ThemeMode.LIGHT, onPicked = onClose)
-            ThemeOption(ThemeMode.DARK, onPicked = onClose)
-            // —— 数据源 ——
-            View { attr { marginTop(6f); height(1f); backgroundColor(colors.c(colors.border)); animate(ANIM_THEME, value = AppTheme.isDark) } }
-            GroupLabel("数据源")
-            SetOption(label = "演示行情", active = true)
-            SetOption(label = "实时行情", disabled = true, desc = "接入中")
-            // —— 模型 ——
-            View { attr { marginTop(6f); height(1f); backgroundColor(colors.c(colors.border)); animate(ANIM_THEME, value = AppTheme.isDark) } }
-            GroupLabel("AI 模型")
-            SetOption(label = "知牛-1（演示）", active = true)
-            SetOption(label = "多模型网关", disabled = true, desc = "接入中")
+            View {
+                attr {
+                    margin(left = 14f, right = 14f)
+                    height(36f); padding(all = 3f)
+                    flexDirectionRow()
+                    backgroundColor(colors.c(colors.surfaceSecondary))
+                    borderRadius(AppRadius.radius6)
+                }
+                ThemeSegment(ThemeMode.SYSTEM)
+                ThemeSegment(ThemeMode.LIGHT)
+                ThemeSegment(ThemeMode.DARK)
+            }
+            View { attr { marginTop(10f); height(1f); backgroundColor(colors.c(colors.border)); animate(ANIM_THEME, value = AppTheme.isDark) } }
+            GroupLabel("服务状态")
+            vif({ gatewayOnline() }) {
+                ServiceStatus(IconKind.DATA, "行情与资讯", true, "实时网关")
+            }
+            velse {
+                ServiceStatus(IconKind.DATA, "行情与资讯", false, "网关未连接")
+            }
+            vif({ agentReady() }) {
+                ServiceStatus(IconKind.AI, "研究 Agent", true, "模型已配置")
+            }
+            velse {
+                ServiceStatus(IconKind.AI, "研究 Agent", false, "规则降级")
+            }
             // —— 免责声明 ——
             View { attr { marginTop(6f); height(1f); backgroundColor(colors.c(colors.border)); animate(ANIM_THEME, value = AppTheme.isDark) } }
             Text {
@@ -88,7 +122,7 @@ fun ViewContainer<*, *>.ThemePopover(
                     marginLeft(14f); marginRight(14f); marginTop(3f); marginBottom(8f)
                     fontSize(AppTypography.fs11); lineHeight(16f)
                     color(colors.c(colors.textTertiary))
-                    text("行情与 AI 输出均为演示数据，不构成投资建议。")
+                    text("行情与 AI 输出仅供研究参考，不构成投资建议。")
                 }
             }
         }
@@ -107,25 +141,30 @@ private fun ViewContainer<*, *>.GroupLabel(label: String) {
     }
 }
 
-private fun ViewContainer<*, *>.ThemeOption(mode: ThemeMode, onPicked: () -> Unit) {
+private fun ViewContainer<*, *>.ThemeSegment(mode: ThemeMode) {
     val colors = AppTheme.colors
     View {
         attr {
-            height(32f); flexDirectionRow(); alignItemsCenter()
-            padding(left = 14f, right = 14f)
-            cssClass("zn-row zn-click")
+            flex(1f); height(30f); allCenter()
+            borderRadius(AppRadius.radius5)
+            backgroundColor(
+                if (AppTheme.mode == mode) colors.c(colors.surface)
+                else Color.TRANSPARENT
+            )
+            if (AppTheme.mode == mode) border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+            accessibility("外观：${mode.label}")
+            accessibilityRole(AccessibilityRole.BUTTON)
+            accessibilityInfo(clickable = true, longClickable = false)
+            cssClass("zn-click")
             highlightBackgroundColor(colors.ca(colors.textSecondary, 7))
         }
         event { click {
             AppTheme.setMode(mode)
-            onPicked()
         } }
-        // 选中圆点
-        OptionDot(active = AppTheme.mode == mode)
-        View { attr { width(10f) } }
         Text {
             attr {
-                fontSize(AppTypography.fs13)
+                fontSize(AppTypography.fs12)
+                fontWeightMedium()
                 color(colors.c(if (AppTheme.mode == mode) colors.textPrimary else colors.textSecondary))
                 text(mode.label)
             }
@@ -133,60 +172,42 @@ private fun ViewContainer<*, *>.ThemeOption(mode: ThemeMode, onPicked: () -> Uni
     }
 }
 
-/** 设置行：圆点 + 标签（+ 可选中/禁用态）。 */
-private fun ViewContainer<*, *>.SetOption(
+/** 真实服务状态行；状态由 /healthz 返回，不把静态说明伪装成可点击设置。 */
+private fun ViewContainer<*, *>.ServiceStatus(
+    icon: IconKind,
     label: String,
-    active: Boolean = false,
-    disabled: Boolean = false,
-    desc: String = "",
+    ok: Boolean,
+    desc: String,
 ) {
     val colors = AppTheme.colors
     View {
         attr {
-            height(32f); flexDirectionRow(); alignItemsCenter()
+            height(44f); flexDirectionRow(); alignItemsCenter()
             padding(left = 14f, right = 14f)
-            if (!disabled) cssClass("zn-row zn-click")
-            if (!disabled) highlightBackgroundColor(colors.ca(colors.textSecondary, 7))
-            opacity(if (disabled) 0.55f else 1f)
+            accessibility("$label：$desc")
+            accessibilityRole(AccessibilityRole.TEXT)
         }
-        OptionDot(active = active)
+        Icon(icon, 16f)
         View { attr { width(10f) } }
-        Text {
-            attr {
-                fontSize(AppTypography.fs13)
-                color(colors.c(if (active) colors.textPrimary else colors.textSecondary))
-                text(label)
-            }
-        }
-        if (desc.isNotEmpty()) {
-            View { attr { flex(1f) } }
+        View {
+            attr { flex(1f) }
             Text {
                 attr {
-                    fontSize(AppTypography.fs11)
-                    color(colors.c(colors.textTertiary))
-                    text(desc)
+                    fontSize(AppTypography.fs13); fontWeightMedium()
+                    color(colors.c(colors.textPrimary)); text(label)
+                }
+            }
+            Text {
+                attr {
+                    marginTop(2f); fontSize(AppTypography.fs11)
+                    color(colors.c(colors.textTertiary)); text(desc)
                 }
             }
         }
-    }
-}
-
-private fun ViewContainer<*, *>.OptionDot(active: Boolean) {
-    val colors = AppTheme.colors
-    View {
-        attr {
-            width(12f); height(12f)
-            borderRadius(allBorderRadius = 6f)
-            border(Border(1.2f, BorderStyle.SOLID, colors.c(colors.textSecondary)))
-            alignItemsCenter(); allCenter()
-        }
-        if (active) {
-            View {
-                attr {
-                    width(6f); height(6f)
-                    borderRadius(allBorderRadius = 3f)
-                    backgroundColor(colors.c(colors.textPrimary))
-                }
+        View {
+            attr {
+                width(7f); height(7f); borderRadius(4f)
+                backgroundColor(colors.c(if (ok) colors.down else colors.ma5))
             }
         }
     }

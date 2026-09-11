@@ -2,7 +2,7 @@
  * 布局：Header(64) → QuoteHeader(132~148) → Chart Workspace(560) → 底部 概览/AI解读 Tab。
  * Chart Workspace：Chart 72% + Right Rail 28%（1px border radius 6，无外层大 Card）。
  * Rail 默认：KeyData + AiQuickInsight；点击「查看完整分析」后原地替换为 AiInsightPanel。
- * K线视口：默认日K 80 根，支持左右拖动 Pan 查看历史。
+ * K线视口：默认显示最新 80 根，支持拖动、滚轮与捏合缩放。
  */
 package com.zhiniu.pages
 
@@ -21,7 +21,11 @@ import com.tencent.kuikly.core.views.List
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
 import com.zhiniu.data.mock.MarketStore
+import com.zhiniu.data.remote.GatewayMarketClient
+import com.zhiniu.data.remote.MarketNewsItem
 import com.zhiniu.domain.model.Candle
+import com.zhiniu.domain.model.StockFundamentals
+import com.zhiniu.domain.model.StockQuote
 import com.zhiniu.domain.model.Timeframe
 import com.zhiniu.pages.components.AiMessageHeader
 import com.zhiniu.pages.components.ANIM_THEME
@@ -38,7 +42,6 @@ import com.zhiniu.pages.components.cssClass
 import com.zhiniu.pages.components.ca
 import com.zhiniu.pages.components.chart.ChartIndicator
 import com.zhiniu.pages.components.chart.ChartToolbar
-import com.zhiniu.pages.components.chart.autoVisibleCount
 import com.zhiniu.pages.components.chart.clampViewStart
 import com.zhiniu.pages.components.chart.drawKLineChart
 import com.zhiniu.pages.components.common.Divider
@@ -53,6 +56,8 @@ import com.zhiniu.pages.components.factsOf
 import com.zhiniu.pages.components.fmt2
 import com.zhiniu.pages.components.fmtAmount
 import com.zhiniu.pages.components.fmtChangeSigned
+import com.zhiniu.pages.components.fmtOptional
+import com.zhiniu.pages.components.fmtOptionalAmount
 import com.zhiniu.pages.components.fmtPct
 import com.zhiniu.pages.components.fmtSymbol
 import com.zhiniu.pages.components.fmtVolHand
@@ -60,6 +65,7 @@ import com.zhiniu.pages.components.ai.AiInsightPanel
 import com.zhiniu.pages.components.ai.AiPanelChatLine
 import com.zhiniu.pages.components.market.Level2Panel
 import com.zhiniu.data.local.Watchlist
+import com.tencent.kuikly.core.coroutines.launch
 
 @Page("StockDetail", supportInLocal = true)
 internal class StockDetailPage : AppBasePage() {
@@ -72,20 +78,33 @@ internal class StockDetailPage : AppBasePage() {
     internal var crossY by observable(-1f)
     internal var detailLoading by observable(true)
     internal var isAiPanelVisible by observable(false)
+    internal var railTab by observable("盘口")
     internal var aiDraft by observable("")
     /** 自选状态（响应式，点击后按钮即反馈）。 */
     internal var watchlisted by observable(false)
     internal val aiChat by observableList<AiPanelChatLine>()
+    internal var liveQuote by observable<StockQuote?>(null)
+    internal var liveFundamentals by observable<StockFundamentals?>(null)
+
+    /** 财务/估值快照：行情快照字段优先、基本面接口补充；在 attr 内调用即随 live 数据到达刷新。 */
+    internal fun facts(q: StockQuote): com.zhiniu.pages.components.StockFacts =
+        com.zhiniu.pages.components.factsOf(liveQuote ?: q, liveFundamentals)
+    internal var klineSource by observable("离线快照")
+    internal val liveBars by observableList<Candle>()
+    internal val liveNews by observableList<MarketNewsItem>()
     /** K线视口起点（用于 Pan）。 */
-    internal var klineOffset by observable(0)
+    internal var klineOffset by observable(Int.MAX_VALUE)
+    internal var klineVisibleCount by observable(80)
     internal var panStartX = 0f
     internal var panStartOffset = 0
+    internal var pinchStartCount = 80
 
-    internal fun quote() = selectedSymbol()?.let { repo.quoteOf(it) }
+    internal fun quote() = liveQuote ?: selectedSymbol()?.let { repo.quoteOf(it) }
     internal fun selectedSymbol() = pageData.params.optString("symbol", "").ifBlank { null }
     internal fun bars(): List<Candle> {
         val sym = selectedSymbol() ?: return emptyList()
-        return repo.candles(sym, timeframeOf())
+        return if (liveBars.isNotEmpty() && (selectedTimeframe == "日K" || selectedTimeframe == "分时")) liveBars
+        else repo.candles(sym, timeframeOf())
     }
     private fun timeframeOf(): Timeframe = when (selectedTimeframe) {
         "分时" -> Timeframe.INTRADAY
@@ -98,7 +117,46 @@ internal class StockDetailPage : AppBasePage() {
         "RSI" -> ChartIndicator.RSI
         else -> ChartIndicator.MA
     }
-    internal fun viewCountFor(b: List<Candle>): Int = autoVisibleCount(b.size)
+    internal fun viewCountFor(b: List<Candle>): Int =
+        if (b.isEmpty()) 0 else klineVisibleCount.coerceIn(24, b.size)
+
+    internal fun zoomChart(deltaBars: Int) {
+        val all = bars()
+        if (all.isEmpty()) return
+        val oldCount = viewCountFor(all)
+        val nextCount = (oldCount + deltaBars).coerceIn(24, all.size)
+        if (nextCount == oldCount) return
+        val oldStart = clampViewStart(klineOffset, all.size, oldCount)
+        val oldEnd = oldStart + oldCount
+        klineVisibleCount = nextCount
+        klineOffset = clampViewStart(oldEnd - nextCount, all.size, nextCount)
+    }
+
+    internal fun resetChartViewport() {
+        klineVisibleCount = 80
+        klineOffset = Int.MAX_VALUE
+        crossX = -1f; crossY = -1f
+    }
+
+    internal fun refreshLiveBars() {
+        val symbol = selectedSymbol() ?: return
+        val requested = selectedTimeframe
+        if (requested != "日K" && requested != "分时") {
+            liveBars.diffUpdate(emptyList())
+            return
+        }
+        val scale = if (requested == "分时") 5 else 240
+        lifecycleScope.launch {
+            runCatching { GatewayMarketClient.candleSeries(symbol, scale, if (scale == 5) 240 else 320) }
+                .onSuccess { series ->
+                    if (requested == selectedTimeframe && series.bars.size >= 24) {
+                        liveBars.diffUpdate(series.bars)
+                        klineSource = if (series.isStale) "${series.source.ifBlank { "离线快照" }} · 缓存"
+                        else series.source.ifBlank { "行情网关" }
+                    }
+                }
+        }
+    }
 
     internal fun sendFollowUp(question: String) {
         val text = question.trim()
@@ -106,19 +164,39 @@ internal class StockDetailPage : AppBasePage() {
         val q = quote() ?: return
         aiChat.add(AiPanelChatLine("user", text))
         aiDraft = ""
-        val insight = MarketStore.aiService.insightFor(q.symbol)
-        val answer = when {
-            text.contains("RSI") || text.contains("rsi") -> "RSI 是相对强弱指标（0-100）。当前数值处于中性区域，未给出极端信号。"
-            text.contains("量能") || text.contains("量") -> insight.volume
-            text.contains("支撑") || text.contains("压力") -> "短期支撑关注 MA20 与近期低点；压力关注前期密集成交区。"
-            else -> insight.trend
+        aiChat.add(AiPanelChatLine("ai", "正在调用研究 Agent…"))
+        val pendingIndex = aiChat.size - 1
+        lifecycleScope.launch {
+            val result = runCatching { GatewayMarketClient.research(q.symbol, text) }.getOrNull()
+            val answer = result?.summary?.ifBlank { null } ?: "研究网关暂不可用，请稍后重试。"
+            val mode = if (result?.synthesisMode == "llm") " · ${result.synthesisProvider}" else " · 规则降级"
+            if (pendingIndex < aiChat.size) aiChat[pendingIndex] = AiPanelChatLine("ai", answer + mode)
         }
-        aiChat.add(AiPanelChatLine("ai", answer))
     }
 
     override fun created() {
         super.created()
         watchlisted = selectedSymbol()?.let { Watchlist.contains(it) } ?: false
+        selectedSymbol()?.let { symbol ->
+            lifecycleScope.launch {
+                runCatching { GatewayMarketClient.quotes(listOf(symbol)).firstOrNull() }
+                    .onSuccess {
+                        if (it != null) {
+                            MarketStore.applyLiveQuotes(listOf(it))
+                            liveQuote = it
+                        }
+                    }
+            }
+            lifecycleScope.launch {
+                runCatching { GatewayMarketClient.news(symbol) }
+                    .onSuccess { items -> if (items.isNotEmpty()) liveNews.diffUpdate(items) }
+            }
+            lifecycleScope.launch {
+                runCatching { GatewayMarketClient.fundamentals(symbol) }
+                    .onSuccess { if (it != null) liveFundamentals = it }
+            }
+        }
+        refreshLiveBars()
         setTimeout(280) { detailLoading = false }
     }
 
@@ -137,7 +215,7 @@ internal class StockDetailPage : AppBasePage() {
             }
             vif({ this@StockDetailPage.detailLoading || this@StockDetailPage.quote() == null }) { detailSkeleton(this@StockDetailPage) }
             velse { detailContent(this@StockDetailPage, this@StockDetailPage.quote()!!) }
-            View { attr { height(48f) } }
+            View { attr { height(48f + this@StockDetailPage.safeBottomInset()) } }
         }
     }
 }
@@ -171,7 +249,7 @@ private fun ViewContainer<*, *>.detailContent(host: StockDetailPage, q: com.zhin
                 cssClass("zn-click")
             }
             event { click { host.goBack() } }
-            Icon(IconKind.BACK, 14f) { colors.textSecondary }
+            Icon(IconKind.BACK, 14f)
             View { attr { width(6f) } }
             Text {
                 attr {
@@ -191,21 +269,19 @@ private fun ViewContainer<*, *>.detailContent(host: StockDetailPage, q: com.zhin
         // ---- 底部 Tab（仅 概览 / AI解读） ----
         View {
             attr { flexDirectionRow(); alignItemsCenter(); height(40f) }
-            DetailTab("概览", host.detailTab == "概览") { host.detailTab = "概览" }
-            DetailTab("资金", host.detailTab == "资金") { host.detailTab = "资金" }
-            DetailTab("财务", host.detailTab == "财务") { host.detailTab = "财务" }
-            DetailTab("新闻", host.detailTab == "新闻") { host.detailTab = "新闻" }
-            DetailTab("AI解读", host.detailTab == "AI解读") { host.detailTab = "AI解读" }
+            DetailTab("概览", { host.detailTab == "概览" }) { host.detailTab = "概览" }
+            DetailTab("资金", { host.detailTab == "资金" }) { host.detailTab = "资金" }
+            DetailTab("财务", { host.detailTab == "财务" }) { host.detailTab = "财务" }
+            DetailTab("新闻", { host.detailTab == "新闻" }) { host.detailTab = "新闻" }
+            DetailTab("AI解读", { host.detailTab == "AI解读" }) { host.detailTab = "AI解读" }
         }
         Divider()
         View { attr { height(16f) } }
-        when (host.detailTab) {
-            "资金" -> fundsTab(q)
-            "财务" -> financeTab(q)
-            "新闻" -> newsTab(q)
-            "AI解读" -> aiTab(host, q)
-            else -> overviewTab(q)
-        }
+        vif({ host.detailTab == "概览" }) { overviewTab(host, q) }
+        vif({ host.detailTab == "资金" }) { fundsTab(q) }
+        vif({ host.detailTab == "财务" }) { financeTab(host, q) }
+        vif({ host.detailTab == "新闻" }) { newsTab(host, q) }
+        vif({ host.detailTab == "AI解读" }) { aiTab(host, q) }
     }
 }
 
@@ -251,7 +327,7 @@ private fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.z
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
             event { click { host.isAiPanelVisible = !host.isAiPanelVisible } }
-            Icon(IconKind.AI, 14f) { colors.aiAccent }
+            Icon(IconKind.AI, 14f)
             View { attr { width(6f) } }
             Text {
                 attr {
@@ -305,11 +381,10 @@ private fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.z
             }
         }
     }
-    // 第三四行：Quote Grid（max 760~860）
+    // 第三四行：Quote Grid（max 760~860）；换手率取行情快照/基本面真实值，缺失显示 —
     View { attr { height(14f) } }
-    val facts = com.zhiniu.pages.components.factsOf(q)
     View {
-        attr { flexDirectionRow(); alignItemsCenter(); width(800f) }
+        attr { flexDirectionRow(); alignItemsCenter(); width(if (host.isCompact()) host.pageData.activityWidth - 32f else 800f) }
         QuoteMetric("今开", com.zhiniu.pages.components.fmt2(q.open))
         QuoteMetric("最高", com.zhiniu.pages.components.fmt2(q.high))
         QuoteMetric("最低", com.zhiniu.pages.components.fmt2(q.low))
@@ -317,15 +392,18 @@ private fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.z
     }
     View { attr { height(8f) } }
     View {
-        attr { flexDirectionRow(); alignItemsCenter(); width(800f) }
+        attr { flexDirectionRow(); alignItemsCenter(); width(if (host.isCompact()) host.pageData.activityWidth - 32f else 800f) }
         QuoteMetric("成交量", com.zhiniu.pages.components.fmtVolHand(q.volume))
         QuoteMetric("成交额", com.zhiniu.pages.components.fmtAmount(q.amount))
-        QuoteMetric("换手率", com.zhiniu.pages.components.fmt2(facts.turnover) + "%")
+        QuoteMetric("换手率") { com.zhiniu.pages.components.fmtOptional(host.facts(q).turnover, "%") }
         QuoteMetric("振幅", com.zhiniu.pages.components.fmtAmplitude(q.high, q.low, q.prevClose))
     }
 }
 
-private fun ViewContainer<*, *>.QuoteMetric(label: String, value: String) {
+private fun ViewContainer<*, *>.QuoteMetric(label: String, value: String) = QuoteMetric(label) { value }
+
+/** 值以 lambda 提供并在 attr 内读取：liveFundamentals / liveQuote 到达后自动刷新。 */
+private fun ViewContainer<*, *>.QuoteMetric(label: String, value: () -> String) {
     val colors = AppTheme.colors
     View {
         attr { flex(1f) }
@@ -342,7 +420,7 @@ private fun ViewContainer<*, *>.QuoteMetric(label: String, value: String) {
                 fontSize(AppTypography.fs13); fontWeightMedium()
                 fontFamily(NUM_FONT)
                 color(colors.c(colors.textPrimary))
-                text(value)
+                text(value())
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
         }
@@ -352,22 +430,23 @@ private fun ViewContainer<*, *>.QuoteMetric(label: String, value: String) {
 private fun marketName(symbol: String): String =
     if (symbol.startsWith("sh")) "沪市" else "深市"
 
-private fun ViewContainer<*, *>.DetailTab(label: String, active: Boolean, onClick: () -> Unit) {
+private fun ViewContainer<*, *>.DetailTab(label: String, active: () -> Boolean, onClick: () -> Unit) {
     val colors = AppTheme.colors
     View {
         attr {
-            height(40f); padding(left = 14f, right = 14f); marginRight(20f)
+            width(if (label == "AI解读") 72f else 58f); height(40f); marginRight(12f)
             flexDirectionColumn(); alignItemsCenter(); justifyContentCenter()
-            cssClass("zn-click")
+            cssClass("zn-detail-tab zn-click")
         }
         event { click { onClick() } }
         Text {
             attr {
+                width(if (label == "AI解读") 56f else 32f); textAlignCenter()
                 fontSize(AppTypography.fs14)
-                fontWeight600()
-                color(colors.c(if (active) colors.textPrimary else colors.textSecondary))
+                fontWeight600(); lines(1); textOverFlowClip()
+                color(colors.c(if (active()) colors.textPrimary else colors.textSecondary))
                 text(label)
-                animate(ANIM_THEME, value = AppTheme.isDark)
+                animate(ANIM_THEME, value = active())
             }
         }
         View { attr { height(4f) } }
@@ -376,7 +455,7 @@ private fun ViewContainer<*, *>.DetailTab(label: String, active: Boolean, onClic
                 height(2f); width(16f)
                 borderRadius(allBorderRadius = 1f)
                 backgroundColor(colors.c(colors.textPrimary))
-                opacity(if (active) 1f else 0f)
+                opacity(if (active()) 1f else 0f)
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
         }
@@ -386,10 +465,13 @@ private fun ViewContainer<*, *>.DetailTab(label: String, active: Boolean, onClic
 // ---------- Chart Workspace（72/28） ----------
 private fun ViewContainer<*, *>.ChartWorkspace(host: StockDetailPage, q: com.zhiniu.domain.model.StockQuote) {
     val colors = AppTheme.colors
+    val stacked = host.isMedium()
+    val railHeight = if (host.isCompact()) 360f else 320f
     View {
         attr {
-            flexDirectionRow(); alignItemsStretch()
-            height(AppSpacing.chartHeight)
+            if (stacked) flexDirectionColumn() else flexDirectionRow()
+            alignItemsStretch()
+            height(if (stacked) AppSpacing.chartHeight + railHeight else AppSpacing.chartHeight)
             backgroundColor(colors.c(colors.surface))
             border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
             borderRadius(AppRadius.radius6)
@@ -398,35 +480,45 @@ private fun ViewContainer<*, *>.ChartWorkspace(host: StockDetailPage, q: com.zhi
         }
         // 左：Chart 72%
         View {
-            attr { flex(7.2f); flexDirectionColumn() }
+            attr {
+                if (stacked) height(AppSpacing.chartHeight) else flex(7.2f)
+                flexDirectionColumn()
+            }
             ChartToolbar(
+                compact = stacked,
                 timeframe = { host.selectedTimeframe },
                 indicator = { host.selectedIndicator },
                 bars = { host.bars() },
                 onTimeframe = { t ->
                     host.selectedTimeframe = t
-                    host.klineOffset = 0
-                    host.crossX = -1f; host.crossY = -1f
+                    host.resetChartViewport()
+                    host.refreshLiveBars()
                 },
                 onIndicator = { host.selectedIndicator = it },
+                visibleCount = { host.viewCountFor(host.bars()) },
+                onZoomIn = { host.zoomChart(-12) },
+                onZoomOut = { host.zoomChart(12) },
+                onResetZoom = { host.resetChartViewport() },
             )
             Canvas({
                 attr {
-                    height(AppSpacing.chartHeight - 40f)
+                    height(AppSpacing.chartHeight - if (host.selectedIndicator == "MA") 64f else 40f)
                     backgroundColor(colors.c(colors.chartBg))
+                    cssClass("zn-chart")
                     animate(ANIM_THEME, value = AppTheme.isDark)
                 }
                 event {
                     pan { p ->
                         val state = p.state
                         val all = host.bars()
-                        val vc = autoVisibleCount(all.size)
+                            val vc = host.viewCountFor(all)
                         if (state == "start") {
                             host.panStartX = p.x
                             host.panStartOffset = host.klineOffset
                         } else if (state == "move") {
                             val dx = p.x - host.panStartX
-                            val plotW = host.pageData.activityWidth * 0.72f - 44f - 14f
+                            val plotW = if (stacked) host.pageData.activityWidth - 76f
+                                else host.pageData.activityWidth * 0.72f - 58f
                             val s = plotW / vc
                             val shift = (dx / s).toInt()
                             host.klineOffset = clampViewStart(host.panStartOffset - shift, all.size, vc)
@@ -437,6 +529,14 @@ private fun ViewContainer<*, *>.ChartWorkspace(host: StockDetailPage, q: com.zhi
                     click { p ->
                         host.crossX = p.x
                         host.crossY = p.y
+                    }
+                    pinch { p ->
+                        if (p.state == "start") host.pinchStartCount = host.viewCountFor(host.bars())
+                        if (p.state == "move" && p.scale > 0f) {
+                            val target = (host.pinchStartCount / p.scale).toInt()
+                            host.zoomChart(target - host.viewCountFor(host.bars()))
+                        }
+                        host.crossX = p.x; host.crossY = p.y
                     }
                 }
             }) { context, w, h ->
@@ -455,7 +555,7 @@ private fun ViewContainer<*, *>.ChartWorkspace(host: StockDetailPage, q: com.zhi
         // 1px vertical divider
         View {
             attr {
-                width(1f)
+                if (stacked) height(1f) else width(1f)
                 backgroundColor(colors.c(colors.border))
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
@@ -463,7 +563,8 @@ private fun ViewContainer<*, *>.ChartWorkspace(host: StockDetailPage, q: com.zhi
         // 右：Rail 28%
         vif({ host.isAiPanelVisible }) {
             AiInsightPanel(
-                width = host.pageData.activityWidth * 0.28f,
+                width = if (stacked) host.pageData.activityWidth - 64f else host.pageData.activityWidth * 0.28f,
+                height = if (stacked) railHeight - 1f else 0f,
                 quote = { host.quote() },
                 insight = { host.quote()?.let { MarketStore.aiService.insightFor(it.symbol) } },
                 followUpText = { host.aiDraft },
@@ -474,89 +575,119 @@ private fun ViewContainer<*, *>.ChartWorkspace(host: StockDetailPage, q: com.zhi
             )
         }
         velse {
-            RailQuickInsight(host, q)
+            RailQuickInsight(
+                host, q,
+                if (stacked) host.pageData.activityWidth - 64f else host.pageData.activityWidth * 0.28f,
+                if (stacked) railHeight - 1f else 0f,
+            )
         }
     }
 }
 
 // ---------- Rail：Level2（五档） + KeyData + AiQuickInsight ----------
-private fun ViewContainer<*, *>.RailQuickInsight(host: StockDetailPage, q: com.zhiniu.domain.model.StockQuote) {
+private fun ViewContainer<*, *>.RailQuickInsight(
+    host: StockDetailPage,
+    q: com.zhiniu.domain.model.StockQuote,
+    railW: Float,
+    railHeight: Float,
+) {
     val colors = AppTheme.colors
-    val facts = com.zhiniu.pages.components.factsOf(q)
     val insight = MarketStore.aiService.insightFor(q.symbol)
-    val railW = host.pageData.activityWidth * 0.28f
     View {
         attr {
             width(railW)
+            if (railHeight > 0f) height(railHeight)
             flexDirectionColumn()
             backgroundColor(colors.c(colors.surface))
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
-        // 五档盘口（卖五~买五，股票软件核心区）
-        Level2Panel(q)
-        View { attr { height(8f) } }
-        Divider()
-        View { attr { height(8f) } }
-        // 关键数据（2 列紧凑网格）
+        // 图表优先：盘口、数据、AI 原位切换，避免三个长区块同时挤压右栏。
         View {
-            attr { padding(left = 16f, right = 16f) }
-            SectionHeader("关键数据")
-            View { attr { height(6f) } }
-            View {
-                attr { flexDirectionRow() }
-                View { attr { flex(1f) }; RailMetric("市盈率", com.zhiniu.pages.components.fmt2(facts.pe)) }
-                View { attr { flex(1f) }; RailMetric("市净率", com.zhiniu.pages.components.fmt2(facts.pb)) }
+            attr {
+                height(42f); flexDirectionRow(); alignItemsCenter()
+                padding(left = 10f, right = 10f)
+                borderBottom(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
             }
-            View {
-                attr { flexDirectionRow() }
-                View { attr { flex(1f) }; RailMetric("总市值", facts.marketCap) }
-                View { attr { flex(1f) }; RailMetric("量比", com.zhiniu.pages.components.fmt2(facts.volumeRatio)) }
+            listOf("盘口", "数据", "AI").forEach { tab ->
+                RailTab(tab, active = host.railTab == tab) { host.railTab = tab }
             }
         }
-        View { attr { height(8f) } }
-        Divider()
-        View { attr { height(8f) } }
-        // AI 快速解读（知牛入口）
-        View {
-            attr { padding(left = 16f, right = 16f); flex(1f) }
-            SectionHeader("AI 快速解读")
-            View { attr { height(8f) } }
-            Text {
-                attr {
-                    fontSize(AppTypography.fs20); fontWeightSemiBold()
-                    color(colors.c(colors.textPrimary))
-                    text(insight.verdict)
-                    animate(ANIM_THEME, value = AppTheme.isDark)
+        vif({ host.railTab == "盘口" }) {
+            View { attr { padding(top = 8f, left = 8f, right = 8f) }; Level2Panel(q) }
+        }
+        vif({ host.railTab == "数据" }) {
+            View {
+                attr { padding(top = 18f, left = 16f, right = 16f); flex(1f) }
+                SectionHeader("关键数据")
+                View { attr { height(12f) } }
+                View {
+                    attr { flexDirectionRow() }
+                    View { attr { flex(1f) }; RailMetric("市盈率") { com.zhiniu.pages.components.fmtOptional(host.facts(q).pe) } }
+                    View { attr { flex(1f) }; RailMetric("市净率") { com.zhiniu.pages.components.fmtOptional(host.facts(q).pb) } }
+                }
+                View {
+                    attr { flexDirectionRow() }
+                    View { attr { flex(1f) }; RailMetric("总市值") { com.zhiniu.pages.components.fmtMarketCap(host.facts(q).marketCap) } }
+                    View { attr { flex(1f) }; RailMetric("量比") { com.zhiniu.pages.components.fmtOptional(host.facts(q).volumeRatio) } }
                 }
             }
-            View { attr { height(10f) } }
-            RailMetric("趋势", if (insight.trend.length > 16) insight.trend.substring(0, 16) + "…" else insight.trend)
-            RailMetric("量能", if (insight.volume.length > 16) insight.volume.substring(0, 16) + "…" else insight.volume)
-            RailMetric("动量", insight.indicator.split("。").firstOrNull() ?: "—")
-            View { attr { flex(1f) } }
+        }
+        vif({ host.railTab == "AI" }) {
             View {
-                attr {
-                    height(34f); borderRadius(6f); allCenter()
-                    backgroundColor(colors.c(colors.surfaceSecondary))
-                    highlightBackgroundColor(colors.ca(colors.textSecondary, 10))
-                    cssClass("zn-click")
-                }
-                event { click { host.isAiPanelVisible = true } }
-                Icon(IconKind.AI, 13f) { colors.aiAccent }
-                View { attr { width(6f) } }
-                Text {
-                    attr {
-                        fontSize(AppTypography.fs13); fontWeightMedium()
-                        color(colors.c(colors.textPrimary))
-                        text("查看完整分析")
+                attr { padding(top = 18f, left = 16f, right = 16f); flex(1f) }
+                View {
+                    attr { flexDirectionRow(); alignItemsCenter() }
+                    Icon(IconKind.AI, 16f)
+                    View { attr { width(8f) } }
+                    Text {
+                        attr {
+                            fontSize(AppTypography.fs16); fontWeightSemiBold()
+                            color(colors.c(colors.textPrimary)); text(insight.verdict)
+                        }
                     }
                 }
+                Text {
+                    attr {
+                        marginTop(12f); fontSize(AppTypography.fs13); lineHeight(20f); lines(3)
+                        color(colors.c(colors.textSecondary)); text(insight.trend + " " + insight.volume)
+                    }
+                }
+                View { attr { height(12f) } }
+                RailMetric("RSI / MACD", insight.indicator.split("。").firstOrNull() ?: "—")
+                View { attr { flex(1f) } }
+                PrimaryButton("打开完整研究", height = 36f, icon = IconKind.AI) {
+                    host.isAiPanelVisible = true
+                }
+                View { attr { height(14f) } }
             }
         }
     }
 }
 
-private fun ViewContainer<*, *>.RailMetric(label: String, value: String) {
+private fun ViewContainer<*, *>.RailTab(label: String, active: Boolean, onClick: () -> Unit) {
+    val colors = AppTheme.colors
+    View {
+        attr {
+            flex(1f); height(32f); allCenter(); borderRadius(AppRadius.radius5)
+            backgroundColor(if (active) colors.c(colors.surfaceSecondary) else com.tencent.kuikly.core.base.Color.TRANSPARENT)
+            highlightBackgroundColor(colors.ca(colors.textSecondary, 8))
+            cssClass("zn-click")
+        }
+        event { click { onClick() } }
+        Text {
+            attr {
+                width(if (label == "AI") 28f else 32f); textAlignCenter(); lines(1); textOverFlowClip()
+                fontSize(AppTypography.fs12); fontWeightMedium()
+                color(colors.c(if (active) colors.textPrimary else colors.textSecondary)); text(label)
+            }
+        }
+    }
+}
+
+private fun ViewContainer<*, *>.RailMetric(label: String, value: String) = RailMetric(label) { value }
+
+/** 值以 lambda 提供并在 attr 内读取：liveFundamentals / liveQuote 到达后自动刷新。 */
+private fun ViewContainer<*, *>.RailMetric(label: String, value: () -> String) {
     val colors = AppTheme.colors
     View {
         attr { flexDirectionRow(); alignItemsCenter(); height(24f); marginBottom(2f) }
@@ -573,15 +704,14 @@ private fun ViewContainer<*, *>.RailMetric(label: String, value: String) {
                 fontSize(AppTypography.fs13); fontWeightMedium()
                 fontFamily(NUM_FONT)
                 color(colors.c(colors.textPrimary))
-                text(value)
+                text(value())
             }
         }
     }
 }
 
-private fun ViewContainer<*, *>.overviewTab(q: com.zhiniu.domain.model.StockQuote) {
+private fun ViewContainer<*, *>.overviewTab(host: StockDetailPage, q: com.zhiniu.domain.model.StockQuote) {
     val colors = AppTheme.colors
-    val facts = com.zhiniu.pages.components.factsOf(q)
     View {
         attr {
             backgroundColor(colors.c(colors.surface))
@@ -614,10 +744,10 @@ private fun ViewContainer<*, *>.overviewTab(q: com.zhiniu.domain.model.StockQuot
         View { attr { height(6f) } }
         View {
             attr { flexDirectionRow() }
-            View { attr { flex(1f) }; QuoteMetric("总市值", facts.marketCap) }
-            View { attr { flex(1f) }; QuoteMetric("市盈率", com.zhiniu.pages.components.fmt2(facts.pe)) }
-            View { attr { flex(1f) }; QuoteMetric("市净率", com.zhiniu.pages.components.fmt2(facts.pb)) }
-            View { attr { flex(1f) }; QuoteMetric("量比", com.zhiniu.pages.components.fmt2(facts.volumeRatio)) }
+            View { attr { flex(1f) }; QuoteMetric("总市值") { com.zhiniu.pages.components.fmtMarketCap(host.facts(q).marketCap) } }
+            View { attr { flex(1f) }; QuoteMetric("市盈率") { com.zhiniu.pages.components.fmtOptional(host.facts(q).pe) } }
+            View { attr { flex(1f) }; QuoteMetric("市净率") { com.zhiniu.pages.components.fmtOptional(host.facts(q).pb) } }
+            View { attr { flex(1f) }; QuoteMetric("量比") { com.zhiniu.pages.components.fmtOptional(host.facts(q).volumeRatio) } }
         }
     }
 }
@@ -698,15 +828,14 @@ private fun ViewContainer<*, *>.fundsTab(q: com.zhiniu.domain.model.StockQuote) 
             attr {
                 fontSize(AppTypography.fs12); lineHeight(19f)
                 color(colors.c(colors.textTertiary))
-                text("演示数据，实时资金流将在接入真实行情后展示。")
+                text("资金流按盘口成交方向估算，仅供盘中参考。")
             }
         }
     }
 }
 
-private fun ViewContainer<*, *>.financeTab(q: com.zhiniu.domain.model.StockQuote) {
+private fun ViewContainer<*, *>.financeTab(host: StockDetailPage, q: com.zhiniu.domain.model.StockQuote) {
     val colors = AppTheme.colors
-    val facts = com.zhiniu.pages.components.factsOf(q)
     View {
         attr {
             backgroundColor(colors.c(colors.surface))
@@ -718,9 +847,9 @@ private fun ViewContainer<*, *>.financeTab(q: com.zhiniu.domain.model.StockQuote
         SectionHeader("财务概览")
         View { attr { height(12f) } }
         View { attr { flexDirectionRow() }
-            View { attr { flex(1f) }; QuoteMetric("市盈率", com.zhiniu.pages.components.fmt2(facts.pe)) }
-            View { attr { flex(1f) }; QuoteMetric("市净率", com.zhiniu.pages.components.fmt2(facts.pb)) }
-            View { attr { flex(1f) }; QuoteMetric("总市值", facts.marketCap) }
+            View { attr { flex(1f) }; QuoteMetric("市盈率") { com.zhiniu.pages.components.fmtOptional(host.facts(q).pe) } }
+            View { attr { flex(1f) }; QuoteMetric("市净率") { com.zhiniu.pages.components.fmtOptional(host.facts(q).pb) } }
+            View { attr { flex(1f) }; QuoteMetric("总市值") { com.zhiniu.pages.components.fmtMarketCap(host.facts(q).marketCap) } }
         }
         View { attr { height(14f) } }
         Divider()
@@ -754,14 +883,18 @@ private fun ViewContainer<*, *>.financeTab(q: com.zhiniu.domain.model.StockQuote
             attr {
                 fontSize(AppTypography.fs12); lineHeight(19f)
                 color(colors.c(colors.textTertiary))
-                text("演示财务数据，接入真实财报后展示。")
+                text("财务指标按最近一期公开口径展示。")
             }
         }
     }
 }
 
-private fun ViewContainer<*, *>.newsTab(q: com.zhiniu.domain.model.StockQuote) {
+private fun ViewContainer<*, *>.newsTab(host: StockDetailPage, q: com.zhiniu.domain.model.StockQuote) {
     val colors = AppTheme.colors
+    val fallback = listOf(
+        MarketNewsItem("fallback-1", q.name + "：相关资讯将在联网后更新", "当前显示离线快照，请核对发布时间与来源。", "--", "知牛离线快照", "offline-snapshot", true),
+    )
+    val items = if (host.liveNews.isNotEmpty()) host.liveNews.toList() else fallback
     View {
         attr {
             backgroundColor(colors.c(colors.surface))
@@ -772,30 +905,37 @@ private fun ViewContainer<*, *>.newsTab(q: com.zhiniu.domain.model.StockQuote) {
         }
         SectionHeader("相关资讯")
         View { attr { height(10f) } }
-        listOf(
-            "今日 09:12" to (q.name + "：白酒板块午后走强，机构关注提价预期"),
-            "昨日 16:40" to (q.name + "：主力资金净流入居前，北向加仓"),
-            "昨日 11:25" to ("行业研报：消费复苏带动" + q.name + "需求回暖"),
-            "08-28 20:15" to (q.name + "：中报披露在即，市场关注毛利率变化"),
-            "08-28 14:30" to ("A股收评：三大指数涨跌互现，" + q.name + "逆势上行"),
-        ).forEach { (time, title) ->
+        items.forEach { item ->
             View {
-                attr { marginTop(12f) }
+                attr {
+                    marginTop(10f); padding(top = 8f, bottom = 10f)
+                    borderBottom(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+                }
                 View { attr { flexDirectionRow(); alignItemsCenter() }
                     Text {
                         attr {
+                            flex(1f)
                             fontSize(AppTypography.fs13); fontWeightSemiBold()
                             color(colors.c(colors.textPrimary))
-                            text(title)
+                            text(item.title)
+                        }
+                    }
+                }
+                if (item.summary.isNotBlank()) {
+                    Text {
+                        attr {
+                            marginTop(5f); fontSize(AppTypography.fs12); lineHeight(18f); lines(2)
+                            textOverFlowClip(); color(colors.c(colors.textSecondary))
+                            text(item.summary)
                         }
                     }
                 }
                 Text {
                     attr {
-                        marginTop(3f)
+                        marginTop(6f)
                         fontSize(AppTypography.fs11)
                         color(colors.c(colors.textTertiary))
-                        text(time)
+                        text(listOf(item.source, item.publishedAt, if (item.isStale) "缓存/快照" else "实时聚合").filter { it.isNotBlank() }.joinToString(" · "))
                     }
                 }
             }
@@ -807,7 +947,7 @@ private fun ViewContainer<*, *>.newsTab(q: com.zhiniu.domain.model.StockQuote) {
             attr {
                 fontSize(AppTypography.fs12); lineHeight(19f)
                 color(colors.c(colors.textTertiary))
-                text("演示资讯，接入真实新闻后展示。")
+                text("资讯按发布时间倒序展示；“缓存/快照”表示上游暂不可用，不应视为实时事件。")
             }
         }
     }
