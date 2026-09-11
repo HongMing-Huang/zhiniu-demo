@@ -84,13 +84,17 @@
 | 真实 AI 接入 | ✅ | FastAPI LLM 网关（OpenAI 兼容协议，多厂商可选）+ 真实新浪/东财数据 |
 | 体验优化 | ✅ | 深/浅色 180ms 切换、骨架屏、Hover/按压微交互、响应式四断点、安全区避让、无障碍语义、等宽数字对齐 |
 
-## 6. 剩余待办（按优先级）
+## 6. 剩余待办（按优先级，已在 GitHub Issues 建立跟踪）
 
-1. 🔶 **录制原型演示视频**（交付物硬性项）：按 `docs/demo-script.md` 分镜录制；H5 主链路 + AI 研究全程即可覆盖评分点。
-2. 🔶 **品牌 Logo**：Header 与 README 当前用文字「知牛」占位（不伪造图形资产）；拿到正式 Logo 后替换 `web-host/index.html` 品牌位与 README 头图。
-3. 🔶 **iOS 原生构建验收**：`pod install` 后 Xcode 构建待跑（Podfile 已对齐 2.25.0，注意不要重跑 xcodegen，见 `docs/platform-readiness.md` §2）。
-4. 🔶 **鸿蒙端真机/模拟器验收**：壳工程就绪；Ktor 无 ohos 引擎，网络层需 expect/actual 桥接（方案见 `docs/platform-readiness.md` §3）。
-4. ⬜ 历史遗留：`docs/zhiniu-technical-design.md` 为最初 62KB 技术方案（含已被否决的早期选型），仅作过程记录保留，评审以现行文档为准。
+| # | 待办 | Issue |
+|:--|:--|:--|
+| 1 | 🔶 录制原型演示视频（交付物硬性项）：按 `docs/demo-script.md` 分镜录制 | [#1](https://github.com/HongMing-Huang/zhiniu-demo/issues/1) |
+| 2 | 🔶 品牌 Logo 素材替换（Header / README / favicon，当前文字占位） | [#2](https://github.com/HongMing-Huang/zhiniu-demo/issues/2) |
+| 3 | 🔶 iOS 原生构建验收（pod install + Xcode；勿重跑 xcodegen） | [#3](https://github.com/HongMing-Huang/zhiniu-demo/issues/3) |
+| 4 | 🔶 鸿蒙网络层 expect/actual 桥接 + 真机验收 | [#4](https://github.com/HongMing-Huang/zhiniu-demo/issues/4) |
+| 5 | ⬜ 重跑 Mimosa 完整安全扫描（提交钩子 scanner_enobufs 未出结论） | [#5](https://github.com/HongMing-Huang/zhiniu-demo/issues/5) |
+
+历史遗留：`docs/zhiniu-technical-design.md` 为最初 62KB 技术方案（含已被否决的早期选型），仅作过程记录保留，评审以现行文档为准。
 
 ---
 
