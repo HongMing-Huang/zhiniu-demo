@@ -9,17 +9,29 @@
 """
 from __future__ import annotations
 
+import asyncio
 import json
+import re
 import time
 from pathlib import Path
 from typing import Dict, Optional
 from urllib import request
+from urllib.parse import urlencode
 
 REFERER = {"Referer": "https://finance.sina.com.cn"}  # 新浪必需的 Referer
 _REQ_HEADERS = {**REFERER, "User-Agent": "Mozilla/5.0 zhiniu-gateway"}
+_EASTMONEY_HEADERS = {
+    "Referer": "https://quote.eastmoney.com/",
+    "User-Agent": "Mozilla/5.0 zhiniu-gateway",
+}
 _TIMEOUT = 4.0  # 新浪 4s 超时即视为失败，避免卡住演示
 
 _REALTIME_TTL = 3.0  # 实时缓存 3s
+_ULIST_TTL = 30.0       # 东财批量市值/换手补充 30s
+_SECTORS_TTL = 60.0     # 行业板块排行 60s
+_SCREENER_TTL = 60.0    # 选股池快照 60s
+_POPULARITY_TTL = 120.0  # 人气榜排名 120s
+_POPULARITY_URL = "https://emappdata.eastmoney.com/stockrank/getAllCurrentList"
 
 # 目录（相对本文件定位到 shared/data/mock，避免硬编码绝对路径依赖 jpy/外挂）
 _MOCK_DIR = (
@@ -31,6 +43,12 @@ _rt_cache: Dict[str, dict] = {}          # codes key → (ts, data)
 _rt_order: list = []                     # 简单 LRU 顺序，防无限增长
 _kline_cache: Dict[str, dict] = {}       # symbol key → (ts, data)
 _rt_last_ok: Dict[str, dict] = {}        # 最近一次成功抓取（stale 兜底）
+_fundamentals_cache: Dict[str, tuple[float, dict]] = {}
+_fundamentals_last_ok: Dict[str, dict] = {}
+_ulist_cache: Dict[str, tuple[float, dict]] = {}        # code → (ts, {marketCap, turnoverRate})
+_sectors_cache: Optional[tuple[float, dict]] = None
+_screener_cache: Optional[tuple[float, dict]] = None
+_popularity_cache: Optional[tuple[float, dict]] = None
 
 
 def _load_quotes() -> Dict[str, dict]:
@@ -58,8 +76,8 @@ def _load_kline():
     return _MOCK_KLINE
 
 
-def _http_get(url: str, decode: Optional[str] = None) -> str:
-    req = request.Request(url, headers=_REQ_HEADERS)
+def _http_get(url: str, decode: Optional[str] = None, headers: Optional[dict] = None) -> str:
+    req = request.Request(url, headers=headers or _REQ_HEADERS)
     with request.urlopen(req, timeout=_TIMEOUT) as resp:
         raw = resp.read()
         return raw.decode(decode or "utf-8", errors="replace")
@@ -70,6 +88,75 @@ def _num(v) -> float:
         return float(v)
     except Exception:
         return 0.0
+
+
+def _optional_num(v) -> Optional[float]:
+    if v in (None, "", "-"):
+        return None
+    try:
+        return float(v)
+    except Exception:
+        return None
+
+
+def _scaled_field(data: dict, key: str) -> Optional[float]:
+    value = _optional_num(data.get(key))
+    if value is None:
+        return None
+    digits = int(_num(data.get("f152")))
+    return round(value / (10 ** max(0, digits)), max(0, digits))
+
+
+def _parse_eastmoney_snapshot(symbol: str, data: dict) -> dict:
+    """Parse valuation and classification fields from Eastmoney's quote snapshot."""
+    concepts = [part.strip() for part in str(data.get("f129") or "").split(",") if part.strip()]
+    return {
+        "symbol": symbol,
+        "name": str(data.get("f58") or ""),
+        "industry": str(data.get("f127") or ""),
+        "region": str(data.get("f128") or ""),
+        "concepts": concepts,
+        "pe": _scaled_field(data, "f162"),
+        "pb": _scaled_field(data, "f167"),
+        "turnoverRate": _scaled_field(data, "f168"),
+        "amplitude": _scaled_field(data, "f171"),
+        "marketCap": _optional_num(data.get("f116")),
+        "floatMarketCap": _optional_num(data.get("f117")),
+    }
+
+
+def _parse_eastmoney_report(payload: dict) -> dict:
+    rows = ((payload.get("result") or {}).get("data") or [])
+    if not rows:
+        return {}
+    row = rows[0]
+    return {
+        "reportDate": str(row.get("REPORTDATE") or "")[:10],
+        "reportType": str(row.get("DATATYPE") or ""),
+        "revenue": _optional_num(row.get("TOTAL_OPERATE_INCOME")),
+        "netProfit": _optional_num(row.get("PARENT_NETPROFIT")),
+        "roe": _optional_num(row.get("WEIGHTAVG_ROE")),
+        "grossMargin": _optional_num(row.get("XSMLL")),
+        "revenueYoY": _optional_num(row.get("YSTZ")),
+        "netProfitYoY": _optional_num(row.get("SJLTZ")),
+    }
+
+
+def _parse_eastmoney_flow(payload: dict) -> dict:
+    rows = ((payload.get("data") or {}).get("klines") or [])
+    if not rows:
+        return {}
+    values = str(rows[-1]).split(",")
+    if len(values) < 6:
+        return {}
+    return {
+        "asOf": values[0],
+        "mainNetInflow": _num(values[1]),
+        "smallNetInflow": _num(values[2]),
+        "mediumNetInflow": _num(values[3]),
+        "largeNetInflow": _num(values[4]),
+        "superLargeNetInflow": _num(values[5]),
+    }
 
 
 def _parse_sina(code: str, raw: str) -> Optional[dict]:
@@ -98,11 +185,14 @@ def _parse_sina(code: str, raw: str) -> Optional[dict]:
         "buy1": _num(f[6]),
         "sell1": _num(f[7]),
         "volume": volume_share / 100.0,     # 股 → 手
-        "amount": amount_yuan / 10000.0,    # 元 → 万元
+        "amount": amount_yuan,              # 元（前端统一按元格式化为万/亿）
         "bids": bids,
         "asks": asks,
         "date": f[30],
         "time": f[31],
+        "source": "新浪财经",
+        "provider": "sina-realtime",
+        "isStale": False,
     }
 
 
@@ -155,12 +245,30 @@ async def quote_realtime(codes: list) -> dict:
     was_stale = False
     for c in need:
         if c not in result and c in _rt_last_ok:
-            result[c] = _rt_last_ok[c]
+            result[c] = {**_rt_last_ok[c], "isStale": True}
             was_stale = True
     # Mock 兜底
     mock = _mock_realtime(need)
     for c, v in mock.items():
-        result.setdefault(c, v)
+        if c not in result:
+            result[c] = {
+                **v,
+                "source": "知牛离线快照",
+                "provider": "offline-snapshot",
+                "isStale": True,
+            }
+            was_stale = True
+
+    # 东财批量补充总市值/换手率（课程要求首页展示总市值、成交量；失败静默）
+    try:
+        extras = await _quote_extras(list(result.keys()))
+        for c, extra in extras.items():
+            if c in result:
+                result[c]["marketCap"] = extra.get("marketCap")
+                result[c]["turnoverRate"] = extra.get("turnoverRate")
+                result[c]["volumeRatio"] = extra.get("volumeRatio")
+    except Exception:
+        pass
 
     return result, was_stale
 
@@ -175,15 +283,16 @@ def _kline_ttl(scale: int) -> float:
 async def quote_kline(symbol: str, scale: int = 240, datalen: int = 120) -> dict:
     """GET /quote/kline?symbol=&scale=&datalen=  返回 {symbol,name,data:[{day...}]}"""
     now = time.time()
-    cached = _kline_cache.get(symbol)
+    cache_key = f"{symbol}|{scale}|{min(datalen, 1023)}"
+    cached = _kline_cache.get(cache_key)
     if cached and now - cached[0] <= _kline_ttl(scale):
         return cached[1]
 
     result: Optional[dict] = None
     is_daily = scale >= 240
-    if is_daily and _kline_cache.get(symbol):
+    if is_daily and _kline_cache.get(cache_key):
         # 日线数据不过期兜底（stale），header 由外层标 stale
-        result = _kline_cache[symbol][1]
+        result = {**_kline_cache[cache_key][1], "isStale": True}
     try:
         url = (
             "https://quotes.sina.cn/cn/api/json_v2.php/CN_MarketData.getKLineData"
@@ -192,7 +301,15 @@ async def quote_kline(symbol: str, scale: int = 240, datalen: int = 120) -> dict
         raw = _http_get(url)
         data = json.loads(raw)
         if isinstance(data, list) and data:
-            result = {"symbol": symbol, "name": data[-1].get("day", ""), "data": data, "scale": scale}
+            result = {
+                "symbol": symbol,
+                "name": data[-1].get("day", ""),
+                "data": data,
+                "scale": scale,
+                "source": "新浪财经",
+                "provider": "sina-kline",
+                "isStale": False,
+            }
     except Exception:
         pass
 
@@ -204,11 +321,258 @@ async def quote_kline(symbol: str, scale: int = 240, datalen: int = 120) -> dict
                 "name": mock.get("name", ""),
                 "data": mock.get("data", []),
                 "scale": scale,
+                "source": "知牛离线快照",
+                "provider": "offline-snapshot",
+                "isStale": True,
             }
 
     if result is not None:
-        _kline_cache[symbol] = (now, result)
+        _kline_cache[cache_key] = (now, result)
     return result or {"symbol": symbol, "name": "", "data": [], "scale": scale}
+
+
+def _eastmoney_secid(symbol: str) -> Optional[str]:
+    if not re.fullmatch(r"(?:sh|sz)\d{6}", symbol):
+        return None
+    return ("1." if symbol.startswith("sh") else "0.") + symbol[2:]
+
+
+async def _eastmoney_json(url: str) -> dict:
+    raw = await asyncio.to_thread(_http_get, _guard_external_url(url), None, _EASTMONEY_HEADERS)
+    parsed = json.loads(raw)
+    return parsed if isinstance(parsed, dict) else {}
+
+
+_ALLOWED_API_HOSTS = {
+    "push2.eastmoney.com",       # 东财行情快照/板块/选股
+    "emappdata.eastmoney.com",   # 东财人气榜
+    "hq.sinajs.cn",              # 新浪实时
+    "quotes.sina.cn",            # 新浪 K 线
+    "qt.gtimg.cn",               # 腾讯行情（市值/换手/量比第二真实来源）
+}
+_TENCENT_HEADERS = {"Referer": "https://gu.qq.com/", "User-Agent": _EASTMONEY_HEADERS["User-Agent"]}
+
+
+def _guard_external_url(url: str) -> str:
+    """出站请求白名单：仅允许 HTTPS + 已知行情域名（防 SSRF / 内网探测）。"""
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or parsed.hostname not in _ALLOWED_API_HOSTS:
+        raise ValueError(f"outbound url not allowed: {parsed.hostname}")
+    return url
+
+
+def _post_popularity_rank(page_size: int) -> dict:
+    """仅请求固定的东财人气榜端点（白名单校验 + 不接受外部 URL）。"""
+    body = {"appId": "appId01", "globalId": "786e4c21", "marketType": "", "pageNo": 1, "pageSize": int(page_size)}
+    req = request.Request(
+        _guard_external_url(_POPULARITY_URL),
+        data=json.dumps(body).encode("utf-8"),
+        headers={"Content-Type": "application/json", "User-Agent": _EASTMONEY_HEADERS["User-Agent"]},
+        method="POST",
+    )
+    with request.urlopen(req, timeout=_TIMEOUT) as resp:
+        parsed = json.loads(resp.read().decode("utf-8", errors="replace"))
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _parse_eastmoney_ulist(payload: dict) -> Dict[str, dict]:
+    """解析 ulist.np 批量快照：code → {marketCap, turnoverRate, volumeRatio}（缺字段保持 null）。"""
+    rows = ((payload.get("data") or {}).get("diff") or [])
+    out: Dict[str, dict] = {}
+    for row in rows:
+        code = str(row.get("f12") or "")
+        if len(code) == 6:
+            out[code] = {
+                "marketCap": _optional_num(row.get("f20")),
+                "turnoverRate": _optional_num(row.get("f8")),
+                "volumeRatio": _optional_num(row.get("f10")),
+            }
+    return out
+
+
+def _parse_tencent_extras(raw: str) -> Dict[str, dict]:
+    """解析腾讯 qt.gtimg.cn `v_<code>="..."` 88 字段：38 换手率 %、49 量比、45 总市值（亿）→ 元。"""
+    out: Dict[str, dict] = {}
+    for line in raw.split(";"):
+        line = line.strip()
+        if not line.startswith("v_") or '="' not in line:
+            continue
+        key, _, rest = line.partition('="')
+        symbol = key[2:].lower()
+        fields = rest.rstrip('"').split("~")
+        if len(fields) < 50 or not re.fullmatch(r"(?:sh|sz)\d{6}", symbol):
+            continue
+        cap_yi = _optional_num(fields[45])
+        out[symbol] = {
+            "marketCap": round(cap_yi * 1e8) if cap_yi is not None else None,
+            "turnoverRate": _optional_num(fields[38]),
+            "volumeRatio": _optional_num(fields[49]),
+        }
+    return out
+
+
+async def _quote_extras(symbols: list) -> Dict[str, dict]:
+    """批量补充总市值/换手率/量比：东财 ulist → 腾讯 gtimg 双真实来源（30s TTL；全部失败静默为 null）。"""
+    now = time.time()
+    out: Dict[str, dict] = {}
+    secids: list = []
+    need_codes: list = []
+    for symbol in symbols:
+        cached = _ulist_cache.get(symbol)
+        if cached and now - cached[0] <= _ULIST_TTL:
+            out[symbol] = cached[1]
+            continue
+        sid = _eastmoney_secid(symbol)
+        if sid:
+            secids.append(sid)
+            need_codes.append(symbol)
+    if secids:
+        url = (
+            "https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&invt=2"
+            "&fields=f12,f8,f10,f20&secids=" + ",".join(secids)
+        )
+        try:
+            parsed = _parse_eastmoney_ulist(await _eastmoney_json(url))
+            for symbol in need_codes:
+                extra = parsed.get(symbol[2:])
+                if extra:
+                    _ulist_cache[symbol] = (now, extra)
+                    out[symbol] = extra
+        except Exception:
+            pass  # 东财限流/断连 → 走腾讯补充
+    missing = [symbol for symbol in need_codes if symbol not in out]
+    if missing:
+        url = _guard_external_url("https://qt.gtimg.cn/q=" + ",".join(missing))
+        try:
+            raw = await asyncio.to_thread(_http_get, url, "gbk", _TENCENT_HEADERS)
+            for symbol, extra in _parse_tencent_extras(raw).items():
+                if symbol in missing:
+                    _ulist_cache[symbol] = (now, extra)
+                    out[symbol] = extra
+        except Exception:
+            pass  # 市值/换手缺失时前端显示 —，不阻塞行情
+    return out
+
+
+def _parse_eastmoney_sector(row: dict) -> Optional[dict]:
+    name = str(row.get("f14") or "").strip()
+    if not name:
+        return None
+    lead_code = str(row.get("f140") or "")
+    lead_symbol = ""
+    if len(lead_code) == 6:
+        lead_symbol = ("sh" if lead_code.startswith(("5", "6", "9")) else "sz") + lead_code
+    return {
+        "code": str(row.get("f12") or ""),
+        "name": name,
+        "changePercent": _optional_num(row.get("f3")),
+        "upCount": int(_num(row.get("f104"))),
+        "downCount": int(_num(row.get("f105"))),
+        "leadStock": str(row.get("f128") or ""),
+        "leadSymbol": lead_symbol,
+        "leadChangePercent": _optional_num(row.get("f136")),
+    }
+
+
+def _parse_eastmoney_stock_row(row: dict) -> Optional[dict]:
+    code = str(row.get("f12") or "")
+    name = str(row.get("f14") or "").strip()
+    if len(code) != 6 or not name:
+        return None
+    symbol = ("sh" if code.startswith(("5", "6", "9")) else "sz") + code
+    return {
+        "symbol": symbol,
+        "name": name,
+        "price": _optional_num(row.get("f2")),
+        "changePercent": _optional_num(row.get("f3")),
+        "volume": _optional_num(row.get("f5")),       # 手
+        "amount": _optional_num(row.get("f6")),       # 元
+        "turnoverRate": _optional_num(row.get("f8")),
+        "pe": _optional_num(row.get("f9")),
+        "marketCap": _optional_num(row.get("f20")),   # 元
+        "industry": str(row.get("f100") or ""),
+    }
+
+
+async def quote_fundamentals(symbol: str) -> dict:
+    """Return real valuation, latest published report, and intraday money flow.
+
+    Missing upstream fields stay null/absent; the gateway never fabricates
+    financial values. A previously successful response may be returned with
+    ``isStale=true`` when Eastmoney is temporarily unavailable.
+    """
+    secid = _eastmoney_secid(symbol)
+    if secid is None:
+        return {
+            "symbol": symbol, "available": False, "isStale": False,
+            "source": "", "provider": "invalid-symbol",
+        }
+    now = time.time()
+    cached = _fundamentals_cache.get(symbol)
+    if cached and now - cached[0] <= 300.0:
+        return cached[1]
+
+    code = symbol[2:]
+    snapshot_url = (
+        "https://push2.eastmoney.com/api/qt/stock/get?"
+        + urlencode({
+            "secid": secid,
+            "fields": "f58,f116,f117,f127,f128,f129,f152,f162,f167,f168,f171",
+        })
+    )
+    report_url = (
+        "https://datacenter-web.eastmoney.com/api/data/v1/get?"
+        + urlencode({
+            "reportName": "RPT_LICO_FN_CPD",
+            "columns": "ALL",
+            "filter": f'(SECURITY_CODE="{code}")',
+            "pageNumber": 1,
+            "pageSize": 1,
+            "sortColumns": "REPORTDATE",
+            "sortTypes": -1,
+        })
+    )
+    flow_url = (
+        "https://push2.eastmoney.com/api/qt/stock/fflow/kline/get?"
+        + urlencode({
+            "lmt": 1, "klt": 1, "secid": secid,
+            "fields1": "f1,f2,f3,f7",
+            "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63",
+        })
+    )
+    try:
+        snapshot_payload, report_payload, flow_payload = await asyncio.gather(
+            _eastmoney_json(snapshot_url),
+            _eastmoney_json(report_url),
+            _eastmoney_json(flow_url),
+        )
+        snapshot = _parse_eastmoney_snapshot(symbol, snapshot_payload.get("data") or {})
+        report = _parse_eastmoney_report(report_payload)
+        flow = _parse_eastmoney_flow(flow_payload)
+        if not snapshot.get("name"):
+            raise ValueError("Eastmoney snapshot contains no security name")
+        result = {
+            **snapshot,
+            **report,
+            "moneyFlow": flow,
+            "available": True,
+            "source": "东方财富",
+            "provider": "eastmoney-fundamentals",
+            "isStale": False,
+        }
+        _fundamentals_cache[symbol] = (now, result)
+        _fundamentals_last_ok[symbol] = result
+        return result
+    except Exception:
+        previous = _fundamentals_last_ok.get(symbol)
+        if previous:
+            return {**previous, "isStale": True}
+        return {
+            "symbol": symbol, "available": False, "isStale": False,
+            "source": "", "provider": "upstream-unavailable",
+        }
 
 
 # --------------------------------------------------------------------- #
@@ -263,19 +627,74 @@ def _mock_index_price(i: int) -> float:
 
 
 async def quote_sectors() -> dict:
-    """GET /quote/sectors：申万板块涨跌排行（真实+fallback 到 mock）。"""
+    """GET /quote/sectors：东财行业板块涨跌排行（真实 + stale/mock 兜底）。"""
+    global _sectors_cache
+    now = time.time()
+    cached = _sectors_cache
+    if cached and now - cached[0] <= _SECTORS_TTL:
+        return cached[1]
+    try:
+        url = (
+            "https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1"
+            "&fltt=2&invt=2&fid=f3&fs=m:90+t:2"
+            "&fields=f3,f12,f14,f104,f105,f128,f136,f140"
+        )
+        payload = await _eastmoney_json(url)
+        rows = [r for r in (_parse_eastmoney_sector(row) for row in ((payload.get("data") or {}).get("diff") or [])) if r]
+        if rows:
+            result = {"sectors": rows, "source": "eastmoney", "isStale": False}
+            _sectors_cache = (now, result)
+            return result
+    except Exception:
+        pass  # 网络/超时 → stale → mock
+    if cached:
+        return {**cached[1], "isStale": True}
     rows = []
     for i, name in enumerate(_SECTORS):
         pct = round(((i * 7) % 11 - 5) + 0.3, 2)  # 确定性涨跌幅
         rows.append({"name": name, "changePercent": pct, "leadStock": f"{name}·龙头"})
     rows.sort(key=lambda r: r["changePercent"], reverse=True)
-    return {"sectors": rows, "source": "mock"}
+    return {"sectors": rows, "source": "mock", "isStale": True}
 
 
-async def quote_screener(industry: str = "", min_pct: float = 0.0) -> dict:
-    """GET /quote/screener?industry=&min_pct=：条件选股（行业过滤 + 涨跌幅阈值）。"""
-    # 用行情 mock 做选股池（与前端 MockData 对齐的几只）
-    pool = [
+async def quote_screener(industry: str = "", min_pct: float = 0.0, limit: int = 30) -> dict:
+    """GET /quote/screener?industry=&min_pct=：条件选股（东财成交额榜前 100 池 + 过滤）。"""
+    global _screener_cache
+    now = time.time()
+    cached = _screener_cache
+    pool: list = []
+    source = "mock"
+    stale = True
+    if cached and now - cached[0] <= _SCREENER_TTL:
+        pool, source, stale = cached[1]["rows"], cached[1]["source"], False
+    else:
+        try:
+            url = (
+                "https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1"
+                "&fltt=2&invt=2&fid=f6&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23"
+                "&fields=f12,f14,f2,f3,f5,f6,f8,f9,f20,f100"
+            )
+            payload = await _eastmoney_json(url)
+            rows = [r for r in (_parse_eastmoney_stock_row(row) for row in ((payload.get("data") or {}).get("diff") or [])) if r]
+            if rows:
+                pool, source, stale = rows, "eastmoney", False
+                _screener_cache = (now, {"rows": rows, "source": source})
+        except Exception:
+            pass  # 网络/超时 → stale → mock
+        if not pool:
+            if cached:
+                pool, source, stale = cached[1]["rows"], cached[1]["source"], True
+            else:
+                pool, source, stale = _mock_screener_pool(), "mock", True
+    rows = [r for r in pool if (_num(r.get("changePercent"))) >= min_pct]
+    if industry:
+        rows = [r for r in rows if industry in str(r.get("industry") or "")]
+    return {"industry": industry, "min_pct": min_pct, "rows": rows[: max(1, limit)], "source": source, "isStale": stale}
+
+
+def _mock_screener_pool() -> list:
+    """离线兜底选股池（与前端 MockData 对齐的几只）。"""
+    return [
         {"symbol": "sh600519", "name": "贵州茅台", "industry": "白酒", "price": 1292.83, "changePercent": 0.10, "pe": 28.2},
         {"symbol": "sz000001", "name": "平安银行", "industry": "银行", "price": 11.30, "changePercent": 1.35, "pe": 5.6},
         {"symbol": "sh600036", "name": "招商银行", "industry": "银行", "price": 36.28, "changePercent": 1.34, "pe": 6.1},
@@ -285,7 +704,55 @@ async def quote_screener(industry: str = "", min_pct: float = 0.0) -> dict:
         {"symbol": "sh601398", "name": "工商银行", "industry": "银行", "price": 5.64, "changePercent": 1.08, "pe": 5.4},
         {"symbol": "sh600887", "name": "伊利股份", "industry": "食品", "price": 27.2, "changePercent": 2.1, "pe": 18.0},
     ]
-    rows = [r for r in pool if r["changePercent"] >= min_pct]
-    if industry:
-        rows = [r for r in rows if industry in r["industry"]]
-    return {"industry": industry, "min_pct": min_pct, "rows": rows, "source": "mock"}
+
+
+async def quote_popularity(count: int = 20) -> dict:
+    """GET /quote/popularity：东财人气榜真实排名 + 新浪实时行情增强（名称/最新价/涨跌幅）。"""
+    global _popularity_cache
+    now = time.time()
+    if _popularity_cache and now - _popularity_cache[0] <= _POPULARITY_TTL:
+        return _popularity_cache[1]
+    try:
+        payload = await asyncio.to_thread(_post_popularity_rank, max(1, min(count, 50)))
+        entries = payload.get("data") or []
+        ranked: list = []
+        for entry in entries:
+            symbol = str(entry.get("sc") or "").strip().lower()
+            if re.fullmatch(r"(?:sh|sz)\d{6}", symbol):
+                ranked.append((symbol, int(_num(entry.get("rk")))))
+        if ranked:
+            symbols = [s for s, _ in ranked]
+            url = _guard_external_url("https://hq.sinajs.cn/list=" + ",".join(symbols))
+            raw = await asyncio.to_thread(_http_get, url, "gbk", None)
+            quotes = {s: parsed for s in symbols if (parsed := _parse_sina(s, raw))}
+            stocks = []
+            for symbol, rank in ranked:
+                row: dict = {"symbol": symbol, "rank": rank}
+                q = quotes.get(symbol)
+                if q and q.get("price", 0) > 0:
+                    prev = _num(q.get("prevClose"))
+                    row.update(
+                        name=q.get("name", ""),
+                        price=q.get("price"),
+                        changePercent=round((q["price"] - prev) / prev * 100, 2) if prev else 0.0,
+                    )
+                stocks.append(row)
+            result = {"stocks": stocks, "source": "eastmoney-popularity", "isStale": False}
+            _popularity_cache = (now, result)
+            return result
+    except Exception:
+        pass  # 网络/超时 → stale → mock 池按成交额排序
+    if _popularity_cache:
+        return {**_popularity_cache[1], "isStale": True}
+    rows = sorted(_MOCK_QUOTES.values(), key=lambda q: -_num(q.get("amount")))[: max(1, min(count, 50))]
+    stocks = []
+    for i, q in enumerate(rows):
+        price, prev = _num(q.get("price")), _num(q.get("prevClose"))
+        stocks.append({
+            "symbol": q.get("symbol", ""),
+            "rank": i + 1,
+            "name": q.get("name", ""),
+            "price": price,
+            "changePercent": round((price - prev) / prev * 100, 2) if prev else 0.0,
+        })
+    return {"stocks": stocks, "source": "mock", "isStale": True}

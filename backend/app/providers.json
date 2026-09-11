@@ -6,10 +6,10 @@
   },
   "order": ["deepseek", "glm", "hunyuan"],
   "routes": {
-    "zhiniu/quick":  { "want": ["fast"],      "fallbackOrder": ["deepseek", "glm", "hunyuan"] },
-    "zhiniu/think":  { "want": ["reasoning"], "fallbackOrder": ["deepseek", "glm", "hunyuan"] },
-    "zhiniu/flash":  { "want": ["fast"],      "fallbackOrder": ["glm", "deepseek", "hunyuan"] },
-    "zhiniu/vision": { "want": ["vision"],    "fallbackOrder": ["deepseek", "glm", "hunyuan"] }
+    "zhiniu/quick":  { "want": ["fast"],      "fallbackOrder": ["deepseek", "glm", "hunyuan", "openai"] },
+    "zhiniu/think":  { "want": ["reasoning"], "fallbackOrder": ["deepseek", "glm", "hunyuan", "openai"] },
+    "zhiniu/flash":  { "want": ["fast"],      "fallbackOrder": ["glm", "deepseek", "hunyuan", "openai"] },
+    "zhiniu/vision": { "want": ["vision"],    "fallbackOrder": ["deepseek", "glm", "hunyuan", "openai"] }
   },
   "providers": [
     {

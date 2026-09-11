@@ -1,13 +1,11 @@
-"""知牛 网关 - 资讯端点（A5）
-
-提供 7×24 快讯列表 + 个股新闻 + 详情。先以本地数据 + 新浪财经 RIAH RSS 兜底，
-保证离线可用（NewsList/Detail 页有数据可渲）。
-"""
+"""Normalized market-news API with live provider, cache and offline snapshot."""
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Dict, List
 
-# 7×24 快讯池（演示用，与比赛题材对齐）
+from .data_sources import NewsQuery, fetch_market_news, remember_news
+
+# 离线快照只在上游与 stale 缓存都不可用时返回；绝不标记为实时。
 _FLASH = [
     {"id": "n1", "time": "14:52", "tag": "宏观", "title": "央行开展 5000 亿 MLF 操作，利率持平，市场流动性充裕",
      "content": "为维护银行体系流动性合理充裕，央行今日开展中期借贷便利（MLF）操作，利率与此前持平。"},
@@ -37,11 +35,31 @@ _STOCK_NEWS = [
      "title": "招商银行：拟派发中期股息，股东回报提升", "content": "董事会通过中期分红预案。"},
 ]
 
-_DETAILS: Dict[str, dict] = {n["id"]: n for n in (_FLASH + _STOCK_NEWS)}
+_DETAILS: Dict[str, dict] = {
+    n["id"]: {
+        **n,
+        "publishedAt": n["time"],
+        "url": "",
+        "source": "知牛离线快照",
+        "provider": "offline-snapshot",
+        "isStale": True,
+    }
+    for n in (_FLASH + _STOCK_NEWS)
+}
 
 
 async def news_list(keyword: str = "", symbol: str = "") -> dict:
-    """GET /news/list?keyword=&symbol=：快讯+个股新闻聚合列表。"""
+    """GET /news/list?keyword=&symbol=：实时优先，stale/离线快照兜底。"""
+    live, was_stale = await fetch_market_news(NewsQuery(keyword=keyword, symbol=symbol))
+    if live:
+        remember_news(live, _DETAILS)
+        return {
+            "items": live,
+            "total": len(live),
+            "source": "eastmoney-search",
+            "isStale": was_stale,
+        }
+
     items: List[dict] = []
     if symbol:
         items = [n for n in _STOCK_NEWS if n.get("symbol") == symbol]
@@ -53,7 +71,13 @@ async def news_list(keyword: str = "", symbol: str = "") -> dict:
     items = sorted(items, key=lambda n: n["time"], reverse=True)
     if keyword:
         items = [n for n in items if keyword in (n["title"] + n["content"])]
-    return {"items": items, "total": len(items), "source": "local+mock"}
+    normalized = [{**_DETAILS[n["id"]]} for n in items]
+    return {
+        "items": normalized,
+        "total": len(normalized),
+        "source": "offline-snapshot",
+        "isStale": True,
+    }
 
 
 async def news_detail(news_id: str) -> dict:

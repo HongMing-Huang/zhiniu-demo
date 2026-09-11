@@ -3,12 +3,15 @@
 工具 schema 定义 + 本地执行器。7 个工具：
 get_realtime_quote / get_kline / get_financials / search_news / screen_stocks / compare_stocks / create_alert
 
-执行器纯本地（复用行情/news/mock），不依赖上游厂商，保证无 Key / 离线也可演示工具编排。
+行情与资讯工具复用统一数据源；网络失败时返回带来源的离线快照。
 """
 from __future__ import annotations
 
 import json
 from typing import Any, Dict, List
+
+from .news import news_list
+from .quote import quote_fundamentals, quote_kline, quote_realtime, quote_screener
 
 TOOLS_SCHEMA: List[dict] = [
     {
@@ -59,7 +62,10 @@ TOOLS_SCHEMA: List[dict] = [
             "description": "搜索个股相关新闻/快讯。",
             "parameters": {
                 "type": "object",
-                "properties": {"keyword": {"type": "string", "description": "股票名/关键词"}},
+                "properties": {
+                    "keyword": {"type": "string", "description": "股票名/关键词"},
+                    "symbol": {"type": "string", "description": "可选证券代码，如 sh600519"},
+                },
                 "required": ["keyword"],
             },
         },
@@ -151,13 +157,21 @@ def _financials(symbol: str) -> dict:
 
 
 def _news(keyword: str) -> dict:
+    """Synchronous compatibility fallback used by local unit tests/CLI callers."""
     return {
         "keyword": keyword,
         "items": [
-            {"title": f"{keyword} 放量突破 20 日线，主力资金净流入", "date": "2026-08-24"},
-            {"title": f"{keyword} 公告：拟回购股份用于股权激励", "date": "2026-08-23"},
-            {"title": f"机构：{keyword} 中报业绩符合预期，维持增持", "date": "2026-08-22"},
+            {
+                "id": "offline-tool-news",
+                "title": f"{keyword or 'A股'} 资讯将在联网后由聚合数据源更新",
+                "content": "当前为可识别的离线快照，不代表实时市场事件。",
+                "source": "知牛离线快照",
+                "provider": "offline-snapshot",
+                "isStale": True,
+            }
         ],
+        "source": "offline-snapshot",
+        "isStale": True,
     }
 
 
@@ -189,6 +203,45 @@ _EXECUTORS: Dict[str, Any] = {
 }
 
 
+async def _live_quote(args: dict) -> dict:
+    symbol = args.get("symbol", "")
+    result, was_stale = await quote_realtime([symbol])
+    quote = result.get(symbol)
+    return ({**quote, "isStale": was_stale} if quote else {"error": f"未找到 {symbol} 的行情"})
+
+
+async def _live_kline(args: dict) -> dict:
+    return await quote_kline(args.get("symbol", ""), datalen=int(args.get("datalen", 20)))
+
+
+async def _live_news(args: dict) -> dict:
+    return await news_list(keyword=args.get("keyword", ""), symbol=args.get("symbol", ""))
+
+
+async def _live_financials(args: dict) -> dict:
+    return await quote_fundamentals(args.get("symbol", ""))
+
+
+async def _live_screen(args: dict) -> dict:
+    return await quote_screener(args.get("industry", ""), float(args.get("min_pct", 0)))
+
+
+async def _live_compare(args: dict) -> dict:
+    symbols = args.get("symbols", [])
+    result, was_stale = await quote_realtime(symbols)
+    return {"rows": [result[s] for s in symbols if s in result], "isStale": was_stale}
+
+
+_ASYNC_EXECUTORS: Dict[str, Any] = {
+    "get_realtime_quote": _live_quote,
+    "get_kline": _live_kline,
+    "get_financials": _live_financials,
+    "search_news": _live_news,
+    "screen_stocks": _live_screen,
+    "compare_stocks": _live_compare,
+}
+
+
 def has_tools() -> bool:
     return len(TOOLS_SCHEMA) > 0
 
@@ -208,3 +261,19 @@ def execute_tool(name: str, args: dict) -> dict:
         return handler(args)
     except Exception as e:  # noqa: BLE001
         return {"error": f"工具 {name} 执行失败: {e}"}
+
+
+async def execute_tool_async(name: str, args: dict) -> dict:
+    """Agent path: use live shared providers where available, sync fallback otherwise."""
+    if not isinstance(args, dict):
+        try:
+            args = json.loads(args) if isinstance(args, str) else {}
+        except Exception:
+            args = {}
+    handler = _ASYNC_EXECUTORS.get(name)
+    if handler is None:
+        return execute_tool(name, args)
+    try:
+        return await handler(args)
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"工具 {name} 执行失败: {exc}"}

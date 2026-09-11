@@ -29,7 +29,7 @@ class TestResolveCandidates(unittest.TestCase):
         candidates = resolve_candidates("zhiniu/quick")
         providers = [c.provider for c in candidates]
         # 降级链：deepseek → glm → hunyuan
-        self.assertEqual(providers, ["deepseek", "glm", "hunyuan"])
+        self.assertEqual(providers, ["deepseek", "glm", "hunyuan", "openai"])
         self.assertEqual(
             candidates[0].base_url, "https://api.deepseek.com"
         )

@@ -29,9 +29,18 @@ from .config import (
 )
 from .discovery import merged_models_for_provider, refresh_models
 from .analytics import record_usage, usage_summary
+from .agent import run_research, stream_research
 from .gateway import gateway
 from .news import news_detail, news_list
-from .quote import quote_indices, quote_kline, quote_realtime, quote_screener, quote_sectors
+from .quote import (
+    quote_fundamentals,
+    quote_indices,
+    quote_kline,
+    quote_popularity,
+    quote_realtime,
+    quote_screener,
+    quote_sectors,
+)
 
 load_dotenv(override=True)
 
@@ -93,6 +102,11 @@ class ChatCompletionRequest(BaseModel):
     tool_choice: Optional[object] = None
     response_format: Optional[dict] = None
     extra_body: Optional[dict] = None  # 透传厂商特有参数
+
+
+class AgentResearchRequest(BaseModel):
+    symbol: str = Field(..., min_length=8, max_length=12, description="如 sh600519")
+    keyword: str = Field("", max_length=80)
 
 
 # ---------- SSE 工具（支持 event+data 双行格式） ----------
@@ -235,8 +249,17 @@ async def admin_refresh_models():
 
 @app.get("/healthz")
 async def healthz(_=Depends(require_gateway_key)):
+    configured = [name for name, conf in PROVIDERS.items() if os.getenv(conf.api_key_env)]
     return {
         "status": "ok",
+        "services": {
+            "market": {"status": "ready", "provider": "sina+eastmoney"},
+            "agent": {
+                "status": "ready" if configured else "degraded",
+                "mode": "llm" if configured else "deterministic_fallback",
+                "configuredProviders": configured,
+            },
+        },
         "providers": {
             name: {
                 "base_url": conf.base_url,
@@ -267,6 +290,12 @@ async def proxy_quote_kline(
     return await quote_kline(symbol, scale=scale, datalen=datalen)
 
 
+@app.get("/quote/fundamentals", dependencies=[Depends(require_gateway_key)])
+async def proxy_quote_fundamentals(symbol: str):
+    """估值、最近一期财报和盘中资金流；缺失字段保持为空。"""
+    return await quote_fundamentals(symbol)
+
+
 @app.get("/quote/indices", dependencies=[Depends(require_gateway_key)])
 async def proxy_quote_indices():
     """A4：主流指数列表。GET /quote/indices"""
@@ -275,14 +304,20 @@ async def proxy_quote_indices():
 
 @app.get("/quote/sectors", dependencies=[Depends(require_gateway_key)])
 async def proxy_quote_sectors():
-    """A4：申万板块涨跌排行。GET /quote/sectors"""
+    """A4：东财行业板块涨跌排行（真实 + stale/mock 兜底）。GET /quote/sectors"""
     return await quote_sectors()
 
 
 @app.get("/quote/screener", dependencies=[Depends(require_gateway_key)])
-async def proxy_quote_screener(industry: str = "", min_pct: float = 0.0):
-    """A4：条件选股。GET /quote/screener?industry=&min_pct="""
-    return await quote_screener(industry=industry, min_pct=min_pct)
+async def proxy_quote_screener(industry: str = "", min_pct: float = 0.0, limit: int = 30):
+    """A4：条件选股。GET /quote/screener?industry=&min_pct=&limit="""
+    return await quote_screener(industry=industry, min_pct=min_pct, limit=limit)
+
+
+@app.get("/quote/popularity", dependencies=[Depends(require_gateway_key)])
+async def proxy_quote_popularity(count: int = 20):
+    """A4：东财人气榜（真实排名 + 新浪实时增强）。GET /quote/popularity?count="""
+    return await quote_popularity(count=count)
 
 
 @app.get("/news/list", dependencies=[Depends(require_gateway_key)])
@@ -295,6 +330,26 @@ async def proxy_news_list(keyword: str = "", symbol: str = ""):
 async def proxy_news_detail(news_id: str):
     """A5：资讯详情。GET /news/detail?news_id="""
     return await news_detail(news_id)
+
+
+@app.post("/agent/research", dependencies=[Depends(require_gateway_key)])
+async def agent_research(body: AgentResearchRequest):
+    """可审计的多阶段研究管线；无 LLM Key 也能返回真实/降级数据证据。"""
+    return await run_research(symbol=body.symbol.lower(), keyword=body.keyword)
+
+
+@app.post("/agent/research/stream", dependencies=[Depends(require_gateway_key)])
+async def agent_research_stream(body: AgentResearchRequest):
+    """类型化 SSE：阶段、结果和终止帧，供多端渲染可恢复的研究进度。"""
+    async def event_stream():
+        async for frame in stream_research(symbol=body.symbol.lower(), keyword=body.keyword):
+            yield _sse(frame, event=frame["type"])
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.get("/analytics/usage", dependencies=[Depends(require_gateway_key)])

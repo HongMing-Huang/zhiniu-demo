@@ -17,7 +17,7 @@ from .config import (
     ProviderResolved,
     resolve_candidates,
 )
-from .tools import execute_tool, get_tools_schema
+from .tools import execute_tool_async, get_tools_schema
 
 
 class LLMGateway:
@@ -281,7 +281,7 @@ class LLMGateway:
                 except Exception:
                     args = {}
                 used_tool_names.append(name)
-                result = execute_tool(name, args)
+                result = await execute_tool_async(name, args)
                 yield {"type": "progress", "step": round_index, "label": name, "tool_call_id": tc.get("id")}
                 history.append({
                     "role": "tool",
