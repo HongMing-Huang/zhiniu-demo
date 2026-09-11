@@ -65,7 +65,6 @@ kotlin {
                 implementation("io.ktor:ktor-client-core:2.3.12")
                 implementation("io.ktor:ktor-client-content-negotiation:2.3.12")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
-                implementation("io.insert-koin:koin-core:3.5.6")
             }
         }
         val jsMain by getting {
@@ -81,6 +80,7 @@ kotlin {
         val androidMain by getting {
             dependencies {
                 api("com.tencent.kuikly-open:core-render-android:${Version.getKuiklyVersion()}")
+                implementation("io.ktor:ktor-client-okhttp:2.3.12") // createPlatformHttpClient() Android actual 引擎
             }
         }
 
@@ -92,6 +92,9 @@ kotlin {
             iosX64Main.dependsOn(this)
             iosArm64Main.dependsOn(this)
             iosSimulatorArm64Main.dependsOn(this)
+            dependencies {
+                implementation("io.ktor:ktor-client-darwin:2.3.12") // createPlatformHttpClient() iOS actual 引擎
+            }
         }
         val iosX64Test by getting
         val iosArm64Test by getting

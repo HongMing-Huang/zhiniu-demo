@@ -23,4 +23,3 @@ dependencyResolutionManagement {
 rootProject.name = "kuikly-shell"
 include(":androidApp")
 include(":shared")
-include(":h5App")

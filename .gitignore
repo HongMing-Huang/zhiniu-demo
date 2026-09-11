@@ -44,6 +44,11 @@ DerivedData/
 .konan/
 # 官方上游基座（临时克隆，可整体删除）
 /upstream-kuiklyui/
-# Web renderer 拼装静态服务产物（可整体删除）
+# 旧双端口链路兼容副本（主入口 web-host/ 已入库）
 /web-8083/
-/web-host/
+
+# === 本地工具状态 ===
+.mimosa/
+.pytest_cache/
+.workbuddy/
+.playwright/
