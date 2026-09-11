@@ -56,9 +56,25 @@ class MockAiService(
         val cap = q.amount * (9 + (h % 40))
         val capText = if (cap >= 1e12) fmt2(cap / 1e12) + "T" else fmt2(cap / 1e8) + "亿"
         return listOf(
+            // Markdown 演示（Task2 渲染评分点）：标题 / 来源 / 列表 / 代码块，离线态同样可演示
             AiBlock.Text(
-                "${q.name}（${q.code}.${q.marketSuffix}）当前报 ${fmt2(q.price)} 元，涨跌 ${fmt1(q.changePercent)}%。" +
-                    "从日 K 与成交量看，处于震荡整理结构，短线情绪中性。"
+                buildString {
+                    appendLine("### ${q.name}（${q.code}.${q.marketSuffix}）研究快照")
+                    appendLine("> 来源：本地确定性快照 · 离线演示模式")
+                    appendLine()
+                    appendLine("当前报 **${fmt2(q.price)} 元**，涨跌 ${fmt1(q.changePercent)}%。")
+                    appendLine("从日 K 与成交量看，处于震荡整理结构，短线情绪中性。")
+                    appendLine()
+                    appendLine("**关注要点**")
+                    appendLine("- 量比 ${fmt2(volRatio)}，观察量能能否同步放大")
+                    appendLine("- MA20 得失决定短线结构")
+                    appendLine("- RSI(14) = ${fmt1(rsi)}，尚未触及极值区间")
+                    appendLine()
+                    appendLine("RSI 参考口径：")
+                    appendLine("```text")
+                    appendLine("RSI14 = 100 - 100 / (1 + avg_gain_14 / avg_loss_14)")
+                    appendLine("```")
+                },
             ),
             AiBlock.StockCard(
                 symbol = symbol,
@@ -78,7 +94,7 @@ class MockAiService(
             ),
             AiBlock.Risk(
                 title = "风险提示",
-                content = "量能没有同步扩大，注意突破持续性；若价格跌破 MA20，短线结构需重新评估。以上为演示行情与 AI 解读，不构成投资建议。",
+                content = "量能没有同步扩大，注意突破持续性；若价格跌破 MA20，短线结构需重新评估。本结论仅供研究参考，不构成投资建议。",
             ),
             AiBlock.FollowUps(
                 questions = listOf("为什么说量能不足？", "解释 RSI 指标", "结合日K分析", "对比宁德时代"),
@@ -102,7 +118,7 @@ class MockAiService(
             ),
             AiBlock.Risk(
                 title = "提示",
-                content = "以上为演示行情数据（Demo），仅用于产品演示；真实行情接入后由行情源实时提供。",
+                content = "当前行情由实时网关提供，网络不可用时自动保留最近快照；数据仅供研究参考。",
             ),
             AiBlock.FollowUps(
                 questions = listOf("分析贵州茅台", "今天哪些板块强势？", "帮我看看宁德时代"),

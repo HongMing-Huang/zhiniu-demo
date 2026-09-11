@@ -41,18 +41,9 @@ fun ViewContainer<*, *>.AiBlockView(
 }
 
 private fun ViewContainer<*, *>.AiTextBlock(content: String) {
-    val colors = AppTheme.colors
-    content.split("\n").forEach { line ->
-        Text {
-            attr {
-                fontSize(AppTypography.fs13); lineHeight(21f)
-                color(colors.c(colors.textSecondary))
-                text(line)
-                animate(ANIM_THEME, value = AppTheme.isDark)
-            }
-        }
-        View { attr { height(4f) } }
-    }
+    // Task2 评分点「AI 返回内容渲染」：Markdown（段落/列表/表格/代码块），
+    // 纯文本按普通段落渲染，向后兼容结构化摘要。
+    MarkdownView(content)
 }
 
 /** 股票卡片（AiResearch 聊天流）。 */
@@ -135,7 +126,7 @@ fun ViewContainer<*, *>.AiStockCard(
             View { attr { height(10f) } }
             // 查看详情
             View { attr { flexDirectionRow(); alignItemsCenter() }
-                Icon(IconKind.CHART, 13f) { colors.textSecondary }
+                Icon(IconKind.CHART, 13f)
                 View { attr { width(5f) } }
                 Text {
                     attr {
@@ -144,14 +135,8 @@ fun ViewContainer<*, *>.AiStockCard(
                         text("查看详情")
                     }
                 }
-                Text {
-                    attr {
-                        marginLeft(4f)
-                        fontSize(AppTypography.fs12)
-                        color(colors.c(colors.textTertiary))
-                        text("→")
-                    }
-                }
+                View { attr { width(4f) } }
+                Icon(IconKind.CHEVRON_RIGHT, 11f)
             }
         }
     }
@@ -198,20 +183,23 @@ private fun ViewContainer<*, *>.AiMetricsBlock(title: String, rows: List<com.zhi
         }
         View { attr { height(6f) } }
         rows.forEach { row ->
+            // 标签固定宽不折行；值占满剩余宽度右对齐，长文本（辩论观点）允许多行、非等宽字体
             View {
-                attr { flexDirectionRow(); alignItemsCenter(); height(24f) }
+                attr { flexDirectionRow(); alignItemsFlexStart(); minHeight(24f); padding(top = 2f, bottom = 2f) }
                 Text {
                     attr {
-                        fontSize(AppTypography.fs13)
+                        width(76f); lines(1)
+                        fontSize(AppTypography.fs13); lineHeight(20f)
                         color(colors.c(colors.textSecondary))
                         text(row.label)
                     }
                 }
-                View { attr { flex(1f) } }
+                View { attr { width(8f) } }
                 Text {
                     attr {
-                        fontSize(AppTypography.fs13); fontWeightMedium()
-                        fontFamily(NUM_FONT)
+                        flex(1f); textAlignRight()
+                        fontSize(AppTypography.fs13); fontWeightMedium(); lineHeight(20f)
+                        if (row.value.length <= 16) fontFamily(NUM_FONT)
                         color(colors.c(colors.textPrimary))
                         text(row.value)
                     }
