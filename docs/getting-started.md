@@ -104,5 +104,6 @@ open iosApp.xcworkspace      # Xcode 选 iosApp target 直接 Run
 - **等宽数字变成系统字体**：字体 404 时 1.5s 后兜底启动；检查 `web-host/assets/common/fonts/` 是否存在（build.sh 自动同步）。
 - **行情乱码**：新浪接口为 GBK 编码，解码在后端统一处理，前端不要直连。
 - **`:shared:jsNodeTest` 内部编译器错误**：`IrSimpleFunctionSymbolImpl is already bound`，为当前 Kuikly/Kotlin 工具链已知问题（clean 后仍复现），与业务代码无关。
+- **Android 构建依赖下载报 TLS `protocol_version`**：本机 SOCKS 代理注入 Gradle JVM 所致，绕过代理变量构建：`env -u http_proxy -u https_proxy -u all_proxy -u NODE_OPTIONS JAVA_HOME=<JDK17> ./gradlew :androidApp:assembleDebug`。
 
 详见 [docs/api-matrix.md](docs/api-matrix.md)（字段/端点/降级链）与 [docs/tech-stack.md](docs/tech-stack.md)（选型）。

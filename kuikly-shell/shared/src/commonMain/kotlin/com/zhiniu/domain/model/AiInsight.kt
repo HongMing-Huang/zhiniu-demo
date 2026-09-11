@@ -12,5 +12,7 @@ data class AiInsight(
     val volume: String,       // 量能解读
     val indicator: String,    // 指标信号（RSI/MA 等）
     val risk: String,         // 风险提示
+    val valuation: String = "",  // 估值判断（高估/合理/低估，真实 PE/PB 规则化；空 = 数据不足）
+    val earnings: String = "",   // 业绩/卖点解读（真实财报摘要；空 = 数据不足）
     val followUps: List<String> = emptyList(), // 追问建议
 )

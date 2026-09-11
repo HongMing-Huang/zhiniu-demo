@@ -5,16 +5,18 @@ package com.zhiniu.data.mock
 
 import com.zhiniu.domain.model.AiInsight
 import com.zhiniu.domain.repository.AiBlock
+import com.zhiniu.domain.repository.AiInsightFundamentals
 import com.zhiniu.domain.repository.AiService
 import com.zhiniu.domain.repository.MarketRepository
 import com.zhiniu.domain.repository.MetricCell
+import com.zhiniu.pages.components.fmtAmount
 import kotlin.math.roundToInt
 
 class MockAiService(
     private val repository: MarketRepository = MockMarketRepository(),
 ) : AiService {
 
-    override fun insightFor(symbol: String): AiInsight {
+    override fun insightFor(symbol: String, fundamentals: AiInsightFundamentals?): AiInsight {
         val q = repository.quoteOf(symbol)
         val name = q?.name ?: symbol
         val h = hash(symbol)
@@ -23,6 +25,39 @@ class MockAiService(
         val volumeText = "近 5 日量能温和，没有明显放大；上涨斜率平缓，追涨资金有限。"
         val indicatorText = "RSI ${fmt1(rsi)}，处于中性区域；MACD 红柱缩短，动能有所减弱。"
         val riskText = "若价格重新跌破 MA20，当前区间结构需要重新评估；大盘波动率上升时个股跟随性增强，注意仓位纪律。"
+        // 估值判断（课题评分点「高估/低估判断」）：真实 PE/PB 规则化，无数据时如实标注
+        val valuationText = fundamentals?.let { f ->
+            val pe = f.pe
+            val pb = f.pb
+            when {
+                pe != null && pe <= 0 -> "PE ${fmt1(pe)}（亏损或微利），估值锚失效，需以 PB ${pb?.let { fmt2(it) } ?: "—"} 与业务拐点为主。"
+                pe != null && pb != null -> {
+                    val verdict = when {
+                        pe < 15 && pb < 2 -> "偏低估"
+                        pe <= 40 -> "合理区间"
+                        else -> "偏高估"
+                    }
+                    "PE ${fmt1(pe)} / PB ${fmt2(pb)}，规则判定「$verdict」；适合与行业中位及自身历史分位对照。"
+                }
+                pe != null -> "PE ${fmt1(pe)}（PB 缺失），单一口径参考意义有限，建议等基本面数据补齐后再判断。"
+                else -> ""
+            }
+        } ?: ""
+        // 业绩解读（课题评分点「卖点/业绩解读」）：真实财报摘要规则化
+        val earningsText = fundamentals?.takeIf { it.revenue != null || it.netProfit != null }?.let { f ->
+            val parts = mutableListOf<String>()
+            f.reportDate.takeIf { it.isNotBlank() }?.let { parts.add("$it 报告期") }
+            f.revenue?.let { parts.add("营收 ${fmtAmount(it)}") }
+            f.netProfit?.let { parts.add("归母净利 ${fmtAmount(it)}") }
+            f.grossMargin?.let { parts.add("毛利率 ${fmt1(it)}%") }
+            f.roe?.let { parts.add("ROE ${fmt1(it)}%") }
+            val quality = when {
+                (f.netProfit ?: 0.0) > 0 && (f.roe ?: 0.0) >= 12.0 -> "盈利质量较强，是当前核心卖点"
+                (f.netProfit ?: 0.0) > 0 -> "整体盈利，关注增长的持续性"
+                else -> "盈利承压，反转节奏是关键变量"
+            }
+            "${parts.joinToString("，")}；$quality。"
+        } ?: ""
         return AiInsight(
             symbol = symbol,
             verdict = if (h % 3 == 0) "中性偏弱" else "中性偏强",
@@ -30,6 +65,8 @@ class MockAiService(
             volume = volumeText,
             indicator = indicatorText,
             risk = riskText,
+            valuation = valuationText,
+            earnings = earningsText,
             followUps = listOf("为什么说量能不足？", "解释 RSI 指标", "结合日K分析", "关键支撑位在哪"),
         )
     }

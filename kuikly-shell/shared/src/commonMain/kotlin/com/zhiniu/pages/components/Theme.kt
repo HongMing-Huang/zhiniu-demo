@@ -193,7 +193,8 @@ object AppTheme {
         ThemeMode.LIGHT -> false; ThemeMode.DARK -> true; ThemeMode.SYSTEM -> systemDark
     }
     private fun resolvedDark() = resolve(mode)
-    fun setMode(m: ThemeMode) {
+    /** 设置主题模式（applyMode：与 `mode` 属性的 JVM setter 签名区分开）。 */
+    fun applyMode(m: ThemeMode) {
         mode = m
         applyDark(if (m != ThemeMode.SYSTEM) resolve(m) else systemDark)
     }

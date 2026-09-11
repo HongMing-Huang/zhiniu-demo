@@ -88,7 +88,7 @@ Android / iOS / 鸿蒙壳运行方式见 [docs/getting-started.md](docs/getting-
 | 平台 | 状态 | 说明 |
 |:--|:--:|:--|
 | Web (H5) | ✅ 主演示端 | 官方渲染宿主 + SPA 路由，四分辨率 + 深浅色验收通过 |
-| Android | 🔶 | 官方 KRView 壳 + 全套适配器（Image/Font/Router/Thread）与 manifest/网络配置齐备，真机构建验收待跑 |
+| Android | ✅ 构建通过 | `:androidApp:assembleDebug` 产出 androidApp-debug.apk（官方 KRView 壳 + 全套适配器）；真机联调见快速开始 |
 | iOS | 🔶 | CocoaPods 壳 + 官方 KRFontHandler/KRRouterHandler，渲染层已对齐 2.25.0；需重新 `pod install` 后 Xcode 构建验收 |
 | HarmonyOS | 🔶 | `ohosApp` 壳与独立构建入口就绪；Ktor 无 ohos 引擎，网络层需 expect/actual 桥接（方案见 `docs/platform-readiness.md`） |
 | 小程序 / macOS | — | Kuikly 具备能力，本课题未投入验证，不做承诺 |

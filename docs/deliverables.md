@@ -80,7 +80,7 @@
 
 | 评分点 | 状态 | 证据 |
 |:--|:--:|:--|
-| 平台覆盖 | ✅/🔶 | H5 主演示端 ✅ 实测；Android/iOS 壳工程 + 官方适配器齐备 🔶（原生构建验收待跑）；鸿蒙壳就绪、网络层待桥接 🔶；静态审查见 `docs/platform-readiness.md` |
+| 平台覆盖 | ✅/🔶 | H5 主演示端 ✅ 实测；**Android ✅ `:androidApp:assembleDebug` 构建 APK 通过（2026-09-11）**；iOS 壳齐备 🔶（待 pod install + Xcode 构建）；鸿蒙壳就绪、网络层待桥接 🔶；静态审查见 `docs/platform-readiness.md` |
 | 真实 AI 接入 | ✅ | FastAPI LLM 网关（OpenAI 兼容协议，多厂商可选）+ 真实新浪/东财数据 |
 | 体验优化 | ✅ | 深/浅色 180ms 切换、骨架屏、Hover/按压微交互、响应式四断点、安全区避让、无障碍语义、等宽数字对齐 |
 
@@ -88,7 +88,8 @@
 
 1. 🔶 **录制原型演示视频**（交付物硬性项）：按 `docs/demo-script.md` 分镜录制；H5 主链路 + AI 研究全程即可覆盖评分点。
 2. 🔶 **品牌 Logo**：Header 与 README 当前用文字「知牛」占位（不伪造图形资产）；拿到正式 Logo 后替换 `web-host/index.html` 品牌位与 README 头图。
-3. 🔶 **鸿蒙端真机/模拟器验收**：壳工程与构建配置就绪，未在本机 DevEco 验证；README 已如实标注。
+3. 🔶 **iOS 原生构建验收**：`pod install` 后 Xcode 构建待跑（Podfile 已对齐 2.25.0，注意不要重跑 xcodegen，见 `docs/platform-readiness.md` §2）。
+4. 🔶 **鸿蒙端真机/模拟器验收**：壳工程就绪；Ktor 无 ohos 引擎，网络层需 expect/actual 桥接（方案见 `docs/platform-readiness.md` §3）。
 4. ⬜ 历史遗留：`docs/zhiniu-technical-design.md` 为最初 62KB 技术方案（含已被否决的早期选型），仅作过程记录保留，评审以现行文档为准。
 
 ---

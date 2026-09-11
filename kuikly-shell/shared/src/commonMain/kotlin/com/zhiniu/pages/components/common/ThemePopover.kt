@@ -159,7 +159,7 @@ private fun ViewContainer<*, *>.ThemeSegment(mode: ThemeMode) {
             highlightBackgroundColor(colors.ca(colors.textSecondary, 7))
         }
         event { click {
-            AppTheme.setMode(mode)
+            AppTheme.applyMode(mode)
         } }
         Text {
             attr {

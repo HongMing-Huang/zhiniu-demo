@@ -136,6 +136,8 @@ fun ViewContainer<*, *>.AiInsightPanel(
             // Sections
             View {
                 attr { padding(left = 18f, right = 18f); flex(1f) }
+                PanelSection("估值判断", view.valuation.ifBlank { "暂未取到估值数据（PE/PB）；网关恢复后自动补充。" })
+                PanelSection("业绩解读", view.earnings.ifBlank { "暂未取到财报数据；网关恢复后自动补充营收/净利解读。" })
                 PanelSection("趋势", view.trend)
                 PanelSection("信号", view.indicator)
                 PanelSection("量能", view.volume)

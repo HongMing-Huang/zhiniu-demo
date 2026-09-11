@@ -88,20 +88,31 @@
 
 - **GET /quote/realtime**
   - 入参：`codes`（逗号分隔的带前缀代码，如 `sh600519,sz000001`）
-  - 出参：`{ code: {symbol,name,open,prevClose,price,high,low,buy1,sell1,volume(手),amount(元),bids[[价,量]×5],asks[[价,量]×5],date,time} }`
+  - 出参：`{ code: {symbol,name,open,prevClose,price,high,low,buy1,sell1,volume(手),amount(元),bids[[价,量]×5],asks[[价,量]×5],date,time,marketCap(元)|null,turnoverRate(%)|null,volumeRatio|null} }`
   - 缓存：实时 TTL=3s；新浪失败 → stale 近况 → Mock JSON 兜底；命中 stale 时响应头 `X-Gateway-Stale: true`
-  - 字段来源：新浪 `hq_str_<code>` 索引 0~31，GBK 解码转 UTF-8
+  - 字段来源：新浪 `hq_str_<code>` 索引 0~31，GBK 解码转 UTF-8；`marketCap/turnoverRate/volumeRatio` 由东财 `push2.eastmoney.com/api/qt/ulist.np/get`（f20/f8/f10，30s TTL）补充，东财断连/限流时回退腾讯 `qt.gtimg.cn/q=`（字段 45 总市值亿→元 / 38 换手 / 49 量比），两者都失败保持 null
 - **GET /quote/kline**
   - 入参：`symbol`、`scale`(默认240日线)、`datalen`(默认120，≤1023)
   - 出参：`{ symbol, name, scale, data:[{day,open,high,low,close,volume}] }`
   - 缓存：日线(scale≥240)隔夜过期，分钟线 scale 秒级 TTL；失败 → stale → Mock 兜底
+- **GET /quote/popularity?count=20**（2026-09-11 新增，课题「人气榜」）
+  - 上游：东财人气榜 `POST emappdata.eastmoney.com/stockrank/getAllCurrentList`（排名）+ 新浪实时增强名称/价格/涨跌幅
+  - 出参：`{ stocks:[{symbol,rank,name,price,changePercent}], source:"eastmoney-popularity"|"mock", isStale }`；120s TTL；失败 → stale → Mock 池按成交额排序（`isStale=true`）
+- **GET /quote/sectors**（改真实）
+  - 上游：东财 `push2 clist fs=m:90+t:2`（行业板块，按 f3 涨跌幅降序，pz=100）
+  - 出参：`{ sectors:[{code,name,changePercent,upCount,downCount,leadStock,leadSymbol,leadChangePercent}], source:"eastmoney"|"mock", isStale }`；60s TTL
+- **GET /quote/screener?industry=&min_pct=&limit=30**（改真实）
+  - 上游：东财 `push2 clist fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23`，按成交额 f6 降序取前 100 为选股池，再做行业（f100 子串）/涨跌幅过滤
+  - 出参：`{ industry, min_pct, rows:[{symbol,name,price,changePercent,volume,amount,turnoverRate,pe,marketCap,industry}], source, isStale }`；60s TTL
+- **出站白名单**：所有上游请求经 `quote._guard_external_url`（仅 HTTPS；域名 ∈ push2.eastmoney.com / emappdata.eastmoney.com / hq.sinajs.cn / quotes.sina.cn / qt.gtimg.cn），防 SSRF；人气榜 POST 端点固定，不接受外部 URL
 
 ### 3.2 资讯与研究 Agent
 
 - 资讯适配参考 AKShare `stock_news_em` 的公开实现，不引入 pandas/AKShare 运行时；标准库解析固定上游 JSONP，并保留 `provider/source/url/publishedAt/isStale`。
 - 上游结果缓存 120 秒；失败优先返回 stale 缓存，再返回明确标注的 `offline-snapshot`。数据源必须可替换。
-- `POST /agent/research` 并行聚合行情、120 根 K 线与资讯，先输出四类可审计证据，再由统一模型网关完成第五阶段结构化归纳；上游模型不可用时返回 `deterministic_fallback`，绝不把规则文案伪装成模型回答。
-- `/agent/research/stream` 复用同一结果构建器；事件含 `runId/type/final`，正常以 `run_finished(final=true)`、异常以 `run_error(final=true)` 收束，客户端无需猜测流是否结束。
+- `POST /agent/research` 并行聚合行情、120 根 K 线、财务与资讯，先输出可审计证据，再进入 **TradingAgents 结构辩论管线**（`backend/app/ta_agents.py`，移植自 TauricResearch/TradingAgents，MIT）：多头研究员 → 空头研究员 → 研究经理五档评级（买入/增持/持有/减持/卖出，JSON）→ 交易员绝对价位观察方案 → 激进/中性/保守风控三方；共 7 次 `zhiniu/quick` 调用，总超时 `ZHINIU_AGENT_TIMEOUT`（默认 75s）。上游模型不可用/超时/评级非法时返回同构的 `mode=deterministic_fallback, provider=rule-engine`，绝不把规则文案伪装成模型回答。
+- `synthesis` 字段：`stance/rating/confidence/summary/trend/pressure/support/bullPoints[]/bearPoints[]/riskNotes[]/trader{entry,stop,plan}/catalysts/risks`；`pressure/support` 由 `agent._levels_from_kline`（近 60 根高低点）确定性计算，模型不得编造价位；`evidence.levels` 同步输出。
+- `/agent/research/stream` 复用同一结果构建器；事件含 `runId/type/final`；辩论各阶段（`bull/bear/manager/trader/risk-aggressive/risk-neutral/risk-conservative/synthesis`）经队列实时转发为 `stage_started/stage_completed`，正常以 `run_finished(final=true)`、异常以 `run_error(final=true)` 收束，客户端无需猜测流是否结束。
 
 ---
 

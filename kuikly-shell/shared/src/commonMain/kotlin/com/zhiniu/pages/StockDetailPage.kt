@@ -25,6 +25,7 @@ import com.zhiniu.data.remote.GatewayMarketClient
 import com.zhiniu.data.remote.MarketNewsItem
 import com.zhiniu.domain.model.Candle
 import com.zhiniu.domain.model.StockFundamentals
+import com.zhiniu.domain.repository.AiInsightFundamentals
 import com.zhiniu.domain.model.StockQuote
 import com.zhiniu.domain.model.Timeframe
 import com.zhiniu.pages.components.AiMessageHeader
@@ -566,7 +567,7 @@ private fun ViewContainer<*, *>.ChartWorkspace(host: StockDetailPage, q: com.zhi
                 width = if (stacked) host.pageData.activityWidth - 64f else host.pageData.activityWidth * 0.28f,
                 height = if (stacked) railHeight - 1f else 0f,
                 quote = { host.quote() },
-                insight = { host.quote()?.let { MarketStore.aiService.insightFor(it.symbol) } },
+                insight = { host.quote()?.let { MarketStore.aiService.insightFor(it.symbol, host.liveFundamentals.toAiFundamentals()) } },
                 followUpText = { host.aiDraft },
                 chatLines = { host.aiChat },
                 onFollowUpChange = { host.aiDraft = it },
@@ -592,7 +593,7 @@ private fun ViewContainer<*, *>.RailQuickInsight(
     railHeight: Float,
 ) {
     val colors = AppTheme.colors
-    val insight = MarketStore.aiService.insightFor(q.symbol)
+    val insight = MarketStore.aiService.insightFor(q.symbol, host.liveFundamentals.toAiFundamentals())
     View {
         attr {
             width(railW)
@@ -752,9 +753,17 @@ private fun ViewContainer<*, *>.overviewTab(host: StockDetailPage, q: com.zhiniu
     }
 }
 
+/** 网关真实基本面 → AI 解读所需最小快照。 */
+private fun StockFundamentals?.toAiFundamentals(): AiInsightFundamentals? = this?.let {
+    AiInsightFundamentals(
+        pe = it.pe, pb = it.pb, marketCap = it.marketCap, reportDate = it.reportDate,
+        revenue = it.revenue, netProfit = it.netProfit, roe = it.roe, grossMargin = it.grossMargin,
+    )
+}
+
 private fun ViewContainer<*, *>.aiTab(host: StockDetailPage, q: com.zhiniu.domain.model.StockQuote) {
     val colors = AppTheme.colors
-    val insight = MarketStore.aiService.insightFor(q.symbol)
+    val insight = MarketStore.aiService.insightFor(q.symbol, host.liveFundamentals.toAiFundamentals())
     View {
         attr {
             backgroundColor(colors.c(colors.surface))
