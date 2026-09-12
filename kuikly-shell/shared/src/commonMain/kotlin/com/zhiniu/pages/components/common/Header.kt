@@ -5,8 +5,10 @@ package com.zhiniu.pages.components.common
 import com.tencent.kuikly.core.base.attr.AccessibilityRole
 import com.tencent.kuikly.core.base.Animation
 import com.tencent.kuikly.core.base.ViewContainer
+import com.tencent.kuikly.core.views.Image
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
+import com.tencent.kuikly.core.base.attr.ImageUri
 import com.zhiniu.pages.components.ANIM_THEME
 import com.zhiniu.pages.components.AppSpacing
 import com.zhiniu.pages.components.AppTheme
@@ -55,9 +57,16 @@ fun ViewContainer<*, *>.AppHeader(
                 flexDirectionRow(); alignItemsCenter()
                 padding(top = topInset, left = sidePad, right = sidePad)
             }
-            // 品牌使用纯文字标识；未提供正式 Logo 前不绘制伪造图形资产。
+            // 品牌位：官方提供的红牛头 Logo 标（透明底，深浅色通用）+ 文字标识
             View {
                 attr { flexDirectionRow(); alignItemsCenter() }
+                Image {
+                    attr {
+                        size(24f, 24f)
+                        src(ImageUri.commonAssets("brand/logo-mark.png"))
+                        marginRight(if (compact) 5f else 7f)
+                    }
+                }
                 Text {
                     attr {
                         fontSize(AppTypography.fs20); fontWeightSemiBold()

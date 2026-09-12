@@ -6,6 +6,12 @@
 
 ***
 
+## 2026-09-12
+
+| 时间 | 类别 | 改动 | 验证 |
+| ---- | ---- | ---- | ---- |
+| 15:45 | brand/fix | 品牌 Logo 全面接入（用户提供 1254×1254 主稿入库 docs/img/logo.png）：PIL 裁切牛头标生成 ①Header 品牌位（commonAssets brand/logo-mark.png，深浅色通用）②H5 favicon-32/apple-touch-icon（web-host + build.sh brand 同步）③Android 自适应启动图标（mipmap 前景 5 密度 + anydpi-v26 XML + manifest 挂载，此前无自定义图标）④iOS AppIcon.appiconset 1024 ⑤鸿蒙 app_icon/layered_image/startIcon 108。后端 fundamentals 修复：①SSRF 白名单补 datacenter-web.eastmoney.com（此前财报被自家网关拦截）②push2 不可达时估值改走腾讯 gtimg（PE/PB/名称实测入库）③三源独立降级互不拖垮；AI 解读抽屉估值判断/业绩解读随即呈现真实数据 | H5 构建部署 + 浏览器实测：头部 Logo 加载、favicon 生效、控制台 0 error；行情页自选/沪市/深市/人气榜/排序菜单逐一验证通过；AI 抽屉显示「PE 19.6 / PB 6.34 合理区间」与「2026-06-30 半年报 营收 922.78亿 净利 445.17亿 ROE 16.8%」；后端 53/53 单测通过；:androidApp:assembleDebug 含新图标构建通过 |
+
 ## 2026-09-11
 
 | 时间 | 类别 | 改动 | 验证 |

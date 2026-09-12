@@ -68,12 +68,21 @@ fun ViewContainer<*, *>.AiInsightPanel(
                 borderBottom(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
             }
             View {
-                attr { flex(1f) }
+                attr { flex(1f); flexDirectionColumn() }
                 Text {
                     attr {
                         fontSize(AppTypography.fs15); fontWeightSemiBold()
                         color(colors.c(colors.textPrimary))
                         text("AI 分析")
+                    }
+                }
+                // 来源诚实标注：本面板为本地规则/快照生成，非模型输出（追问走真实研究管线）
+                Text {
+                    attr {
+                        marginTop(1f)
+                        fontSize(AppTypography.fs11)
+                        color(colors.c(colors.textTertiary))
+                        text("本地规则生成 · 非模型输出 · 追问走研究管线")
                     }
                 }
             }

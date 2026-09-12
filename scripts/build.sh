@@ -18,6 +18,13 @@ if [ -d "$SRC_ICONS" ]; then
 else
   echo "  ⚠ 缺失 $SRC_ICONS（先跑 scripts/icons_build.sh + icons_render.js）"
 fi
+SRC_BRAND="$ROOT/kuikly-shell/shared/src/commonMain/assets/common/brand"
+DST_BRAND="$ROOT/web-host/assets/common/brand"
+if [ -d "$SRC_BRAND" ]; then
+  mkdir -p "$DST_BRAND"
+  rsync -a --delete "$SRC_BRAND/" "$DST_BRAND/"
+  echo "  品牌资源: $(ls $DST_BRAND | wc -l | tr -d ' ') 个"
+fi
 SRC_FONTS="$ROOT/kuikly-shell/shared/src/commonMain/assets/common/fonts"
 DST_FONTS="$ROOT/web-host/assets/common/fonts"
 if [ -d "$SRC_FONTS" ]; then

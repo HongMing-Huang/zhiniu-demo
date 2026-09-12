@@ -344,7 +344,8 @@ async def _eastmoney_json(url: str) -> dict:
 
 
 _ALLOWED_API_HOSTS = {
-    "push2.eastmoney.com",       # 东财行情快照/板块/选股
+    "push2.eastmoney.com",
+    "datacenter-web.eastmoney.com",       # 东财行情快照/板块/选股
     "emappdata.eastmoney.com",   # 东财人气榜
     "hq.sinajs.cn",              # 新浪实时
     "quotes.sina.cn",            # 新浪 K 线
@@ -393,7 +394,7 @@ def _parse_eastmoney_ulist(payload: dict) -> Dict[str, dict]:
 
 
 def _parse_tencent_extras(raw: str) -> Dict[str, dict]:
-    """解析腾讯 qt.gtimg.cn `v_<code>="..."` 88 字段：38 换手率 %、49 量比、45 总市值（亿）→ 元。"""
+    """解析腾讯 qt.gtimg.cn `v_<code>="..."` 88 字段：38 换手率 %、39 市盈率、45 总市值（亿）→ 元、46 市净率、49 量比。"""
     out: Dict[str, dict] = {}
     for line in raw.split(";"):
         line = line.strip()
@@ -406,9 +407,12 @@ def _parse_tencent_extras(raw: str) -> Dict[str, dict]:
             continue
         cap_yi = _optional_num(fields[45])
         out[symbol] = {
+            "name": fields[1],
             "marketCap": round(cap_yi * 1e8) if cap_yi is not None else None,
             "turnoverRate": _optional_num(fields[38]),
             "volumeRatio": _optional_num(fields[49]),
+            "pe": _optional_num(fields[39]),
+            "pb": _optional_num(fields[46]),
         }
     return out
 
@@ -542,30 +546,51 @@ async def quote_fundamentals(symbol: str) -> dict:
             "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63",
         })
     )
+    # 三源独立降级：push2 被墙/限流时，估值走腾讯 gtimg，财报走 datacenter-web，互不拖垮。
+    snapshot: dict = {}
+    report: dict = {}
+    flow: dict = {}
     try:
-        snapshot_payload, report_payload, flow_payload = await asyncio.gather(
-            _eastmoney_json(snapshot_url),
-            _eastmoney_json(report_url),
-            _eastmoney_json(flow_url),
-        )
+        snapshot_payload = await _eastmoney_json(snapshot_url)
         snapshot = _parse_eastmoney_snapshot(symbol, snapshot_payload.get("data") or {})
-        report = _parse_eastmoney_report(report_payload)
-        flow = _parse_eastmoney_flow(flow_payload)
-        if not snapshot.get("name"):
-            raise ValueError("Eastmoney snapshot contains no security name")
-        result = {
-            **snapshot,
-            **report,
-            "moneyFlow": flow,
-            "available": True,
-            "source": "东方财富",
-            "provider": "eastmoney-fundamentals",
-            "isStale": False,
-        }
-        _fundamentals_cache[symbol] = (now, result)
-        _fundamentals_last_ok[symbol] = result
-        return result
     except Exception:
+        snapshot = {}
+    try:
+        report = _parse_eastmoney_report(await _eastmoney_json(report_url))
+    except Exception:
+        report = {}
+    try:
+        flow = _parse_eastmoney_flow(await _eastmoney_json(flow_url))
+    except Exception:
+        flow = {}
+
+    if not snapshot.get("name"):
+        # push2 快照不可达 → 腾讯 gtimg 兜底：名称/PE/PB/总市值（同一批真实行情源）
+        try:
+            raw = await asyncio.to_thread(
+                _http_get,
+                _guard_external_url("https://qt.gtimg.cn/q=" + symbol),
+                "gbk",
+                _TENCENT_HEADERS,
+            )
+            extra = _parse_tencent_extras(raw).get(symbol) or {}
+            if extra:
+                snapshot = {
+                    "symbol": symbol,
+                    "name": extra.get("name") or "",
+                    "industry": "", "region": "", "concepts": [],
+                    "pe": extra.get("pe"),
+                    "pb": extra.get("pb"),
+                    "turnoverRate": extra.get("turnoverRate"),
+                    "amplitude": None,
+                    "marketCap": extra.get("marketCap"),
+                    "floatMarketCap": None,
+                }
+        except Exception:
+            pass
+
+    has_any = bool(snapshot.get("pe") or snapshot.get("name") or report or flow)
+    if not has_any:
         previous = _fundamentals_last_ok.get(symbol)
         if previous:
             return {**previous, "isStale": True}
@@ -573,6 +598,26 @@ async def quote_fundamentals(symbol: str) -> dict:
             "symbol": symbol, "available": False, "isStale": False,
             "source": "", "provider": "upstream-unavailable",
         }
+
+    providers = [p for p, ok in (
+        ("eastmoney-snapshot", bool(snapshot.get("name"))),
+        ("tencent-valuation", bool(snapshot.get("pe")) and not snapshot.get("industry")),
+        ("eastmoney-report", bool(report)),
+        ("eastmoney-flow", bool(flow)),
+    ) if ok]
+    result = {
+        **snapshot,
+        **report,
+        "moneyFlow": flow,
+        "available": True,
+        "source": "东方财富/腾讯" if "tencent-valuation" in providers else "东方财富",
+        "provider": "+".join(providers) or "upstream-unavailable",
+        "isStale": False,
+    }
+    _fundamentals_cache[symbol] = (now, result)
+    if len(providers) >= 2:
+        _fundamentals_last_ok[symbol] = result
+    return result
 
 
 # --------------------------------------------------------------------- #
