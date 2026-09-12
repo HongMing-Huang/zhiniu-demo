@@ -28,12 +28,12 @@ class TestResolveCandidates(unittest.TestCase):
     def test_alias_quick_returns_fallback_chain(self):
         candidates = resolve_candidates("zhiniu/quick")
         providers = [c.provider for c in candidates]
-        # 降级链：deepseek → glm → hunyuan
-        self.assertEqual(providers, ["deepseek", "glm", "hunyuan", "openai"])
+        # 降级链：gemai（GemAI 中转）→ deepseek → glm → hunyuan → openai
+        self.assertEqual(providers, ["gemai", "deepseek", "glm", "hunyuan", "openai"])
         self.assertEqual(
-            candidates[0].base_url, "https://api.deepseek.com"
+            candidates[0].base_url, "https://gemai.huchan.cn/v1"
         )
-        self.assertEqual(candidates[0].model, "deepseek-chat")
+        self.assertEqual(candidates[0].model, "deepseek-v4-flash")
 
     def test_alias_think_first_is_reasoner(self):
         candidates = resolve_candidates("zhiniu/think")
@@ -70,7 +70,7 @@ class TestResolveCandidates(unittest.TestCase):
 
     def test_provider_order_stable(self):
         # 新增厂商/别名应复用全局顺序，首厂商恒为 deepseek
-        self.assertEqual(PROVIDER_ORDER, ["deepseek", "glm", "hunyuan"])
+        self.assertEqual(PROVIDER_ORDER, ["gemai", "deepseek", "glm", "hunyuan"])
         for alias in ("zhiniu/quick", "zhiniu/think", "zhiniu/flash", "zhiniu/vision"):
             chain = [c.provider for c in resolve_candidates(alias)]
             self.assertEqual(len(set(chain)), len(chain), f"{alias} 候选不应重复")

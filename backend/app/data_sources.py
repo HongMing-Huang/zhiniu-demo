@@ -17,6 +17,16 @@ from urllib import parse, request
 
 
 _EASTMONEY_SEARCH = "https://search-api-web.eastmoney.com/search/jsonp"
+
+# 出站白名单：仅 HTTPS + 已知资讯域名（防 SSRF / 内网探测）
+_ALLOWED_NEWS_HOSTS = {"search-api-web.eastmoney.com"}
+
+
+def _guard_external_url(url: str) -> str:
+    parsed = parse.urlparse(url)
+    if parsed.scheme != "https" or parsed.hostname not in _ALLOWED_NEWS_HOSTS:
+        raise ValueError(f"outbound url not allowed: {parsed.hostname}")
+    return url
 _TIMEOUT = 4.0
 _NEWS_TTL = 120.0
 _TAG_RE = re.compile(r"<[^>]+>")
@@ -75,7 +85,7 @@ def _fetch_eastmoney(query: NewsQuery) -> list[dict]:
         {"cb": callback, "param": json.dumps(inner, ensure_ascii=False), "_": str(int(time.time() * 1000))}
     )
     req = request.Request(
-        f"{_EASTMONEY_SEARCH}?{params}",
+        _guard_external_url(f"{_EASTMONEY_SEARCH}?{params}"),
         headers={
             "Accept": "*/*",
             "Referer": f"https://so.eastmoney.com/news/s?keyword={parse.quote(query.search_term)}",
