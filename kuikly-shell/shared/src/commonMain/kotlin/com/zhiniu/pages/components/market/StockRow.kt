@@ -143,6 +143,7 @@ fun ViewContainer<*, *>.StockRow(
                     fontSize(AppTypography.fs12)
                     color(colors.c(colors.textTertiary))
                     lines(1)
+                    cssClass("zn-nowrap")
                     text(if (compactMeta.isEmpty()) fmtSymbol(q.symbol) else q.code + "  " + compactMeta)
                     animate(ANIM_THEME, value = AppTheme.isDark)
                 }

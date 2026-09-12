@@ -39,11 +39,11 @@ fun fmtAmount(v: Double): String {
     }
 }
 
-/** sh600519 → "600519 · SH"，sz300750 → "300750 · SZ"。 */
+/** sh600519 → "600519·SH"（无空格：tabular-nums 下窄列不折行）。 */
 fun fmtSymbol(sym: String): String {
     val prefix = sym.take(2).uppercase()
     val code = sym.drop(2)
-    return "$code · $prefix"
+    return "$code·$prefix"
 }
 
 /** 市场标签。 */

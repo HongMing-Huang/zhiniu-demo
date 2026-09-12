@@ -24,7 +24,7 @@
     body {
         overflow: hidden; overflow-x: hidden;
         font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
-        "Helvetica Neue", "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
+        "HarmonyOS Sans SC", "MiSans", "Helvetica Neue", "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         text-rendering: optimizeLegibility;
@@ -48,6 +48,8 @@
     .zn-row:hover { background-color: var(--zn-hover) !important; }
     .zn-iconbtn:hover { background-color: var(--zn-hover) !important; }
     .zn-click { cursor: pointer; }
+    /* Kuikly H5 文本测量与渲染可能有 1-2px 偏差：短代码/标签防折行兜底 */
+    .zn-nowrap, .zn-nowrap * { white-space: nowrap !important; }
     /* Kuikly H5 的子 Text/Image 会吞掉父 View 的 click；统一把命中交给按钮容器。 */
     .zn-click > * { pointer-events: none !important; }
     .zn-chart { cursor: crosshair; touch-action: none; }
@@ -78,7 +80,7 @@
   三者均同步阻塞加载，保证 DOMContentLoaded 时全局就绪。
   TODO: 未来接入官方 EnhancedBundleLoader + bundles/manifest 按页动态加载，可获按需分包。
 -->
-<script type="text/javascript" src="nativevue2.js?v=17"></script>
+<script type="text/javascript" src="nativevue2.js?v=18"></script>
 <script type="text/javascript">
     /* 单 bundle 模式：全量内核已由 nativevue2.js 提供，直接放行宿主启动 */
     window.kuiklyBundlesReady = true;

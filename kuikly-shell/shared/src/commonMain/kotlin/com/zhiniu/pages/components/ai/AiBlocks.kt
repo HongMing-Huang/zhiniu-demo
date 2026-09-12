@@ -18,6 +18,7 @@ import com.zhiniu.pages.components.IconKind
 import com.zhiniu.pages.components.NUM_FONT
 import com.zhiniu.pages.components.c
 import com.zhiniu.pages.components.ca
+import com.zhiniu.pages.components.common.Divider
 import com.zhiniu.pages.components.cssClass
 import com.zhiniu.pages.components.fmt2
 import com.zhiniu.pages.components.fmtPct
@@ -123,8 +124,10 @@ fun ViewContainer<*, *>.AiStockCard(
                     animate(ANIM_THEME, value = AppTheme.isDark)
                 }
             }
+            View { attr { height(12f) } }
+            Divider()
             View { attr { height(10f) } }
-            // 查看详情
+            // 查看详情：卡片页脚行（左文案 + 右箭头，行可供性）
             View { attr { flexDirectionRow(); alignItemsCenter() }
                 Icon(IconKind.CHART, 13f)
                 View { attr { width(5f) } }
@@ -135,7 +138,7 @@ fun ViewContainer<*, *>.AiStockCard(
                         text("查看详情")
                     }
                 }
-                View { attr { width(4f) } }
+                View { attr { flex(1f) } }
                 Icon(IconKind.CHEVRON_RIGHT, 11f)
             }
         }
@@ -155,11 +158,12 @@ private fun ViewContainer<*, *>.AiKeyValue(label: String, value: String) {
             }
         }
         // flex(1f) 吃满剩余行宽：窄容器下数字不再被挤压折行（如 63.90 → 63.9/0）
+        // 等宽字体仅用于含数字的值；纯中文值走系统字体，避免中英混排字号不一
         Text {
             attr {
                 flex(1f)
                 fontSize(AppTypography.fs13); fontWeightMedium()
-                fontFamily(NUM_FONT)
+                if (value.any { it.isDigit() }) fontFamily(NUM_FONT)
                 color(colors.c(colors.textPrimary))
                 text(value)
                 animate(ANIM_THEME, value = AppTheme.isDark)

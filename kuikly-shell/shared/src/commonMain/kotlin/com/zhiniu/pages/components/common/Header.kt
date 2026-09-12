@@ -21,7 +21,7 @@ import com.zhiniu.pages.components.cssClass
 
 /**
  * 全局 Header：64px，1px 底描边。
- * @param activeNav 当前一级导航（"市场" / "AI研究"）。
+ * @param activeNav 当前一级导航（"市场" / "AI研究" / "待办"）。
  * @param onSearch 点击 Header 搜索 → 打开 StockSearchOverlay。
  * @param onTheme  点击主题按钮 → 打开 ThemePopover。
  */
@@ -31,6 +31,7 @@ fun ViewContainer<*, *>.AppHeader(
     topInset: Float = 0f,
     onNavMarket: () -> Unit,
     onNavAiResearch: () -> Unit,
+    onNavTodo: () -> Unit,
     onSearch: () -> Unit,
     onTheme: () -> Unit,
 ) {
@@ -80,6 +81,7 @@ fun ViewContainer<*, *>.AppHeader(
             // 导航
             HeaderNav("市场", activeNav == "市场", onClick = onNavMarket)
             HeaderNav("AI研究", activeNav == "AI研究", onClick = onNavAiResearch)
+            HeaderNav("待办", activeNav == "待办", onClick = onNavTodo)
             View { attr { flex(1f) } }
             // 全局搜索（点击打开 Overlay）
             SearchField(width = if (compact) 120f else 240f, onClick = onSearch)

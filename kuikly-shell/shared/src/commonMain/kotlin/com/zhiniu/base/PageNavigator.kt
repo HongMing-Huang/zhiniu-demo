@@ -18,6 +18,8 @@ internal fun Pager.openStockDetail(symbol: String) =
 
 internal fun Pager.openAiResearchPage() = openZhiniuPage("AiResearch")
 
+internal fun Pager.openTodoPage() = openZhiniuPage("TodoList")
+
 /** 关闭当前页（H5 SPA 下等价浏览器 Back，返回上一页并恢复滚动位置）。 */
 internal fun Pager.closeCurrentPage() {
     acquireModule<RouterModule>(RouterModule.MODULE_NAME).closePage()

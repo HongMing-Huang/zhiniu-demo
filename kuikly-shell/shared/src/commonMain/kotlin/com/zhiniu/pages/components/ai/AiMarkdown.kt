@@ -16,6 +16,7 @@ import com.zhiniu.pages.components.AppTheme
 import com.zhiniu.pages.components.AppTypography
 import com.zhiniu.pages.components.NUM_FONT
 import com.zhiniu.pages.components.c
+import com.zhiniu.pages.components.ca
 
 // ---------- 行内片段 ----------
 /** 行内片段：普通文本 / **加粗** / `行内代码`。 */
@@ -306,7 +307,7 @@ fun ViewContainer<*, *>.MarkdownView(content: String) {
                 View {
                     attr {
                         width(2f); alignSelfStretch()
-                        backgroundColor(colors.c(colors.borderStrong))
+                        backgroundColor(colors.ca(colors.aiAccent, 70))
                         animate(ANIM_THEME, value = AppTheme.isDark)
                     }
                 }
