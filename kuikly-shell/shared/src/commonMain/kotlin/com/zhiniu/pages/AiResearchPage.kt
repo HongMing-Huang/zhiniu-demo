@@ -389,17 +389,26 @@ private fun ViewContainer<*, *>.sessionColumn(host: AiResearchPage) {
                 View {
                     attr {
                         height(48f); flexDirectionRow(); alignItemsCenter()
-                        padding(left = 16f, right = 16f)
                         backgroundColor(colors.c(if (session.id == host.currentSessionId) colors.surfaceHover else colors.surface))
                         cssClass("zn-row zn-click")
                         animate(ANIM_THEME, value = AppTheme.isDark)
                     }
                     event { click { host.selectSession(session.id) } }
+                    // 选中态：AI 强调色指示条（小面积点缀）
+                    View {
+                        attr {
+                            width(3f); alignSelfStretch()
+                            backgroundColor(colors.ca(colors.aiAccent, if (session.id == host.currentSessionId) 100 else 0))
+                            animate(ANIM_THEME, value = AppTheme.isDark)
+                        }
+                    }
+                    View { attr { width(13f) } }
                     Icon(IconKind.CHAT, 14f)
                     View { attr { width(8f) } }
                     Text {
                         attr {
                             fontSize(AppTypography.fs13)
+                            if (session.id == host.currentSessionId) fontWeightSemiBold()
                             color(colors.c(if (session.id == host.currentSessionId) colors.textPrimary else colors.textSecondary))
                             text(session.title)
                         }
@@ -486,19 +495,30 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
                             }
                         }
                     } else {
-                        View { attr { alignSelfStretch(); maxWidth(820f) }
+                        View { attr { alignSelfStretch(); maxWidth(960f) }
                             AiMessageHeader("知牛 AI")
                             View { attr { height(8f) } }
                             vif({ msg.streaming && msg.blocks.isEmpty() }) {
                                 AgentProgressRow(msg.progress)
                             }
-                            msg.blocks.forEach { block ->
-                                View { attr { marginTop(10f) } }
-                                AiBlockView(
-                                    block,
-                                    onOpenStock = { sym -> host.openStock(sym) },
-                                    onAsk = { q -> host.send(q) },
-                                )
+                            // 消息卡：内容收敛进 surface 容器，与页面底形成层次
+                            View {
+                                attr {
+                                    alignSelfStretch()
+                                    borderRadius(AppRadius.radius8)
+                                    border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+                                    backgroundColor(colors.c(colors.surface))
+                                    padding(top = 12f, bottom = 12f, left = 14f, right = 14f)
+                                    animate(ANIM_THEME, value = AppTheme.isDark)
+                                }
+                                msg.blocks.forEachIndexed { i, block ->
+                                    if (i > 0) View { attr { marginTop(10f) } }
+                                    AiBlockView(
+                                        block,
+                                        onOpenStock = { sym -> host.openStock(sym) },
+                                        onAsk = { q -> host.send(q) },
+                                    )
+                                }
                             }
                             View { attr { height(14f) } }
                         }

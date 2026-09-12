@@ -35,6 +35,7 @@ class ProviderDef:
     requires_endpoint: bool = False
     key_hint: str = ""
     models: List[dict] = field(default_factory=list)   # [{id, capabilities}]
+    extra_body: Dict[str, dict] = field(default_factory=dict)  # 厂商级固定扩展参数（如关闭思考模式）
 
 
 def _load_providers() -> dict:
@@ -75,6 +76,7 @@ def _provider_defs() -> Dict[str, ProviderDef]:
             requires_endpoint=bool(p.get("requiresEndpoint", False)),
             key_hint=p.get("keyHint", ""),
             models=p.get("models", []),
+            extra_body=dict(p.get("extraBody") or {}),
         )
     return defs
 
@@ -252,7 +254,7 @@ def resolve_candidates(model_alias: str) -> List[ProviderResolved]:
     resolved: List[ProviderResolved] = []
     for provider, model in chain:
         conf = PROVIDERS[provider]
-        extra: dict = {}
+        extra: dict = dict(conf.extra_body)
         resolved.append(
             ProviderResolved(
                 provider=provider,

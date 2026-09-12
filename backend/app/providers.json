@@ -1,14 +1,15 @@
 {
   "defaultModel": {
+    "gemai": "deepseek-v4-flash",
     "deepseek": "deepseek-chat",
     "glm": "glm-4.6",
     "hunyuan": "hunyuan-turbos-latest"
   },
-  "order": ["deepseek", "glm", "hunyuan"],
+  "order": ["gemai", "deepseek", "glm", "hunyuan"],
   "routes": {
-    "zhiniu/quick":  { "want": ["fast"],      "fallbackOrder": ["deepseek", "glm", "hunyuan", "openai"] },
+    "zhiniu/quick":  { "want": ["fast"],      "fallbackOrder": ["gemai", "deepseek", "glm", "hunyuan", "openai"] },
     "zhiniu/think":  { "want": ["reasoning"], "fallbackOrder": ["deepseek", "glm", "hunyuan", "openai"] },
-    "zhiniu/flash":  { "want": ["fast"],      "fallbackOrder": ["glm", "deepseek", "hunyuan", "openai"] },
+    "zhiniu/flash":  { "want": ["fast"],      "fallbackOrder": ["gemai", "glm", "deepseek", "hunyuan", "openai"] },
     "zhiniu/vision": { "want": ["vision"],    "fallbackOrder": ["deepseek", "glm", "hunyuan", "openai"] }
   },
   "providers": [
@@ -20,6 +21,14 @@
         {"id": "gpt-4o", "capabilities": ["vision", "chat"]},
         {"id": "gpt-4o-mini", "capabilities": ["fast", "vision", "chat"]},
         {"id": "o3-mini", "capabilities": ["reasoning", "fast"]}
+      ]
+    },
+    {
+      "id": "gemai", "name": "GemAI 中转", "baseUrl": "https://gemai.huchan.cn/v1",
+      "apiKeyEnv": "GEMAI_API_KEY", "protocol": "openai", "supportsDiscover": true,
+      "tier": "domestic", "keyHint": "sk-", "extraBody": { "thinking": { "type": "disabled" } },
+      "models": [
+        {"id": "deepseek-v4-flash", "capabilities": ["fast", "chat"]}
       ]
     },
     {

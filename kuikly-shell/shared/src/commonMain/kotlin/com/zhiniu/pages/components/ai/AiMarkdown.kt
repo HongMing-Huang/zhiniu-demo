@@ -260,7 +260,7 @@ fun ViewContainer<*, *>.MarkdownView(content: String) {
                 )
             }
 
-            is MdBlock.Paragraph -> richSpans(block.spans, AppTypography.fs13, colors.c(colors.textSecondary))
+            is MdBlock.Paragraph -> richSpans(block.spans, AppTypography.fs14, colors.c(colors.textSecondary))
 
             is MdBlock.Bullets -> block.items.forEach { item ->
                 View {
@@ -274,7 +274,7 @@ fun ViewContainer<*, *>.MarkdownView(content: String) {
                     }
                     View {
                         attr { flex(1f) }
-                        richSpans(item, AppTypography.fs13, colors.c(colors.textSecondary))
+                        richSpans(item, AppTypography.fs14, colors.c(colors.textSecondary))
                     }
                 }
             }
@@ -291,7 +291,7 @@ fun ViewContainer<*, *>.MarkdownView(content: String) {
                     }
                     View {
                         attr { flex(1f) }
-                        richSpans(item, AppTypography.fs13, colors.c(colors.textSecondary))
+                        richSpans(item, AppTypography.fs14, colors.c(colors.textSecondary))
                     }
                 }
             }
@@ -312,7 +312,7 @@ fun ViewContainer<*, *>.MarkdownView(content: String) {
                 }
                 View {
                     attr { flex(1f); padding(top = 8f, bottom = 8f, left = 10f, right = 10f) }
-                    richSpans(block.spans, AppTypography.fs13, colors.c(colors.textSecondary))
+                    richSpans(block.spans, AppTypography.fs14, colors.c(colors.textSecondary))
                 }
             }
 

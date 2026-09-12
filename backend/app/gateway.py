@@ -21,6 +21,19 @@ from .tools import execute_tool_async, get_tools_schema
 
 
 class LLMGateway:
+    def __init__(self) -> None:
+        # 按厂商复用 AsyncOpenAI 客户端：辩论管线一次研究要串行 7+ 次调用，
+        # 每次新建客户端会重复 TLS 握手，明显拉长端到端耗时。
+        self._clients: Dict[tuple, AsyncOpenAI] = {}
+
+    def _client_for(self, base_url: str, api_key: Optional[str]) -> AsyncOpenAI:
+        cache_key = (base_url, api_key or "")
+        client = self._clients.get(cache_key)
+        if client is None:
+            client = AsyncOpenAI(base_url=base_url, api_key=api_key)
+            self._clients[cache_key] = client
+        return client
+
     async def chat_completions(
         self,
         model: str,
@@ -175,7 +188,7 @@ class LLMGateway:
         cand: ProviderResolved,
         **kw,
     ) -> AsyncIterator[dict]:
-        client = AsyncOpenAI(base_url=cand.base_url, api_key=cand.api_key)
+        client = self._client_for(cand.base_url, cand.api_key)
         try:
             payload = dict(
                 model=cand.model,
@@ -315,7 +328,7 @@ class LLMGateway:
                 continue
             used_any_key = True
             try:
-                client = AsyncOpenAI(base_url=cand.base_url, api_key=cand.api_key)
+                client = self._client_for(cand.base_url, cand.api_key)
                 payload = dict(model=cand.model, messages=messages, stream=False)
                 if tools:
                     payload["tools"] = tools

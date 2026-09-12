@@ -21,7 +21,7 @@ from typing import Awaitable, Callable, Optional
 
 from .gateway import gateway
 
-DEBATE_TIMEOUT_S = float(os.getenv("ZHINIU_AGENT_TIMEOUT", "75"))
+DEBATE_TIMEOUT_S = float(os.getenv("ZHINIU_AGENT_TIMEOUT", "150"))
 RATING_LABELS = ("买入", "增持", "持有", "减持", "卖出")
 ProgressFn = Optional[Callable[[str, str, str], Awaitable[None]]]
 

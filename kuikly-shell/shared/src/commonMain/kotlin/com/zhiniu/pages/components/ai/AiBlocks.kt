@@ -154,9 +154,12 @@ private fun ViewContainer<*, *>.AiKeyValue(label: String, value: String) {
                 text(label)
             }
         }
+        // flex(1f) 吃满剩余行宽：窄容器下数字不再被挤压折行（如 63.90 → 63.9/0）
         Text {
             attr {
-                fontSize(AppTypography.fs13)
+                flex(1f)
+                fontSize(AppTypography.fs13); fontWeightMedium()
+                fontFamily(NUM_FONT)
                 color(colors.c(colors.textPrimary))
                 text(value)
                 animate(ANIM_THEME, value = AppTheme.isDark)

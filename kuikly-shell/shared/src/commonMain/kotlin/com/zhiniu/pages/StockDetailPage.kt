@@ -378,7 +378,7 @@ private fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.z
             attr {
                 fontSize(AppTypography.fs12)
                 color(colors.c(colors.textTertiary))
-                text("更新 " + q.date + " " + q.time)
+                text("更新 " + q.date.substring(5) + " " + q.time.take(5))
             }
         }
     }
