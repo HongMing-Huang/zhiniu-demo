@@ -163,10 +163,9 @@ zhiniu-demo/
 - [字体规范（官方字体接入）](docs/typography.md)
 - [交付物与评分自查](docs/deliverables.md)
 - [外部 API 接入与降级链](docs/api-matrix.md)
-- [AI 设计指导](docs/ai-design-guide.md) · [UI 设计](docs/ui-design.md) · [UI 重设计记录](docs/ui-redesign.md)
 - [LLM 网关设计](docs/backend-llm-gateway-design.md)
+- [课题组对标调研](docs/sairen-benchmark.md)
 - [变更日志](docs/WORKLOG.md)
-- [开发问题汇总](DEVELOPMENT-ISSUES.md)
 
 ## 致谢与参考
 

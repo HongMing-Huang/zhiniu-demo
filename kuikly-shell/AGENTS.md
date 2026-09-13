@@ -9,7 +9,7 @@
 
 - **唯一记录文件**：`docs/WORKLOG.md`（仓库根 `zhiniu/docs/WORKLOG.md`）。所有 Agent 每次实质改动后**必须**在顶部追加一行。
 - 行格式：`YYYY-MM-DD HH:mm | 类别 | 改动描述 | 验证结果`；类别 ∈ {ui / build / data / agent / docs / design / git / chore}。
-- 禁止重复写研究/设计文档（已有 `docs/ui-redesign.md` / `AGENTS.md` / 各设计文档），只做增量记录。
+- 禁止重复写研究/设计文档（已有 `AGENTS.md` / `docs/` 各现行文档），只做增量记录。
 - 每轮结束时用 `git status` 核对，确保 WORKLOG 与本轮提交一致。
 
 ## 1. 项目性质

@@ -10,6 +10,7 @@
 
 | 时间 | 类别 | 改动 | 验证 |
 | ---- | ---- | ---- | ---- |
+| 19:17 | ui | 跨端响应式几何改用 Kuikly 官方 `pageViewWidth/pageViewHeight`（root view）而非原生壳物理像素 `activityWidth/activityHeight`，覆盖 Header、浮层、行情居中、详情图表与 AI 主列宽度；手机行情筛选由 9 项压缩为「自选/全部/人气/涨幅/板块」5 个主任务，移除手机无效的字段按钮与重复搜索；Header 以 TDesign 官方 `user-circle` 图标新增「我的」入口并承接外观、数据/Agent 状态 | JS 编译已通过；待四端构建与模拟器截图验收 |
 | 19:00 | design/mobile | 移动端专项（课题重移动端，对标 KuiklyStock/SaiRen 手机形态）：①Light 主题改微灰页面底 #F7F8FA + 纯白 Surface（card-on-gray 层次，两位组员共同语言；桌面回归更清晰）②MarketPulse compact 重写为三张指数卡（名称/大价格/涨跌色/迷你走势，白卡描边）+ 市场宽度摘要卡，替换原纯文本两行③重建 bundle 使并行会话的 BottomTabBar 生效（行情/自选/AI研究 底部导航，此前组件存在但未构建进包）④Header 手机端隐藏文字导航（导航职责移交底部 Tab）+ 二级页（详情/对比）compact 左上返回箭头 | H5 390×844 三页实测（指数卡/底部 Tab/返回箭头/涨跌 chip 渲染正确，0 error）；Android 模拟器实装最新 APK 验证一致；桌面 1440 回归通过（微灰底表格层次更佳）；README 拼图刷新 |
 
 | 时间 | 类别 | 改动 | 验证 |

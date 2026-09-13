@@ -133,4 +133,3 @@
 ## 参考
 - 新浪字段/接口解析 — tech-stack §行情；CSDN 新浪 API 全解析（2026-02/06）
 - LLM 端点官方文档 — docs/backend-llm-gateway-design.md §2
-- 技术方案 — docs/zhiniu-technical-design.md §6

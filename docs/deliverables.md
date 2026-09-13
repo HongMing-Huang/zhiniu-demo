@@ -94,8 +94,6 @@
 | 4 | 🔶 鸿蒙网络层 expect/actual 桥接 + 真机验收 | [#4](https://github.com/HongMing-Huang/zhiniu-demo/issues/4) |
 | 5 | ⬜ 重跑 Mimosa 完整安全扫描（提交钩子 scanner_enobufs 未出结论） | [#5](https://github.com/HongMing-Huang/zhiniu-demo/issues/5) |
 
-历史遗留：`docs/zhiniu-technical-design.md` 为最初 62KB 技术方案（含已被否决的早期选型），仅作过程记录保留，评审以现行文档为准。
-
 ---
 
 ### 本次自查验证记录（2026-09-11）

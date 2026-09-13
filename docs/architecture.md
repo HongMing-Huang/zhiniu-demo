@@ -79,4 +79,3 @@ flowchart LR
 ---
 
 ## 参考
-- 技术方案 §4 架构 / §13 C4 规范 — docs/zhiniu-technical-design.md
