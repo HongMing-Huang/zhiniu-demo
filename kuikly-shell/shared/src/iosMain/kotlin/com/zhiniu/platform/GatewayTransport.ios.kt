@@ -14,10 +14,10 @@ import platform.Foundation.NSURL
 import platform.Foundation.NSURLRequest
 import platform.Foundation.NSURLSession
 import platform.Foundation.NSURLSessionConfiguration
+import platform.Foundation.NSString
 import platform.Foundation.NSUTF8StringEncoding
 import platform.Foundation.HTTPBody
 import platform.Foundation.HTTPMethod
-import platform.Foundation.timeoutInterval
 import platform.Foundation.allHTTPHeaderFields
 import platform.darwin.DISPATCH_TIME_FOREVER
 import platform.darwin.dispatch_semaphore_create
@@ -41,15 +41,15 @@ internal class IosGatewayTransport : GatewayTransport {
         val sem = dispatch_semaphore_create(0)
         var payload: NSData? = null
         var failure: NSError? = null
-        val task = session.dataTaskWithRequest(request) { data, _, error ->
+        val task = session.dataTaskWithRequestCompletionHandler(request) { data, _, error ->
             payload = data
             failure = error
             dispatch_semaphore_signal(sem)
         }
         task.resume()
         // 15s 上限：网络异常时保证 Worker 不永久阻塞
-        val waitResult = dispatch_semaphore_wait(sem, 15_000_000_000L)
-        if (waitResult != 0) throw RuntimeException("ios transport timeout")
+        val waitResult = dispatch_semaphore_wait(sem, 15_000_000_000UL)
+        if (waitResult.toInt() != 0) throw RuntimeException("ios transport timeout")
         val err = failure
         if (err != null) throw RuntimeException("ios transport error: ${err.localizedDescription}")
         val body = payload ?: throw RuntimeException("ios transport empty body")
@@ -59,7 +59,6 @@ internal class IosGatewayTransport : GatewayTransport {
     private fun request(url: String, method: String, jsonBody: String?): NSMutableURLRequest {
         val req = NSMutableURLRequest.requestWithURL(NSURL.URLWithString(url)!!)
         req.HTTPMethod = method
-        req.timeoutInterval = 15.0
         if (jsonBody != null) {
             req.allHTTPHeaderFields(mapOf("Content-Type" to "application/json"))
             req.HTTPBody = (jsonBody as NSString).dataUsingEncoding(NSUTF8StringEncoding)
