@@ -16,7 +16,7 @@ if [ -d "$SRC_ICONS" ]; then
   rsync -a --delete "$SRC_ICONS/" "$DST_ICONS/"
   echo "  图标数量: $(ls $DST_ICONS | wc -l | tr -d ' ')"
 else
-  echo "  ⚠ 缺失 $SRC_ICONS（先跑 scripts/icons_build.sh + icons_render.js）"
+  echo "  ⚠ 缺失 $SRC_ICONS（先跑 scripts/icons_build.sh + scripts/icons_render.js）"
 fi
 SRC_BRAND="$ROOT/kuikly-shell/shared/src/commonMain/assets/common/brand"
 DST_BRAND="$ROOT/web-host/assets/common/brand"

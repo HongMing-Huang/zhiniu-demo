@@ -9,8 +9,10 @@ package com.zhiniu.pages
 import com.tencent.kuikly.core.annotations.Page
 import com.tencent.kuikly.core.base.Border
 import com.tencent.kuikly.core.base.BorderStyle
+import com.tencent.kuikly.core.base.Color
 import com.tencent.kuikly.core.base.ViewBuilder
 import com.tencent.kuikly.core.base.ViewContainer
+import com.tencent.kuikly.core.base.attr.AccessibilityRole
 import com.tencent.kuikly.core.directives.velse
 import com.tencent.kuikly.core.directives.vif
 import com.tencent.kuikly.core.reactive.handler.observable
@@ -294,12 +296,179 @@ private fun ViewContainer<*, *>.detailContent(host: StockDetailPage, q: com.zhin
         vif({ host.detailTab == "财务" }) { financeTab(host, q) }
         vif({ host.detailTab == "新闻" }) { newsTab(host, q) }
         vif({ host.detailTab == "AI解读" }) { aiTab(host, q) }
+        // 手机布局：欧易式底部主操作条（全宽胶囊 AI 分析），List 内容末尾
+        vif({ host.isCompact() }) {
+            View { attr { height(20f) } }
+            View {
+                attr {
+                    height(46f); borderRadius(23f); allCenter()
+                    flexDirectionRow()
+                    backgroundColor(colors.c(colors.textPrimary))
+                    cssClass("zn-click")
+                    highlightBackgroundColor(colors.ca(colors.textSecondary, 12))
+                    accessibility("打开 AI 分析面板")
+                    accessibilityRole(AccessibilityRole.BUTTON)
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+                event { click { host.isAiPanelVisible = !host.isAiPanelVisible } }
+                Icon(IconKind.AI, 16f)
+                View { attr { width(8f) } }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs15); fontWeightSemiBold()
+                        color(Color.WHITE)
+                        text("AI 分析 " + q.name)
+                    }
+                }
+            }
+            View { attr { height(16f) } }
+        }
     }
 }
 
 private fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.zhiniu.domain.model.StockQuote) {
     val colors = AppTheme.colors
-    // 第一行：返回箭头旁无；名称代码 + 自选/AI分析
+    if (host.isCompact()) {
+        // ---- 手机布局（欧易式）：名称/副行两行 + 右侧星标/AI 图标钮；大价格块；两列数据网格 ----
+        View {
+            attr { flexDirectionRow(); alignItemsCenter() }
+            View {
+                attr { flex(1f); flexDirectionColumn() }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs18); fontWeightSemiBold()
+                        color(colors.c(colors.textPrimary))
+                        text(q.name)
+                        animate(ANIM_THEME, value = AppTheme.isDark)
+                    }
+                }
+                View { attr { height(3f) } }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs12)
+                        color(colors.c(colors.textTertiary))
+                        text(fmtSymbol(q.symbol) + " · " + marketName(q.symbol))
+                        animate(ANIM_THEME, value = AppTheme.isDark)
+                    }
+                }
+            }
+            // 星标（加自选）
+            View {
+                attr {
+                    width(36f); height(36f); borderRadius(18f); allCenter()
+                    backgroundColor(colors.c(colors.surfaceSecondary))
+                    cssClass("zn-click")
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                    accessibility(if (host.watchlisted) "移出自选" else "加入自选")
+                    accessibilityRole(AccessibilityRole.BUTTON)
+                }
+                event { click { host.watchlisted = !host.watchlisted; com.zhiniu.data.local.Watchlist.toggle(q.symbol) } }
+                Icon(if (host.watchlisted) IconKind.STAR_FILLED else IconKind.STAR, 16f)
+            }
+            View { attr { width(8f) } }
+            // AI 分析（图标钮，打开抽屉）
+            View {
+                attr {
+                    width(36f); height(36f); borderRadius(18f); allCenter()
+                    backgroundColor(colors.ca(colors.aiAccent, 12))
+                    border(Border(1f, BorderStyle.SOLID, colors.c(colors.aiAccent)))
+                    cssClass("zn-click")
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                    accessibility("打开 AI 分析")
+                    accessibilityRole(AccessibilityRole.BUTTON)
+                }
+                event { click { host.isAiPanelVisible = !host.isAiPanelVisible } }
+                Icon(IconKind.AI, 16f)
+            }
+        }
+        View { attr { height(10f) } }
+        // 大价格块：价格 + 涨跌额/幅 同行；更新时间独立小字一行（避免挤压重叠）
+        View {
+            attr { flexDirectionRow(); alignItemsCenter() }
+            Text {
+                attr {
+                    fontSize(AppTypography.fs28); fontWeightSemiBold()
+                    fontFamily(NUM_FONT)
+                    color(colors.c(if (q.isUp) colors.up else colors.down))
+                    text(com.zhiniu.pages.components.fmt2(q.price))
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+            }
+            Text {
+                attr {
+                    marginLeft(10f); marginTop(8f)
+                    fontSize(AppTypography.fs13); fontWeightMedium()
+                    fontFamily(NUM_FONT)
+                    color(colors.c(if (q.isUp) colors.up else colors.down))
+                    text(com.zhiniu.pages.components.fmtChangeSigned(q.change) + "  " + com.zhiniu.pages.components.fmtPct(q.changePercent))
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+            }
+        }
+        Text {
+            attr {
+                marginTop(4f)
+                fontSize(AppTypography.fs11)
+                color(colors.c(colors.textTertiary))
+                text("更新 " + q.date + " " + q.time.take(5))
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+        }
+        View { attr { height(12f) } }
+        // 两列数据网格（欧易式：label 左 + value 右；4 行 × 2 列）
+        data class Metric(val label: String, val value: String)
+        val rows = listOf(
+            listOf(
+                Metric("今开", com.zhiniu.pages.components.fmt2(q.open)),
+                Metric("最高", com.zhiniu.pages.components.fmt2(q.high)),
+            ),
+            listOf(
+                Metric("最低", com.zhiniu.pages.components.fmt2(q.low)),
+                Metric("昨收", com.zhiniu.pages.components.fmt2(q.prevClose)),
+            ),
+            listOf(
+                Metric("成交量", com.zhiniu.pages.components.fmtVolHand(q.volume)),
+                Metric("成交额", com.zhiniu.pages.components.fmtAmount(q.amount)),
+            ),
+            listOf(
+                Metric("换手率", com.zhiniu.pages.components.fmtOptional(host.facts(q).turnover, "%")),
+                Metric("振幅", com.zhiniu.pages.components.fmtAmplitude(q.high, q.low, q.prevClose)),
+            ),
+        )
+        rows.forEach { rowItems ->
+            View {
+                attr {
+                    flexDirectionRow(); alignItemsCenter()
+                    padding(top = 6f, bottom = 6f)
+                }
+                rowItems.forEach { m ->
+                    View {
+                        attr { flex(1f); flexDirectionRow(); alignItemsCenter() }
+                        Text {
+                            attr {
+                                fontSize(AppTypography.fs12)
+                                color(colors.c(colors.textTertiary))
+                                text(m.label)
+                            }
+                        }
+                        View { attr { flex(1f) } }
+                        Text {
+                            attr {
+                                fontSize(AppTypography.fs13); fontWeightMedium()
+                                fontFamily(NUM_FONT)
+                                color(colors.c(colors.textPrimary))
+                                text(m.value)
+                                animate(ANIM_THEME, value = AppTheme.isDark)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return
+    }
+    // ---- 桌面布局（保持原样） ----
+    // 第一行：名称代码 + 自选/AI分析
     View {
         attr { flexDirectionRow(); alignItemsCenter() }
         Text {
@@ -350,7 +519,7 @@ private fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.z
             }
         }
     }
-    // 第二行：大价格 + 涨跌
+    // 第二行：大价格 + 涨跌 + 更新时间
     View { attr { height(8f) } }
     View {
         attr { flexDirectionRow(); alignItemsCenter() }

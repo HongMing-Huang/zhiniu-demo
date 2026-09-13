@@ -58,15 +58,18 @@ fun ViewContainer<*, *>.ChartToolbar(
         TIMEFRAMES.forEach { tf ->
             ToolbarTab(label = tf, active = timeframe() == tf, compact = compact, onClick = { onTimeframe(tf) })
         }
-        ChartAction("放大", "zn-chart-zoom-in zn-click", compact, onZoomIn)
-        ChartAction("缩小", "zn-chart-zoom-out zn-click", compact, onZoomOut)
-        ChartAction("复位", "zn-chart-zoom-reset zn-click", compact, onResetZoom)
-        Text {
-            attr {
-                width(44f); textAlignCenter(); lines(1)
-                fontSize(AppTypography.fs11); fontFamily(NUM_FONT)
-                color(colors.c(colors.textTertiary))
-                text("${visibleCount()}根")
+        // compact：缩放靠捏合/滚轮手势，隐藏放大/缩小/复位/根数（避免窄屏工具条溢出）
+        if (!compact) {
+            ChartAction("放大", "zn-chart-zoom-in zn-click", compact, onZoomIn)
+            ChartAction("缩小", "zn-chart-zoom-out zn-click", compact, onZoomOut)
+            ChartAction("复位", "zn-chart-zoom-reset zn-click", compact, onResetZoom)
+            Text {
+                attr {
+                    width(44f); textAlignCenter(); lines(1)
+                    fontSize(AppTypography.fs11); fontFamily(NUM_FONT)
+                    color(colors.c(colors.textTertiary))
+                    text("${visibleCount()}根")
+                }
             }
         }
         View { attr { flex(1f) } }

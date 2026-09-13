@@ -107,7 +107,7 @@
 - **加载**：Kuikly `Image` + `tintColor`（H5 用 SVG filter 实现 / 原生用 ImageView tint）
 - **禁**：Emoji、Unicode 符号、自绘 Canvas 图标、第三方 Icon 字体、运行时 TDesign 组件
 - **落地 20 个**（真实文件名映射，详见 `docs/REFERENCE.md`）：含 search/back/star/star-filled/theme/close/send/ai/chart/more/filter、chevron 三向、calendar/check/filter-sort/error/chat/data
-- **新增图标**：编辑 `scripts/icons_build.sh` 加 `TDesign 官方文件名` → 跑 `scripts/icons_build.sh && node icons_render.js`
+- **新增图标**：编辑 `scripts/icons_build.sh` 加 `TDesign 官方文件名` → 跑 `scripts/icons_build.sh && node scripts/icons_render.js`
 
 ## 8. 动画（只允许）
 - Button Press 100–120ms 背景 · StockRow Hover 120ms · Tab 160ms · SearchOverlay 160ms opacity+translateY · AIDrawer 200ms translateX+opacity · Theme 180ms backgroundColor · K线周期切换 100ms crossfade
