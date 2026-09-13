@@ -35,6 +35,7 @@ fun ViewContainer<*, *>.AppHeader(
     onNavWatchlist: () -> Unit,
     onSearch: () -> Unit,
     onTheme: () -> Unit,
+    onBack: (() -> Unit)? = null,
 ) {
     val colors = AppTheme.colors
     val compact = contentWidth <= 760f
@@ -58,6 +59,11 @@ fun ViewContainer<*, *>.AppHeader(
                 width(contentWidth)
                 flexDirectionRow(); alignItemsCenter()
                 padding(top = topInset, left = sidePad, right = sidePad)
+            }
+            // 手机布局二级页返回（底部 Tab 承接导航后，Header 左侧让位给返回）
+            if (compact && onBack != null) {
+                IconButton(IconKind.BACK, size = 16f, box = 36f, accessibilityLabel = "返回上一页") { onBack() }
+                View { attr { width(8f) } }
             }
             // 品牌位：官方提供的红牛头 Logo 标（透明底，深浅色通用）+ 文字标识
             View {

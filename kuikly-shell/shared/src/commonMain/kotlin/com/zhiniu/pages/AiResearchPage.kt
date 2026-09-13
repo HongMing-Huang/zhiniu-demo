@@ -525,6 +525,71 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
                     host.chatListRef?.view?.setContentOffset(0f, height, false)
                 }
             }
+            // 空会话欢迎态（欧易/ChatGPT 式）：品牌 + 推荐问题胶囊，点击直接发送
+            vif({ host.messages.isEmpty() }) {
+                View {
+                    attr {
+                        padding(top = 60f, bottom = 20f, left = 24f, right = 24f)
+                        flexDirectionColumn(); alignItemsCenter()
+                    }
+                    View {
+                        attr {
+                            width(56f); height(56f); borderRadius(28f); allCenter()
+                            backgroundColor(colors.ca(colors.aiAccent, 14))
+                            border(Border(1f, BorderStyle.SOLID, colors.c(colors.aiAccent)))
+                        }
+                        Icon(IconKind.AI, 24f)
+                    }
+                    View { attr { height(12f) } }
+                    Text {
+                        attr {
+                            fontSize(AppTypography.fs17); fontWeightSemiBold()
+                            color(colors.c(colors.textPrimary)); text("你好，我是知牛 AI")
+                            animate(ANIM_THEME, value = AppTheme.isDark)
+                        }
+                    }
+                    View { attr { height(6f) } }
+                    Text {
+                        attr {
+                            textAlignCenter()
+                            fontSize(AppTypography.fs12)
+                            color(colors.c(colors.textSecondary))
+                            text("多 Agent 辩论研究：行情 · 技术面 · 财务 · 资讯 · 多空 · 风控\n输入股票名称或选择下方问题开始")
+                            animate(ANIM_THEME, value = AppTheme.isDark)
+                        }
+                    }
+                    View { attr { height(18f) } }
+                    listOf(
+                        "分析贵州茅台",
+                        "分析宁德时代",
+                        "解释 RSI 指标",
+                        "结合日K分析五粮液",
+                    ).forEach { q ->
+                        View {
+                            attr {
+                                marginBottom(8f)
+                                padding(left = 14f, right = 14f, top = 9f, bottom = 9f)
+                                borderRadius(18f)
+                                border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+                                backgroundColor(colors.c(colors.surface))
+                                cssClass("zn-click")
+                                highlightBackgroundColor(colors.ca(colors.textSecondary, 6))
+                                accessibility("发送问题 $q")
+                                accessibilityRole(AccessibilityRole.BUTTON)
+                                animate(ANIM_THEME, value = AppTheme.isDark)
+                            }
+                            event { click { host.send(q) } }
+                            Text {
+                                attr {
+                                    fontSize(AppTypography.fs13)
+                                    color(colors.c(colors.textSecondary)); text(q)
+                                    animate(ANIM_THEME, value = AppTheme.isDark)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             vfor({ host.messages }) { msg ->
                 View {
                     attr { padding(top = 14f, left = host.chatSidePad(), right = host.chatSidePad()) }

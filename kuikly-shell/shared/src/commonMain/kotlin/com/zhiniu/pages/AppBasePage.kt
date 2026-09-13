@@ -123,7 +123,7 @@ internal fun ViewContainer<*, *>.renderBottomTab(host: AppBasePage, activeNav: S
 }
 
 /** 公共浮层渲染（顶级扩展，body lambda 可隐式 ViewContainer receiver 调用）。 */
-internal fun ViewContainer<*, *>.renderCommonOverlays(host: AppBasePage, activeNav: String) {
+internal fun ViewContainer<*, *>.renderCommonOverlays(host: AppBasePage, activeNav: String, showBack: Boolean = false) {
     AppHeader(
         activeNav = activeNav,
         contentWidth = host.contentWidth(),
@@ -133,6 +133,7 @@ internal fun ViewContainer<*, *>.renderCommonOverlays(host: AppBasePage, activeN
         onNavWatchlist = { host.navWatchlist() },
         onSearch = { host.isSearchVisible = true },
         onTheme = { host.isThemePopoverVisible = !host.isThemePopoverVisible },
+        onBack = if (showBack) { { host.goBack() } } else null,
     )
     // 手机布局的底部 Tab 由各页面在 body 末尾经 renderBottomTab 渲染（流式布局，ohos 兼容）
     StockSearchOverlay(

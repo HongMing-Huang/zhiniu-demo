@@ -260,7 +260,7 @@ internal class StockDetailPage : AppBasePage() {
             backgroundColor(AppTheme.colors.c(AppTheme.colors.pageBg))
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
-        renderCommonOverlays(this@StockDetailPage, "市场")
+        renderCommonOverlays(this@StockDetailPage, "市场", showBack = true)
         List {
             attr {
                 flex(1f)

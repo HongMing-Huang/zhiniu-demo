@@ -79,7 +79,7 @@ internal class ComparePage : AppBasePage() {
             backgroundColor(AppTheme.colors.c(AppTheme.colors.pageBg))
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
-        renderCommonOverlays(this@ComparePage, "市场")
+        renderCommonOverlays(this@ComparePage, "市场", showBack = true)
         compareContent(this@ComparePage)
         renderBottomTab(this@ComparePage, "市场")
     }

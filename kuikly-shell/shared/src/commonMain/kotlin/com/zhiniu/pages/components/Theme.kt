@@ -82,9 +82,9 @@ open class AppColors(
     open val surfaceRaised: String = surface, // Surface Raised（Dark 用）
 )
 
-/** Light —— 中性白（AppBg #FFFFFF，绝非整页灰底）。 */
+/** Light —— 微灰页面底 + 纯白 Surface（卡片浮层层次，对标移动端行情 App）。 */
 object LightColors : AppColors(
-    pageBg = "#FFFFFF",
+    pageBg = "#F7F8FA",
     surface = "#FFFFFF",
     surfaceSecondary = "#F7F8FA",
     surfaceHover = "#EEF1F4",

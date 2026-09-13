@@ -33,9 +33,30 @@ fun ViewContainer<*, *>.MarketPulse(
     compact: Boolean = false,
 ) {
     val colors = AppTheme.colors
+    // 手机：三张指数卡（对标移动端行情 App 首页），市场宽度做第二行摘要
+    if (compact) {
+        View {
+            attr {
+                flexDirectionColumn()
+                padding(top = 12f, bottom = 12f, left = 16f, right = 16f)
+                backgroundColor(colors.c(colors.pageBg))
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+            View {
+                attr { flexDirectionRow(); alignItemsStretch() }
+                indices.forEachIndexed { i, idx ->
+                    if (i > 0) View { attr { width(8f) } }
+                    IndexCard(idx)
+                }
+            }
+            View { attr { height(10f) } }
+            CompactBreadthCard(breadth)
+        }
+        return
+    }
     View {
         attr {
-            height(if (compact) 148f else AppSpacing.pulse)
+            height(AppSpacing.pulse)
             flexDirectionColumn(); alignItemsStretch()
             backgroundColor(colors.c(colors.surface))
             borderTop(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
@@ -48,18 +69,89 @@ fun ViewContainer<*, *>.MarketPulse(
                 if (i > 0) VerticalDivider()
                 IndexColumn(idx, compact)
             }
-            if (!compact) {
+            VerticalDivider()
+            BreadthColumn(breadth)
+            if (!narrow) {
                 VerticalDivider()
-                BreadthColumn(breadth)
-                if (!narrow) {
-                    VerticalDivider()
-                    AmountColumn(breadth)
-                }
+                AmountColumn(breadth)
             }
         }
-        if (compact) {
-            View { attr { height(1f); backgroundColor(colors.c(colors.border)) } }
-            CompactBreadthRow(breadth)
+    }
+}
+
+/** 手机指数卡：白底描边小卡（名称 / 大价格 / 涨跌 chip / 迷你走势）。 */
+private fun ViewContainer<*, *>.IndexCard(idx: MarketIndex) {
+    val colors = AppTheme.colors
+    View {
+        attr {
+            flex(1f)
+            borderRadius(8f)
+            border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+            backgroundColor(colors.c(colors.surface))
+            padding(top = 10f, bottom = 10f, left = 10f, right = 10f)
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+        Text {
+            attr {
+                fontSize(AppTypography.fs11)
+                color(colors.c(colors.textSecondary)); text(idx.name)
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+        }
+        View { attr { height(3f) } }
+        Text {
+            attr {
+                fontSize(AppTypography.fs18); fontWeightSemiBold(); fontFamily(NUM_FONT)
+                color(colors.c(if (idx.isUp) colors.up else colors.down)); text(fmt2(idx.price))
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+        }
+        View { attr { height(3f) } }
+        Text {
+            attr {
+                fontSize(AppTypography.fs11); fontWeightMedium(); fontFamily(NUM_FONT)
+                color(colors.c(if (idx.isUp) colors.up else colors.down)); text(fmtPct(idx.changePercent))
+            }
+        }
+        View { attr { height(5f) } }
+        Canvas({ attr { width(96f); height(20f) } }) { context, w, h ->
+            drawSparkLine(context, idx.spark, colors.c(if (idx.isUp) colors.up else colors.down), w, h)
+        }
+    }
+}
+
+/** 手机市场宽度摘要卡：上涨/下跌/成交，卡片容器与指数卡同语言。 */
+private fun ViewContainer<*, *>.CompactBreadthCard(breadth: MarketBreadth) {
+    val colors = AppTheme.colors
+    View {
+        attr {
+            flexDirectionRow(); alignItemsCenter()
+            borderRadius(8f)
+            border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+            backgroundColor(colors.c(colors.surface))
+            padding(top = 10f, bottom = 10f, left = 12f, right = 12f)
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+        Text { attr { fontSize(AppTypography.fs11); color(colors.c(colors.textSecondary)); text("市场宽度") } }
+        View { attr { width(8f) } }
+        Text {
+            attr {
+                fontSize(AppTypography.fs13); fontWeightSemiBold(); fontFamily(NUM_FONT)
+                color(colors.c(colors.up)); text(fmtInt(breadth.upCount) + " 涨")
+            }
+        }
+        Text {
+            attr {
+                marginLeft(6f); fontSize(AppTypography.fs13); fontWeightSemiBold(); fontFamily(NUM_FONT)
+                color(colors.c(colors.down)); text(fmtInt(breadth.downCount) + " 跌")
+            }
+        }
+        View { attr { flex(1f) } }
+        Text {
+            attr {
+                fontSize(AppTypography.fs11); color(colors.c(colors.textTertiary))
+                text("成交 " + com.zhiniu.pages.components.fmtAmount(breadth.amountYi * 1e8))
+            }
         }
     }
 }

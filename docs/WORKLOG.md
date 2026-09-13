@@ -10,6 +10,8 @@
 
 | 时间 | 类别 | 改动 | 验证 |
 | ---- | ---- | ---- | ---- |
+| 19:00 | design/mobile | 移动端专项（课题重移动端，对标 KuiklyStock/SaiRen 手机形态）：①Light 主题改微灰页面底 #F7F8FA + 纯白 Surface（card-on-gray 层次，两位组员共同语言；桌面回归更清晰）②MarketPulse compact 重写为三张指数卡（名称/大价格/涨跌色/迷你走势，白卡描边）+ 市场宽度摘要卡，替换原纯文本两行③重建 bundle 使并行会话的 BottomTabBar 生效（行情/自选/AI研究 底部导航，此前组件存在但未构建进包）④Header 手机端隐藏文字导航（导航职责移交底部 Tab）+ 二级页（详情/对比）compact 左上返回箭头 | H5 390×844 三页实测（指数卡/底部 Tab/返回箭头/涨跌 chip 渲染正确，0 error）；Android 模拟器实装最新 APK 验证一致；桌面 1440 回归通过（微灰底表格层次更佳）；README 拼图刷新 |
+
 | 时间 | 类别 | 改动 | 验证 |
 | ---- | ---- | ---- | ---- |
 | 18:10 | qa/multiplat | Android 模拟器实机验收（emulator-5554 / zhiniu_api34）：最新 APK 安装启动，品牌图标进桌面；首页（脉冲/Tab/工具条/涨跌幅 chip/紧凑副行）、对比页、AI 研究页逐页截图；同 commonMain 与 H5 行为一致，实机无崩溃 |
