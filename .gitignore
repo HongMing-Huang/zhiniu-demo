@@ -27,6 +27,12 @@ captures/
 .externalNativeBuild/
 .cxx/
 
+# === HarmonyOS（ohpm 依赖 / hvigor 缓存 / 构建产物）===
+oh_modules/
+.hvigor/
+entry/build/
+*.hap
+
 # === iOS / Xcode ===
 Podfile.lock
 Pods/
