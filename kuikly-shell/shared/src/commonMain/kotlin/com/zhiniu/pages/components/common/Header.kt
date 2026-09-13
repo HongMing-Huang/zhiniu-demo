@@ -18,6 +18,7 @@ import com.zhiniu.pages.components.IconKind
 import com.zhiniu.pages.components.c
 import com.zhiniu.pages.components.ca
 import com.zhiniu.pages.components.cssClass
+import com.zhiniu.pages.components.common.IconButton
 
 /**
  * 全局 Header：64px，1px 底描边。
@@ -85,9 +86,15 @@ fun ViewContainer<*, *>.AppHeader(
                 HeaderNav("待办", activeNav == "待办", onClick = onNavTodo)
             }
             View { attr { flex(1f) } }
-            // 全局搜索（点击打开 Overlay）
-            SearchField(width = if (compact) 120f else 240f, onClick = onSearch)
-            View { attr { width(if (compact) 8f else 10f) } }
+            // 全局搜索（点击打开 Overlay）：手机用图标按钮（占位文字窄屏被裁），桌面用宽搜索框
+            if (compact) {
+                IconButton(IconKind.SEARCH, size = 15f, box = 36f, accessibilityLabel = "搜索股票") {
+                    onSearch()
+                }
+            } else {
+                SearchField(width = 240f, onClick = onSearch)
+                View { attr { width(10f) } }
+            }
             SecondaryButton("设置", height = 36f, icon = IconKind.THEME, onClick = onTheme)
         }
     }

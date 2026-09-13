@@ -109,10 +109,10 @@ fun ViewContainer<*, *>.StockRow(
     onClick: () -> Unit,
 ) {
     val colors = AppTheme.colors
-    // compact 副行：把市值/成交量并入名称列，保证窄屏也能看到课题要求的基础字段
+    // compact 副行：代码 + 市值（缺失省略）+ 成交量，去掉「市值/量」前缀省宽度
     val compactMeta = if (compact) buildList {
-        if (StockColumns.MARKET_CAP in columns) add("市值 " + fmtMarketCap(q.marketCap))
-        if (StockColumns.VOLUME in columns) add("量 " + fmtVolHand(q.volume))
+        if (StockColumns.MARKET_CAP in columns && (q.marketCap ?: 0.0) > 0.0) add(fmtMarketCap(q.marketCap))
+        if (StockColumns.VOLUME in columns) add(fmtVolHand(q.volume))
     }.joinToString(" · ") else ""
     View {
         attr {
@@ -145,7 +145,7 @@ fun ViewContainer<*, *>.StockRow(
                     color(colors.c(colors.textTertiary))
                     lines(1)
                     cssClass("zn-nowrap")
-                    text(if (compactMeta.isEmpty()) fmtSymbol(q.symbol) else q.code + "  " + compactMeta)
+                    text(if (compactMeta.isEmpty()) fmtSymbol(q.symbol) else fmtSymbol(q.symbol) + " · " + compactMeta)
                     animate(ANIM_THEME, value = AppTheme.isDark)
                 }
             }

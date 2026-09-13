@@ -9,6 +9,8 @@ import com.zhiniu.domain.model.StockFundamentals
 import com.zhiniu.domain.model.StockQuote
 import com.zhiniu.platform.GatewayTransport
 import com.zhiniu.platform.createPlatformGatewayTransport
+import com.zhiniu.platform.runOffMainThread
+import com.zhiniu.platform.sseStreamingSupported
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
@@ -138,17 +140,17 @@ object GatewayMarketClient {
 
     suspend fun quotes(symbols: List<String>): List<StockQuote> {
         if (symbols.isEmpty()) return emptyList()
-        val text = transport.get("$baseUrl/quote/realtime?codes=${symbols.joinToString(",")}")
+        val text = runOffMainThread { transport.get("$baseUrl/quote/realtime?codes=${symbols.joinToString(",")}") }
         return parseQuotes(text, symbols)
     }
 
     suspend fun candles(symbol: String, scale: Int = 240, count: Int = 240): List<Candle> {
-        val text = transport.get("$baseUrl/quote/kline?symbol=$symbol&scale=$scale&datalen=$count")
+        val text = runOffMainThread { transport.get("$baseUrl/quote/kline?symbol=$symbol&scale=$scale&datalen=$count") }
         return parseCandles(text)
     }
 
     suspend fun candleSeries(symbol: String, scale: Int = 240, count: Int = 240): CandleSeriesResult {
-        val text = transport.get("$baseUrl/quote/kline?symbol=$symbol&scale=$scale&datalen=$count")
+        val text = runOffMainThread { transport.get("$baseUrl/quote/kline?symbol=$symbol&scale=$scale&datalen=$count") }
         val root = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull()
             ?: JsonObject(emptyMap())
         return CandleSeriesResult(
@@ -160,25 +162,25 @@ object GatewayMarketClient {
     }
 
     suspend fun fundamentals(symbol: String): StockFundamentals? {
-        val text = transport.get("$baseUrl/quote/fundamentals?symbol=$symbol")
+        val text = runOffMainThread { transport.get("$baseUrl/quote/fundamentals?symbol=$symbol") }
         return parseFundamentals(text)
     }
 
     suspend fun news(symbol: String): List<MarketNewsItem> {
-        val text = transport.get("$baseUrl/news/list?symbol=$symbol")
+        val text = runOffMainThread { transport.get("$baseUrl/news/list?symbol=$symbol") }
         return parseNews(text)
     }
 
     /** 东财人气榜（真实排名）；后端离线时返回 source=mock + isStale。 */
     suspend fun popularity(count: Int = 20): PopularityResult {
-        val text = transport.get("$baseUrl/quote/popularity?count=$count")
+        val text = runOffMainThread { transport.get("$baseUrl/quote/popularity?count=$count") }
         return parsePopularity(text)
     }
 
     /** 新浪三大指数实时行情（/quote/indices）；网关不可用返回 null（页面回退本地快照）。 */
     suspend fun indices(): List<MarketIndex>? {
         val text = runCatching {
-            transport.get("$baseUrl/quote/indices")
+            runOffMainThread { transport.get("$baseUrl/quote/indices") }
         }.getOrNull() ?: return null
         val root = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull() ?: return null
         val items = root["indices"]?.jsonArray?.mapNotNull { element ->
@@ -201,7 +203,7 @@ object GatewayMarketClient {
     /** 东财行业板块（按当日涨跌幅排序）；网关不可用返回 null（页面显示空态提示，不伪造板块）。 */
     suspend fun sectors(): SectorResult? {
         val text = runCatching {
-            transport.get("$baseUrl/quote/sectors")
+            runOffMainThread { transport.get("$baseUrl/quote/sectors") }
         }.getOrNull() ?: return null
         val root = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull() ?: return null
         val sectors = root["sectors"]?.jsonArray?.mapNotNull { element ->
@@ -224,7 +226,7 @@ object GatewayMarketClient {
     }
 
     suspend fun research(symbol: String, keyword: String): AgentResearchResult? {
-        val text = transport.postJson("$baseUrl/agent/research", researchPayload(symbol, keyword))
+        val text = runOffMainThread { transport.postJson("$baseUrl/agent/research", researchPayload(symbol, keyword)) }
         return parseResearch(text)
     }
 
@@ -237,6 +239,7 @@ object GatewayMarketClient {
         keyword: String,
         onStage: (ResearchStageEvent) -> Unit,
     ): AgentResearchResult? {
+        if (!sseStreamingSupported) return null // iOS Debug 断言下关闭流式，调用方回退一次性接口
         var result: AgentResearchResult? = null
         var pendingEvent: String? = null  // SSE event: 行先于 data: 行到达时挂起（lambda 闭包捕获）
         transport.postSse("$baseUrl/agent/research/stream", researchPayload(symbol, keyword)) { line ->
@@ -288,7 +291,7 @@ object GatewayMarketClient {
             if (symbol.isNotBlank()) put("symbol", symbol)
         }
         val text = runCatching {
-            transport.postJson("$baseUrl/agent/chat", payload.toString())
+            runOffMainThread { transport.postJson("$baseUrl/agent/chat", payload.toString()) }
         }.getOrNull() ?: return null
         val root = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull() ?: return null
         val content = root.string("content")
@@ -301,7 +304,7 @@ object GatewayMarketClient {
     }
 
     suspend fun health(): GatewayStatus {
-        val text = transport.get("$baseUrl/healthz")
+        val text = runOffMainThread { transport.get("$baseUrl/healthz") }
         val root = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull()
             ?: return GatewayStatus()
         val services = root["services"]?.jsonObject ?: JsonObject(emptyMap())
