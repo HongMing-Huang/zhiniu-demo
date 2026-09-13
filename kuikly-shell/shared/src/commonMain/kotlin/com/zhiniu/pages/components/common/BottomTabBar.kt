@@ -10,6 +10,8 @@ import com.tencent.kuikly.core.views.View
 import com.zhiniu.pages.components.ANIM_THEME
 import com.zhiniu.pages.components.AppTheme
 import com.zhiniu.pages.components.AppTypography
+import com.zhiniu.pages.components.Icon
+import com.zhiniu.pages.components.IconKind
 import com.zhiniu.pages.components.c
 import com.zhiniu.pages.components.ca
 import com.zhiniu.pages.components.cssClass
@@ -46,14 +48,14 @@ fun ViewContainer<*, *>.BottomTabBar(
             )
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
-        BottomTab("市场", activeNav == "市场") { onNavMarket() }
-        BottomTab("AI研究", activeNav == "AI研究") { onNavAiResearch() }
-        BottomTab("待办", activeNav == "待办") { onNavTodo() }
+        BottomTab("市场", IconKind.CHART, activeNav == "市场") { onNavMarket() }
+        BottomTab("AI研究", IconKind.CHAT, activeNav == "AI研究") { onNavAiResearch() }
+        BottomTab("待办", IconKind.CALENDAR, activeNav == "待办") { onNavTodo() }
     }
 }
 
-/** 单个底部 Tab：图标位省略（文字 + 顶部 2px 指示条，克制不花哨）。 */
-private fun ViewContainer<*, *>.BottomTab(label: String, active: Boolean, onClick: () -> Unit) {
+/** 单个底部 Tab：图标 + 文字（欧易式）；选中态 = 图标不透明 + 主色文字 + semibold。 */
+private fun ViewContainer<*, *>.BottomTab(label: String, icon: IconKind, active: Boolean, onClick: () -> Unit) {
     val colors = AppTheme.colors
     View {
         attr {
@@ -61,7 +63,7 @@ private fun ViewContainer<*, *>.BottomTab(label: String, active: Boolean, onClic
             flexDirectionColumn()
             alignItemsCenter()
             justifyContentCenter()
-            paddingTop(6f)
+            paddingTop(7f)
             accessibility(if (active) "当前在 $label 页" else "切换到 $label")
             accessibilityRole(AccessibilityRole.BUTTON)
             accessibilityInfo(clickable = true, longClickable = false)
@@ -69,21 +71,11 @@ private fun ViewContainer<*, *>.BottomTab(label: String, active: Boolean, onClic
             highlightBackgroundColor(colors.ca(colors.textSecondary, 6))
         }
         event { click { onClick() } }
-        // 顶部 2px 指示条
-        View {
-            attr {
-                height(2f)
-                width(24f)
-                borderRadius(allBorderRadius = 1f)
-                backgroundColor(colors.c(colors.textPrimary))
-                opacity(if (active) 1f else 0f)
-                animate(Animation.easeOut(0.14f), value = active)
-            }
-        }
+        Icon(icon, 20f)
         View { attr { height(4f) } }
         Text {
             attr {
-                fontSize(AppTypography.fs13)
+                fontSize(AppTypography.fs12)
                 if (active) fontWeightSemiBold()
                 lines(1)
                 color(colors.c(if (active) colors.textPrimary else colors.textSecondary))

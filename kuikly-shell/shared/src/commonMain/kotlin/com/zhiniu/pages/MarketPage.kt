@@ -428,9 +428,36 @@ private fun ViewContainer<*, *>.stockTable(host: MarketPage) {
 
 private fun ViewContainer<*, *>.MarketTab(label: String, active: () -> Boolean, compact: Boolean, onClick: () -> Unit) {
     val colors = AppTheme.colors
+    // 手机布局：胶囊选中态（欧易式），占位小、触控友好；桌面保留下划线
+    if (compact) {
+        View {
+            attr {
+                height(32f); padding(left = 12f, right = 12f); marginRight(8f)
+                borderRadius(16f)
+                backgroundColor(colors.c(if (active()) colors.surfaceHover else colors.surface))
+                animate(ANIM_THEME, value = AppTheme.isDark)
+                accessibility(label)
+                accessibilityRole(AccessibilityRole.BUTTON)
+                accessibilityInfo(clickable = true, longClickable = false)
+                cssClass("zn-click")
+                highlightBackgroundColor(colors.ca(colors.textSecondary, 6))
+            }
+            event { click { onClick() } }
+            Text {
+                attr {
+                    fontSize(AppTypography.fs13)
+                    color(colors.c(if (active()) colors.textPrimary else colors.textSecondary))
+                    fontWeight600(); lines(1)
+                    text(label)
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+            }
+        }
+        return
+    }
     View {
         attr {
-            height(34f); padding(left = 4f, right = 4f); marginRight(if (compact) 9f else 20f)
+            height(34f); padding(left = 4f, right = 4f); marginRight(20f)
             flexDirectionColumn(); alignItemsCenter(); justifyContentCenter()
             accessibility(label)
             accessibilityRole(AccessibilityRole.BUTTON)

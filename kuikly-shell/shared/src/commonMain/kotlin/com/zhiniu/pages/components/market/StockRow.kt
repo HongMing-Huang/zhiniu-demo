@@ -2,6 +2,7 @@
 // 无外层 Card；行间 1px 分割线；hover surfaceHover 120ms；pressed surfaceSecondary。
 package com.zhiniu.pages.components.market
 
+import com.tencent.kuikly.core.base.Color
 import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.base.attr.AccessibilityRole
 import com.tencent.kuikly.core.directives.vfor
@@ -70,10 +71,10 @@ fun ViewContainer<*, *>.StockTableHeader(
         View { attr { flex(2.4f) }; ThLabel("股票", alignLeft = true) }
         View { attr { width(if (compact) 78f else 120f) }; ThLabel("最新价", alignLeft = false) }
         if (!compact && StockColumns.CHANGE in columns) View { attr { width(110f) }; ThLabel("涨跌额", alignLeft = false) }
-        View { attr { width(if (compact) 68f else 110f) }; ThLabel("涨跌幅", alignLeft = false) }
+        View { attr { width(if (compact) 84f else 110f) }; ThLabel("涨跌幅", alignLeft = false) }
         if (!compact && StockColumns.MARKET_CAP in columns) View { attr { width(110f) }; ThLabel("总市值", alignLeft = false) }
         if (!compact && StockColumns.VOLUME in columns) View { attr { width(110f) }; ThLabel("成交量", alignLeft = false) }
-        if (StockColumns.SPARK in columns) View { attr { width(if (compact) 82f else 170f) }; ThLabel("走势", alignLeft = false) }
+        if (!compact && StockColumns.SPARK in columns) View { attr { width(if (compact) 82f else 170f) }; ThLabel("走势", alignLeft = false) }
         if (!narrow && StockColumns.HIGH_LOW in columns) View { attr { width(150f) }; ThLabel("高 / 低", alignLeft = false) }
         if (!narrow && StockColumns.AMOUNT in columns) View { attr { width(110f) }; ThLabel("成交额", alignLeft = false) }
     }
@@ -95,6 +96,36 @@ private fun ViewContainer<*, *>.ThLabel(label: String, alignLeft: Boolean) {
             text(label)
             if (!alignLeft) textAlignRight() else textAlignLeft()
             animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+    }
+}
+
+/** 涨跌幅色块（欧易式）：红/绿实心圆角块 + 白字，0% 灰块。 */
+private fun ViewContainer<*, *>.ChangeBadge(changePercent: Double, compact: Boolean) {
+    val colors = AppTheme.colors
+    val bg = when {
+        changePercent > 0.0001 -> colors.up
+        changePercent < -0.0001 -> colors.down
+        else -> colors.textTertiary
+    }
+    View {
+        attr {
+            width(if (compact) 84f else 110f); allCenter()
+        }
+        View {
+            attr {
+                padding(left = 8f, right = 8f, top = 4f, bottom = 4f)
+                borderRadius(4f)
+                backgroundColor(colors.c(bg))
+            }
+            Text {
+                attr {
+                    fontSize(AppTypography.fs12); fontWeightSemiBold()
+                    fontFamily(NUM_FONT); lines(1); textOverFlowClip()
+                    color(Color.WHITE)
+                    text(fmtPct(changePercent))
+                }
+            }
         }
     }
 }
@@ -154,17 +185,21 @@ fun ViewContainer<*, *>.StockRow(
         NumCell(fmt2(q.price), if (compact) 78f else 120f, { colors.textPrimary }, semibold = true)
         // 涨跌额
         if (!compact && StockColumns.CHANGE in columns) NumCell(fmtChangeSigned(q.change), 110f, { if (q.isUp) colors.up else colors.down })
-        // 涨跌幅
-        NumCell(fmtPct(q.changePercent), if (compact) 68f else 110f, { if (q.isUp) colors.up else colors.down }, semibold = true)
+        // 涨跌幅（compact：欧易式色块；桌面：文字）
+        if (compact) {
+            ChangeBadge(q.changePercent, compact = true)
+        } else {
+            NumCell(fmtPct(q.changePercent), 110f, { if (q.isUp) colors.up else colors.down }, semibold = true)
+        }
         // 总市值 / 成交量（课题基础字段）
         if (!compact && StockColumns.MARKET_CAP in columns) NumCell(fmtMarketCap(q.marketCap), 110f, { colors.textSecondary })
         if (!compact && StockColumns.VOLUME in columns) NumCell(fmtVolHand(q.volume), 110f, { colors.textSecondary })
-        // 今日走势（84×28 sparkline）
-        if (StockColumns.SPARK in columns) {
+        // 今日走势（84×28 sparkline；compact 隐藏——色块已是视觉锚点）
+        if (!compact && StockColumns.SPARK in columns) {
             View {
-                attr { width(if (compact) 82f else 170f); allCenter() }
+                attr { width(170f); allCenter() }
                 Canvas({
-                    attr { width(if (compact) 68f else 84f); height(28f) }
+                    attr { width(84f); height(28f) }
                 }) { context, w, h ->
                     drawSparkLine(
                         context, spark,
