@@ -31,7 +31,8 @@ fun ViewContainer<*, *>.BottomTabBar(
     bottomInset: Float,
     onNavMarket: () -> Unit,
     onNavAiResearch: () -> Unit,
-    onNavTodo: () -> Unit,
+    onNavWatchlist: () -> Unit,
+    onNavAiResearch: () -> Unit,
 ) {
     val colors = AppTheme.colors
     View {
@@ -48,9 +49,9 @@ fun ViewContainer<*, *>.BottomTabBar(
             )
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
-        BottomTab("市场", IconKind.CHART, activeNav == "市场") { onNavMarket() }
+        BottomTab("行情", IconKind.CHART, activeNav == "市场") { onNavMarket() }
         BottomTab("AI研究", IconKind.CHAT, activeNav == "AI研究") { onNavAiResearch() }
-        BottomTab("待办", IconKind.CALENDAR, activeNav == "待办") { onNavTodo() }
+        BottomTab("自选", IconKind.STAR, activeNav == "自选") { onNavWatchlist() }
     }
 }
 
