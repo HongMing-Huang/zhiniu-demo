@@ -226,8 +226,9 @@ internal class StockDetailPage : AppBasePage() {
             }
             vif({ this@StockDetailPage.detailLoading || this@StockDetailPage.quote() == null }) { detailSkeleton(this@StockDetailPage) }
             velse { detailContent(this@StockDetailPage, this@StockDetailPage.quote()!!) }
-            View { attr { height(48f + this@StockDetailPage.bottomNavInset()) } }
+            View { attr { height(32f) } }
         }
+        renderBottomTab(this@StockDetailPage, "市场")
     }
 }
 

@@ -399,6 +399,7 @@ internal class AiResearchPage : AppBasePage() {
             if (!this@AiResearchPage.isCompact()) sessionColumn(this@AiResearchPage)
             chatColumn(this@AiResearchPage)
         }
+        renderBottomTab(this@AiResearchPage, "AI研究")
     }
 }
 

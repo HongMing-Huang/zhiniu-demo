@@ -38,7 +38,7 @@ struct Index {
     Stack() {
       if (this.showKuikly) {
         Kuikly({
-          pageName: this.pageName ?? 'HelloWorld',
+          pageName: this.pageName ?? 'MarketList',
           pageData: this.pageData ?? {},
           delegate: this.kuiklyViewDelegate,
           onControllerReadyCallback: (controller) => {

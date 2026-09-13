@@ -1,0 +1,10 @@
+-keep-property-name
+arkTSCallNative
+createNativeRoot
+isBackPressConsumed
+onDestroyRenderView
+onInitRenderView
+OnLaunchStart
+onRenderViewSizeChanged
+sendEvent
+updateConfig

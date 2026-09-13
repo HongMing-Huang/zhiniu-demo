@@ -119,6 +119,7 @@ internal class TodoListPage : AppBasePage() {
         }
         renderCommonOverlays(this@TodoListPage, "待办")
         todoContent(this@TodoListPage)
+        renderBottomTab(this@TodoListPage, "待办")
     }
 }
 
@@ -130,7 +131,7 @@ private fun ViewContainer<*, *>.todoContent(host: TodoListPage) {
             flex(1f); flexDirectionColumn(); alignItemsCenter()
             paddingLeft(if (host.isCompact()) 16f else 32f)
             paddingRight(if (host.isCompact()) 16f else 32f)
-            paddingBottom(host.bottomNavInset() + 48f)
+            paddingBottom(48f)
             backgroundColor(colors.c(colors.pageBg))
             animate(ANIM_THEME, value = AppTheme.isDark)
         }

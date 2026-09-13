@@ -1,0 +1,91 @@
+{
+  "lockVersion": "1.0",
+  "settings": {
+    "resolveConflict": true,
+    "resolveConflictStrict": false,
+    "installAll": true
+  },
+  "overrides": {},
+  "overrideDependencyMap": {},
+  "modules": {
+    ".": {
+      "name": "",
+      "dependencies": {},
+      "devDependencies": {
+        "@ohos/hypium": {
+          "specifier": "1.0.16",
+          "version": "1.0.16"
+        },
+        "@ohos/hamock": {
+          "specifier": "1.0.0",
+          "version": "1.0.0"
+        }
+      },
+      "dynamicDependencies": {},
+      "maskedByOverrideDependencyMap": false
+    },
+    "entry": {
+      "name": "entry",
+      "dependencies": {
+        "@kuikly-open/render": {
+          "specifier": "2.25.0",
+          "version": "2.25.0"
+        },
+        "libkuikly_entry.so": {
+          "specifier": "file:entry/src/main/cpp/types/kuikly_entry",
+          "version": "file:entry/src/main/cpp/types/kuikly_entry"
+        }
+      },
+      "devDependencies": {},
+      "dynamicDependencies": {},
+      "maskedByOverrideDependencyMap": false
+    }
+  },
+  "packages": {
+    "@ohos/hypium@1.0.16": {
+      "integrity": "sha512-PC3jpwKERg68V+4dmKU+SLjNps9i5JcQH57rQriaTsh62NBgVZs4SceMmNOtrIOyldbEJ5mXSwoZwiG/nkRmTw==",
+      "storePath": "oh_modules/.ohpm/@ohos+hypium@1.0.16",
+      "dependencies": {},
+      "dynamicDependencies": {},
+      "dev": true,
+      "dynamic": false,
+      "maskedByOverrideDependencyMap": false
+    },
+    "@ohos/hamock@1.0.0": {
+      "integrity": "sha512-K6lDPYc6VkKe6ZBNQa9aoG+ZZMiwqfcR/7yAVFSUGIuOAhPvCJAo9+t1fZnpe0dBRBPxj2bxPPbKh69VuyAtDg==",
+      "storePath": "oh_modules/.ohpm/@ohos+hamock@1.0.0",
+      "dependencies": {},
+      "dynamicDependencies": {},
+      "dev": true,
+      "dynamic": false,
+      "maskedByOverrideDependencyMap": false
+    },
+    "@kuikly-open/render@2.25.0": {
+      "integrity": "sha512-emv5lDxhiNMznRhVifQzP67v84GEeuU0HZvelH4OFqVE2ilRuiJlhrpIIAriUeZYKHlXiIt0jH1eEDF5lHII1A==",
+      "storePath": "oh_modules/.ohpm/@kuikly-open+render@2.25.0",
+      "dependencies": {
+        "libkuikly.so": "oh_modules/.ohpm/@kuikly-open+render@2.25.0/oh_modules/@kuikly-open/render/src/main/cpp/types"
+      },
+      "dynamicDependencies": {},
+      "dev": false,
+      "dynamic": false,
+      "maskedByOverrideDependencyMap": false
+    },
+    "libkuikly_entry.so@file:entry/src/main/cpp/types/kuikly_entry": {
+      "storePath": "entry/src/main/cpp/types/kuikly_entry",
+      "dependencies": {},
+      "dynamicDependencies": {},
+      "dev": false,
+      "dynamic": false,
+      "maskedByOverrideDependencyMap": false
+    },
+    "libkuikly.so@file:oh_modules/.ohpm/@kuikly-open+render@2.25.0/oh_modules/@kuikly-open/render/src/main/cpp/types": {
+      "storePath": "oh_modules/.ohpm/@kuikly-open+render@2.25.0/oh_modules/@kuikly-open/render/src/main/cpp/types",
+      "dependencies": {},
+      "dynamicDependencies": {},
+      "dev": false,
+      "dynamic": false,
+      "maskedByOverrideDependencyMap": false
+    }
+  }
+}

@@ -1,0 +1,147 @@
+{
+  "HVIGOR_OHOS_PLUGIN": {
+    "MODULES": [
+      {
+        "MODULE_NAME": "923fe53966c6cd9343e11af776cd4b05be315ea4b200b02e4d5dfb0f929b73bf",
+        "API_TYPE": "stageMode",
+        "INCLUDE_IN_BUILD": true,
+        "IS_COMMAND_LINE_ENTRY_MODULE": true,
+        "BUILD_OPTION": [
+          {
+            "path": "debuggable",
+            "traceValue": true,
+            "value": true
+          },
+          {
+            "path": "copyFrom",
+            "traceValue": false,
+            "value": ""
+          },
+          {
+            "path": "strictMode",
+            "traceValue": false,
+            "value": ""
+          },
+          {
+            "path": "strictMode.useNormalizedOHMUrl",
+            "traceValue": true,
+            "value": true
+          },
+          {
+            "path": "externalNativeOptions",
+            "traceValue": false,
+            "value": ""
+          },
+          {
+            "path": "externalNativeOptions.path",
+            "traceValue": false,
+            "value": ""
+          },
+          {
+            "path": "externalNativeOptions.arguments",
+            "traceValue": false,
+            "value": ""
+          },
+          {
+            "path": "externalNativeOptions.cppFlags",
+            "traceValue": false,
+            "value": ""
+          },
+          {
+            "path": "arkOptions",
+            "traceValue": false,
+            "value": ""
+          },
+          {
+            "path": "arkOptions.obfuscation",
+            "traceValue": false,
+            "value": ""
+          },
+          {
+            "path": "arkOptions.obfuscation.ruleOptions",
+            "traceValue": false,
+            "value": ""
+          },
+          {
+            "path": "arkOptions.obfuscation.ruleOptions.enable",
+            "traceValue": true,
+            "value": false
+          },
+          {
+            "path": "arkOptions.obfuscation.ruleOptions.files",
+            "traceValue": false,
+            "value": ""
+          },
+          {
+            "path": "nativeLib",
+            "traceValue": false,
+            "value": ""
+          },
+          {
+            "path": "nativeLib.debugSymbol",
+            "traceValue": false,
+            "value": ""
+          },
+          {
+            "path": "nativeLib.debugSymbol.strip",
+            "traceValue": true,
+            "value": false
+          }
+        ],
+        "PACKAGE_JSON": [],
+        "MODULE_TYPE": "entry",
+        "INCREMENTAL_TASKS": {
+          "BUILD_NATIVE_WITH_CMAKE": true
+        },
+        "IS_INCREMENTAL_MODULE": true
+      }
+    ],
+    "NATIVE_COMPILER": "Default",
+    "IS_FULL_BUILD": false,
+    "PACKAGE_JSON": [],
+    "BUILD_MODE": "debug"
+  },
+  "HVIGOR": {
+    "IS_INCREMENTAL": true,
+    "IS_DAEMON": false,
+    "IS_PARALLEL": true,
+    "IS_HVIGORFILE_TYPE_CHECK": false,
+    "IS_EXECUTION_OHPM_BY_HVIGOR": false,
+    "BUILD_ANALYSIS_MODE": "normal",
+    "TASK_TIME": {
+      "923fe53966c6cd9343e11af776cd4b05be315ea4b200b02e4d5dfb0f929b73bf": {
+        "CreateModuleInfo": 387292,
+        "ConfigureCmake": 10694917,
+        "PreCheckSyscap": 108500,
+        "GeneratePkgSdkInfo": 1057125,
+        "ProcessIntegratedHsp": 370583,
+        "BuildNativeWithCmake": 5314917,
+        "SyscapTransform": 16517291,
+        "ProcessStartupConfig": 2174792,
+        "BuildJS": 896834,
+        "BuildNativeWithNinja": 985595084,
+        "ProcessLibs": 61000625,
+        "DoNativeStrip": 7953458,
+        "CacheNativeLibs": 1737625,
+        "ProcessCompiledResources": 172667,
+        "PackageHap": 422629750,
+        "PackingCheck": 1812708,
+        "SignHap": 418875,
+        "CollectDebugSymbol": 195667,
+        "assembleHap": 51292
+      }
+    },
+    "CUSTOM_TASK_TIME": {},
+    "CUSTOM_PLUGIN_TIME": {},
+    "APIS": [
+      "getProperty"
+    ],
+    "CONFIG_EXPERIMENT": {
+      "ENABLE_MODULE_SKIP": false,
+      "ENABLE_CPP_FUNCTION_LEVEL_INCREMENTAL": false
+    },
+    "CONFIG_PROPERTIES": {},
+    "BUILD_ID": "202609131314095970",
+    "TOTAL_TIME": 2398538500
+  }
+}

@@ -110,6 +110,18 @@ internal abstract class AppBasePage : BasePager() {
     }
 }
 
+/** 手机布局底部 Tab（页面 body 末尾调用；流式布局，ohos 渲染器兼容）。 */
+internal fun ViewContainer<*, *>.renderBottomTab(host: AppBasePage, activeNav: String) {
+    if (!host.isCompact()) return
+    BottomTabBar(
+        activeNav = activeNav,
+        bottomInset = host.safeBottomInset(),
+        onNavMarket = { host.navMarket() },
+        onNavAiResearch = { host.navAiResearch() },
+        onNavTodo = { host.navTodo() },
+    )
+}
+
 /** 公共浮层渲染（顶级扩展，body lambda 可隐式 ViewContainer receiver 调用）。 */
 internal fun ViewContainer<*, *>.renderCommonOverlays(host: AppBasePage, activeNav: String) {
     AppHeader(
@@ -122,17 +134,7 @@ internal fun ViewContainer<*, *>.renderCommonOverlays(host: AppBasePage, activeN
         onSearch = { host.isSearchVisible = true },
         onTheme = { host.isThemePopoverVisible = !host.isThemePopoverVisible },
     )
-    // 手机布局：底部 Tab 导航（Android/iOS App 标配）；桌面不渲染
-    if (host.isCompact()) {
-        BottomTabBar(
-            activeNav = activeNav,
-            pageWidth = host.pageData.activityWidth,
-            bottomInset = host.safeBottomInset(),
-            onNavMarket = { host.navMarket() },
-            onNavAiResearch = { host.navAiResearch() },
-            onNavTodo = { host.navTodo() },
-        )
-    }
+    // 手机布局的底部 Tab 由各页面在 body 末尾经 renderBottomTab 渲染（流式布局，ohos 兼容）
     StockSearchOverlay(
         visible = { host.isSearchVisible },
         query = { host.searchQuery },

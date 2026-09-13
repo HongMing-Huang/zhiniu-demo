@@ -216,8 +216,9 @@ internal class MarketPage : AppBasePage() {
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
             marketContent(this@MarketPage)
-            View { attr { height(48f + this@MarketPage.bottomNavInset()) } }
+            View { attr { height(32f) } }
         }
+        renderBottomTab(this@MarketPage, "市场")
     }
 }
 

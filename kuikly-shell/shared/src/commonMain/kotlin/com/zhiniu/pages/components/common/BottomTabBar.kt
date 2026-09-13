@@ -19,12 +19,13 @@ const val BOTTOM_TAB_HEIGHT = 54f
 
 /**
  * 手机布局底部导航：3 个 Tab 均分，选中态 2px 顶部指示条 + 主色文字。
+ * 流式布局元素（非绝对定位）——ohos 渲染器对 absolutePosition 支持不完整，
+ * 由各页面在 body 末尾调用，配合内容区 flex(1f) 贴底。
  * @param activeNav 当前一级导航（"市场" / "AI研究" / "待办"）
  * @param bottomInset 底部安全区（iPhone Home 条 / Android 手势条避让）
  */
 fun ViewContainer<*, *>.BottomTabBar(
     activeNav: String,
-    pageWidth: Float,
     bottomInset: Float,
     onNavMarket: () -> Unit,
     onNavAiResearch: () -> Unit,
@@ -33,7 +34,6 @@ fun ViewContainer<*, *>.BottomTabBar(
     val colors = AppTheme.colors
     View {
         attr {
-            absolutePosition(left = 0f, right = 0f, bottom = 0f)
             height(BOTTOM_TAB_HEIGHT + bottomInset)
             flexDirectionRow()
             backgroundColor(colors.c(colors.surface))

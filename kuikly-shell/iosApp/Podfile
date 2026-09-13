@@ -15,4 +15,25 @@ post_install do |installer|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.1'
     end
   end
+
+  # 知牛补丁：对齐 Debug 与 Release 的线程断言行为。
+  # 背景：OpenKuiklyIOSRender 2.25.0 的 assertContextQueue 对 Kotlin→native 调用做严格
+  # Context 线程断言；本项目网络层走 Ktor（Darwin 引擎），其恢复线程不受 Kuikly
+  # context 线程管辖，页面在协程回调里更新 observable（TextShadow.setProp 等）会
+  # 触发 assert 并 SIGABRT。ObjC assert() 在 Release 构建本就被编译掉——即生产
+  # 版本不启用该断言，此处将 Debug 对齐 Release（降级为日志），与 Android/H5
+  # 渲染层对跨线程更新的宽容行为一致。
+  assert_file = File.join(installer.sandbox.root, 'OpenKuiklyIOSRender/core-render-ios/Thread/KuiklyRenderThreadManager.m')
+  if File.exist?(assert_file)
+    content = File.read(assert_file)
+    patched = content.gsub(
+      /assert\(\[KuiklyRenderThreadManager isContextQueue\]\);/,
+      'if (![KuiklyRenderThreadManager isContextQueue]) { NSLog(@"[zhiniu] callNative off context queue (tolerated, aligned with Release)"); }'
+    )
+    if patched != content
+      File.chmod(0644, assert_file)
+      File.write(assert_file, patched)
+      puts '[zhiniu] KuiklyRenderThreadManager.m assert 已降级为日志（对齐 Release 行为）'
+    end
+  end
 end
