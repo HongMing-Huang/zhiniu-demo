@@ -60,3 +60,5 @@ DerivedData/
 .playwright/
 # === 本地研究笔记（不入库）===
 docs/sairen-benchmark.md
+# === 审计过程截图（不入库）===
+docs/audit-*/

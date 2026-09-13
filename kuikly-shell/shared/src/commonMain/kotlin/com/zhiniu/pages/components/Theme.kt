@@ -168,8 +168,11 @@ private object AdaptiveColors : AppColors(
     surfaceRaised = "",
 ) {
     private val active: AppColors get() = if (AppTheme.isDark) DarkColors else LightColors
-    override val riseBackground get() = active.riseBackground
-    override val fallBackground get() = active.fallBackground
+    // 涨跌配色反转：up↔down / 浅红底↔浅绿底 同步交换，保证语义一致
+    override val up get() = if (AppTheme.swapUpDon) active.down else active.up
+    override val down get() = if (AppTheme.swapUpDon) active.up else active.down
+    override val riseBackground get() = if (AppTheme.swapUpDon) active.fallBackground else active.riseBackground
+    override val fallBackground get() = if (AppTheme.swapUpDon) active.riseBackground else active.fallBackground
     override val riskLow get() = active.riskLow
     override val riskMediumLow get() = active.riskMediumLow
     override val riskMedium get() = active.riskMedium
@@ -185,8 +188,6 @@ private object AdaptiveColors : AppColors(
     override val textPrimary get() = active.textPrimary
     override val textSecondary get() = active.textSecondary
     override val textTertiary get() = active.textTertiary
-    override val up get() = active.up
-    override val down get() = active.down
     override val flat get() = active.flat
     override val ma5 get() = active.ma5
     override val ma10 get() = active.ma10
@@ -207,6 +208,8 @@ object AppTheme {
     var mode by observable(ThemeMode.SYSTEM)
     private var systemDark by observable(false)
     var isDark by observable(false)
+    /** 涨跌配色反转（绿涨红跌）：A股海外化偏好，全App经 AdaptiveColors 代理生效。 */
+    var swapUpDon by observable(false)
     val colors: AppColors get() = AdaptiveColors
 
     fun start() {

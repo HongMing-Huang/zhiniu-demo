@@ -3,11 +3,17 @@ import globalNativeManager from '../kuikly/MyNativeManager';
 import { KuiklyViewDelegate } from '../kuikly/KuiklyViewDelegate';
 import router from '@ohos.router';
 import fs from '@ohos.file.fs';
+import common from '@ohos.app.ability.common';
+import util from '@ohos.util';
 
 const COMMON_ASSETS: string[] = [
+  'brand/apple-touch-icon.png',
+  'brand/favicon-32.png',
   'brand/logo-mark.png',
+  'fonts/JetBrainsMono-Regular.ttf',
   'icons/ai.png',
   'icons/back.png',
+  'icons/bell.png',
   'icons/calendar.png',
   'icons/chart.png',
   'icons/chat-message.png',
@@ -20,9 +26,12 @@ const COMMON_ASSETS: string[] = [
   'icons/error-triangle.png',
   'icons/filter-sort.png',
   'icons/filter.png',
+  'icons/info.png',
   'icons/more.png',
+  'icons/refresh.png',
   'icons/search.png',
   'icons/send.png',
+  'icons/setting.png',
   'icons/star_filled.png',
   'icons/star.png',
   'icons/theme.png',
@@ -39,21 +48,41 @@ struct Index {
   private assetsDir: string = '';
   @State showKuikly: boolean = true;
 
+  // 资产清单来源：优先读 rawfile/common/manifest.txt（syncCommonAssets.sh 生成，随源目录自动更新），
+  // 读不到时回退内置列表。单文件缺失只跳过该项，不再让 aboutToAppear 抛异常导致
+  // assetsDir 为空、全端图标消失（曾出现“顶部和底栏只剩文字”的根因之一）。
+  private commonAssetList(context: common.Context): string[] {
+    try {
+      const raw = context.resourceManager.getRawFileContentSync('common/manifest.txt');
+      const text = util.TextDecoder.create('utf-8').decodeToString(new Uint8Array(raw.buffer));
+      const lines = text.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0);
+      if (lines.length > 0) {
+        return lines;
+      }
+    } catch (e) {
+      console.error('[zhiniu] manifest.txt missing, fallback to builtin list');
+    }
+    return COMMON_ASSETS;
+  }
+
   private prepareCommonAssets(): string {
     const context = getContext(this);
     const root = `${context.filesDir}/kuikly-assets`;
-    fs.mkdirSync(`${root}/common/brand`, true);
-    fs.mkdirSync(`${root}/common/icons`, true);
-    COMMON_ASSETS.forEach((relativePath: string) => {
-      const content = context.resourceManager.getRawFileContentSync(`common/${relativePath}`);
-      const file = fs.openSync(
-        `${root}/common/${relativePath}`,
-        fs.OpenMode.CREATE | fs.OpenMode.TRUNC | fs.OpenMode.READ_WRITE
-      );
+    ['brand', 'icons', 'fonts'].forEach((dir: string) => fs.mkdirSync(`${root}/common/${dir}`, true));
+    this.commonAssetList(context).forEach((relativePath: string) => {
       try {
-        fs.writeSync(file.fd, content.buffer, { length: content.length });
-      } finally {
-        fs.closeSync(file);
+        const content = context.resourceManager.getRawFileContentSync(`common/${relativePath}`);
+        const file = fs.openSync(
+          `${root}/common/${relativePath}`,
+          fs.OpenMode.CREATE | fs.OpenMode.TRUNC | fs.OpenMode.READ_WRITE
+        );
+        try {
+          fs.writeSync(file.fd, content.buffer, { length: content.length });
+        } finally {
+          fs.closeSync(file);
+        }
+      } catch (e) {
+        console.error(`[zhiniu] rawfile missing, skipped: common/${relativePath}`);
       }
     });
     return root;

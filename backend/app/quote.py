@@ -42,6 +42,7 @@ _MOCK_DIR = (
 _rt_cache: Dict[str, dict] = {}          # codes key → (ts, data)
 _rt_order: list = []                     # 简单 LRU 顺序，防无限增长
 _kline_cache: Dict[str, dict] = {}       # symbol key → (ts, data)
+_spark_cache: Dict[str, tuple] = {}      # symbol → (ts, closes[]) 指数迷你走势
 _rt_last_ok: Dict[str, dict] = {}        # 最近一次成功抓取（stale 兜底）
 _fundamentals_cache: Dict[str, tuple[float, dict]] = {}
 _fundamentals_last_ok: Dict[str, dict] = {}
@@ -643,7 +644,7 @@ _SECTORS = [
 
 
 async def quote_indices() -> dict:
-    """GET /quote/indices：主流指数实时行情列表（新浪源 + mock 兜底）。"""
+    """GET /quote/indices：主流指数实时行情列表（新浪源 + mock 兜底）+ 分时迷你走势 spark。"""
     codes = [c for c, _ in _MAIN_INDICES]
     try:
         url = "https://hq.sinajs.cn/list=" + ",".join(codes)
@@ -655,16 +656,47 @@ async def quote_indices() -> dict:
                 parsed["name"] = name
                 out.append(parsed)
         if out:
+            # 并发补分时迷你走势（5 分钟 K 收盘，60s 进程缓存；失败该指数无 spark）
+            sparks = await asyncio.gather(*[_index_spark(c) for c in codes])
+            for item, spark in zip(out, sparks):
+                if len(spark) >= 2:
+                    item["spark"] = spark
             return {"indices": out, "source": "sina"}
     except Exception:
         pass
-    # Mock 兜底：用主程序里的行情 mock（固定值）
-    mock = [
-        {"symbol": c, "name": n, "price": _mock_index_price(i), "prevClose": _mock_index_price(i) * 0.99,
-         "open": 0, "high": 0, "low": 0, "changePercent": round((i % 5) * 0.18, 2)}
-        for i, (c, n) in enumerate(_MAIN_INDICES)
-    ]
+    # Mock 兜底：用主程序里的行情 mock（固定值）；spark 给确定性波形保证图不空
+    mock = []
+    for i, (c, n) in enumerate(_MAIN_INDICES):
+        base = _mock_index_price(i)
+        wave = [round(base * (0.99 + 0.004 * ((j % 7) - 3) + 0.002 * j / 24.0), 2) for j in range(24)]
+        mock.append({
+            "symbol": c, "name": n, "price": wave[-1], "prevClose": base * 0.99,
+            "open": 0, "high": 0, "low": 0, "changePercent": round((i % 5) * 0.18, 2),
+            "spark": wave,
+        })
     return {"indices": mock, "source": "mock"}
+
+
+async def _index_spark(symbol: str) -> list:
+    """指数分时迷你走势：5 分钟 K 收盘价序列（TTL 60s；失败回落上次缓存 → 空）。"""
+    now = time.time()
+    cached = _spark_cache.get(symbol)
+    if cached and now - cached[0] <= 60.0:
+        return cached[1]
+    try:
+        url = (
+            "https://quotes.sina.cn/cn/api/json_v2.php/CN_MarketData.getKLineData"
+            f"?symbol={symbol}&scale=5&ma=no&datalen=24"
+        )
+        raw = await asyncio.to_thread(_http_get, url)
+        data = json.loads(raw)
+        closes = [float(item["close"]) for item in data if isinstance(item, dict) and item.get("close")]
+        if len(closes) >= 2:
+            _spark_cache[symbol] = (now, closes)
+            return closes
+    except Exception:
+        pass
+    return cached[1] if cached else []
 
 
 def _mock_index_price(i: int) -> float:

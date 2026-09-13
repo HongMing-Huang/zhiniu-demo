@@ -35,6 +35,8 @@
 | 特性 | 说明 |
 |:---|:---|
 | 真实行情 | 新浪 `hq.sinajs.cn` 实时报价 + 日K/分时 + 东方财富个股资讯，经 FastAPI 网关统一归一化（含来源、TTL、stale 标记），断网自动回退本地快照 |
+| 移动端 4 Tab | 行情 / 自选 / AI研究 / 我的 底部导航（对标 KuiklyStock）；「我的」页：用户卡 + 资产统计 + 外观（浅/深/跟随系统）+ **涨跌配色切换**（红涨绿跌↔绿涨红跌，全 App 即时生效，SP 持久化）+ 服务状态 + 关于/免责声明 |
+| 全屏搜索（手机） | 首页大搜索栏 → 全屏搜索页：热门榜单化（序号热红）/ 最近查看 / 东财 suggest 全市场 / 结果带真实价与涨跌幅；桌面保留下拉面板 |
 | 多 Agent 研究 | 行情 → 技术面 → 财务 → 资讯 → 风险 → 多头 → 空头 → 研究经理 → 交易员 → 风控 → 归纳，四阶段进度实时可见；已接入真实 LLM（OpenAI 兼容多厂商网关，GemAI/DeepSeek 实测跑通），LLM 不可用时明确标记「规则降级 · 未伪装模型」 |
 | Markdown 渲染 | 自研 commonMain Markdown 解析器（标题/列表/表格/代码块/引用/行内加粗），`RichText+Span` 官方组件渲染，commonTest 单测覆盖 |
 | AI 诊股抽屉 | 个股页一键 AI 分析：**服务端 LLM 诊股**（`/agent/insight`，1h 缓存 + 同标的并发去重），输出结论 / 估值 / 业绩 / 趋势 / 信号 / 量能 / **买卖观察区间** / **风险五档**；买卖区间由服务端校验（必须落在支撑/压力 ±3% 内，否则丢弃不编造），LLM 不可用时规则降级明示 |
@@ -43,7 +45,7 @@
 | 全市场搜索 | `/quote/search` 东财 suggest（名称/代码/拼音缩写，过滤港美股/指数/基金），离线回退本地快照；结果批量补真实报价，无价不展示假数据 |
 | 图表交互 | Kuikly Canvas 自绘蜡烛图 / 量柱 / MACD / RSI，按钮 + 滚轮 + 拖拽 + 捏合缩放，十字线 OHLCV 联动 |
 | 完整状态机 | Idle / Loading 骨架 / Success / Empty / Error 重试 / Stale 六态覆盖 |
-| Light/Dark/System | 语义色 token + 动态调色板代理，180ms 平滑切换，H5/原生一致 |
+| Light/Dark/System | 语义色 token + 动态调色板代理，180ms 平滑切换，H5/原生一致；涨跌配色经同一代理全局反转 |
 | 官方字体接入 | 数字等宽 JetBrains Mono（OFL），按 KuiklyUI 官方机制三端注册（见 [docs/typography.md](docs/typography.md)） |
 | 跨端待办基线 | 待办清单页（新增/编辑/删除/完成/清除已完成），持久化走 Kuikly 官方 `SharedPreferencesModule` 三端落地；一套 commonMain 代码，Android APK 构建 + iOS Kotlin 编译 + H5 实测三端验证 |
 | 离线可跑 | 内置确定性 Mock，断网 / 无 Key 均可完整演示 |

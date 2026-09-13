@@ -38,8 +38,8 @@ internal abstract class AppBasePage : BasePager() {
     internal var agentReady by observable(false)
 
     /**
-     * Kuikly H5 的 root view 由宿主画布决定，浏览器响应式宽度来自 activity；
-     * 原生端则相反，activity 可能是物理像素而 pageView 才是可布局区域。
+     * 响应式宽度统一用官方 root view 尺寸（逻辑单位：Android=dp / iOS=pt / ohos=vp / H5=CSS px，
+     * 已实测各端桥一致传递）。H5 的 root view 由宿主画布决定，浏览器响应式宽度改用 activity。
      */
     internal fun viewportWidth(): Float =
         if (pageData.isWeb) pageData.activityWidth else pageData.pageViewWidth
@@ -60,8 +60,7 @@ internal abstract class AppBasePage : BasePager() {
     }
 
     /**
-     * 响应式布局必须基于 Kuikly 官方 root view 尺寸。activityWidth 在部分原生壳
-     * 是设备物理像素，用它计算内容宽度会让 Header、浮层和图表横向溢出。
+     * 响应式布局基于 Kuikly 官方 root view 尺寸（逻辑单位，三端桥一致，见 viewportWidth 注释）。
      */
     internal fun isCompact(): Boolean {
         val vw: Float = viewportWidth()
@@ -171,6 +170,7 @@ internal fun ViewContainer<*, *>.renderCommonOverlays(host: AppBasePage, activeN
         left = host.overlayLeft(host.searchOverlayWidth()),
         width = host.searchOverlayWidth(),
         topInset = host.safeTopInset(),
+        compact = host.isCompact(),
         onQueryChange = { t -> host.searchQuery = t; host.refreshSearchResults() },
         onPick = { q ->
             host.rememberSearch(q.symbol); host.searchQuery = ""; host.isSearchVisible = false

@@ -68,10 +68,22 @@ typedef struct {
 } libshared_kref_com_zhiniu_base_PendingAsk;
 typedef struct {
   libshared_KNativePtr pinned;
-} libshared_kref_com_zhiniu_data_local_Watchlist;
+} libshared_kref_com_zhiniu_data_local_PriceAlert;
+typedef struct {
+  libshared_KNativePtr pinned;
+} libshared_kref_kotlin_Any;
+typedef struct {
+  libshared_KNativePtr pinned;
+} libshared_kref_com_zhiniu_data_local_AlertStore;
 typedef struct {
   libshared_KNativePtr pinned;
 } libshared_kref_kotlin_collections_List;
+typedef struct {
+  libshared_KNativePtr pinned;
+} libshared_kref_kotlin_Function1;
+typedef struct {
+  libshared_KNativePtr pinned;
+} libshared_kref_com_zhiniu_data_local_Watchlist;
 typedef struct {
   libshared_KNativePtr pinned;
 } libshared_kref_com_zhiniu_data_mock_MarketStore;
@@ -107,13 +119,13 @@ typedef struct {
 } libshared_kref_com_zhiniu_data_remote_MarketNewsItem;
 typedef struct {
   libshared_KNativePtr pinned;
-} libshared_kref_kotlin_Any;
-typedef struct {
-  libshared_KNativePtr pinned;
 } libshared_kref_com_zhiniu_data_remote_AgentStage;
 typedef struct {
   libshared_KNativePtr pinned;
 } libshared_kref_com_zhiniu_data_remote_AgentChatResult;
+typedef struct {
+  libshared_KNativePtr pinned;
+} libshared_kref_com_zhiniu_data_remote_AgentToolDirective;
 typedef struct {
   libshared_KNativePtr pinned;
 } libshared_kref_com_zhiniu_data_remote_SectorRow;
@@ -138,6 +150,15 @@ typedef struct {
 typedef struct {
   libshared_KNativePtr pinned;
 } libshared_kref_com_zhiniu_data_remote_GatewayStatus;
+typedef struct {
+  libshared_KNativePtr pinned;
+} libshared_kref_com_zhiniu_data_remote_SearchSuggestion;
+typedef struct {
+  libshared_KNativePtr pinned;
+} libshared_kref_com_zhiniu_data_remote_CompareStock;
+typedef struct {
+  libshared_KNativePtr pinned;
+} libshared_kref_com_zhiniu_data_remote_AgentCompareResult;
 typedef struct {
   libshared_KNativePtr pinned;
 } libshared_kref_com_zhiniu_data_remote_GatewayMarketClient;
@@ -296,6 +317,9 @@ typedef struct {
 } libshared_kref_com_zhiniu_domain_repository_AiBlock_KLine;
 typedef struct {
   libshared_KNativePtr pinned;
+} libshared_kref_com_zhiniu_domain_repository_AiBlock_ToolResult;
+typedef struct {
+  libshared_KNativePtr pinned;
 } libshared_kref_com_zhiniu_domain_repository_MetricCell;
 typedef struct {
   libshared_KNativePtr pinned;
@@ -321,9 +345,6 @@ typedef struct {
 typedef struct {
   libshared_KNativePtr pinned;
 } libshared_kref_com_tencent_kuikly_core_base_Attr;
-typedef struct {
-  libshared_KNativePtr pinned;
-} libshared_kref_kotlin_Function1;
 typedef struct {
   libshared_KNativePtr pinned;
 } libshared_kref_kotlin_Function0;
@@ -455,6 +476,18 @@ typedef struct {
 } libshared_kref_com_zhiniu_pages_components_IconKind_USER;
 typedef struct {
   libshared_KNativePtr pinned;
+} libshared_kref_com_zhiniu_pages_components_IconKind_REFRESH;
+typedef struct {
+  libshared_KNativePtr pinned;
+} libshared_kref_com_zhiniu_pages_components_IconKind_BELL;
+typedef struct {
+  libshared_KNativePtr pinned;
+} libshared_kref_com_zhiniu_pages_components_IconKind_INFO;
+typedef struct {
+  libshared_KNativePtr pinned;
+} libshared_kref_com_zhiniu_pages_components_IconKind_SETTING;
+typedef struct {
+  libshared_KNativePtr pinned;
 } libshared_kref_com_zhiniu_pages_components_ThemeMode;
 typedef struct {
   libshared_KNativePtr pinned;
@@ -536,6 +569,38 @@ typedef struct {
             struct {
               struct {
                 libshared_KType* (*_type)(void);
+                libshared_kref_com_zhiniu_data_local_PriceAlert (*PriceAlert)(const char* id, const char* symbol, const char* name, const char* operator_, libshared_KDouble price, libshared_KBoolean triggered);
+                const char* (*get_id)(libshared_kref_com_zhiniu_data_local_PriceAlert thiz);
+                const char* (*get_name)(libshared_kref_com_zhiniu_data_local_PriceAlert thiz);
+                const char* (*get_operator)(libshared_kref_com_zhiniu_data_local_PriceAlert thiz);
+                libshared_KDouble (*get_price)(libshared_kref_com_zhiniu_data_local_PriceAlert thiz);
+                const char* (*get_symbol)(libshared_kref_com_zhiniu_data_local_PriceAlert thiz);
+                libshared_KBoolean (*get_triggered)(libshared_kref_com_zhiniu_data_local_PriceAlert thiz);
+                const char* (*component1)(libshared_kref_com_zhiniu_data_local_PriceAlert thiz);
+                const char* (*component2)(libshared_kref_com_zhiniu_data_local_PriceAlert thiz);
+                const char* (*component3)(libshared_kref_com_zhiniu_data_local_PriceAlert thiz);
+                const char* (*component4)(libshared_kref_com_zhiniu_data_local_PriceAlert thiz);
+                libshared_KDouble (*component5)(libshared_kref_com_zhiniu_data_local_PriceAlert thiz);
+                libshared_KBoolean (*component6)(libshared_kref_com_zhiniu_data_local_PriceAlert thiz);
+                libshared_kref_com_zhiniu_data_local_PriceAlert (*copy)(libshared_kref_com_zhiniu_data_local_PriceAlert thiz, const char* id, const char* symbol, const char* name, const char* operator_, libshared_KDouble price, libshared_KBoolean triggered);
+                libshared_KBoolean (*equals)(libshared_kref_com_zhiniu_data_local_PriceAlert thiz, libshared_kref_kotlin_Any other);
+                libshared_KInt (*hashCode)(libshared_kref_com_zhiniu_data_local_PriceAlert thiz);
+                const char* (*toString)(libshared_kref_com_zhiniu_data_local_PriceAlert thiz);
+              } PriceAlert;
+              struct {
+                libshared_KType* (*_type)(void);
+                libshared_kref_com_zhiniu_data_local_AlertStore (*_instance)();
+                libshared_kref_com_zhiniu_data_local_PriceAlert (*add)(libshared_kref_com_zhiniu_data_local_AlertStore thiz, const char* symbol, const char* name, const char* operator_, libshared_KDouble price);
+                libshared_kref_kotlin_collections_List (*alerts)(libshared_kref_com_zhiniu_data_local_AlertStore thiz);
+                libshared_kref_kotlin_collections_List (*check)(libshared_kref_com_zhiniu_data_local_AlertStore thiz, libshared_kref_kotlin_collections_List quotes);
+                libshared_kref_kotlin_collections_List (*deserialize)(libshared_kref_com_zhiniu_data_local_AlertStore thiz, const char* text);
+                void (*remove)(libshared_kref_com_zhiniu_data_local_AlertStore thiz, const char* id);
+                void (*removeAll)(libshared_kref_com_zhiniu_data_local_AlertStore thiz, libshared_kref_kotlin_Function1 predicate);
+                void (*restore)(libshared_kref_com_zhiniu_data_local_AlertStore thiz, libshared_kref_kotlin_collections_List list);
+                const char* (*serialize)(libshared_kref_com_zhiniu_data_local_AlertStore thiz);
+              } AlertStore;
+              struct {
+                libshared_KType* (*_type)(void);
                 libshared_kref_com_zhiniu_data_local_Watchlist (*_instance)();
                 void (*add)(libshared_kref_com_zhiniu_data_local_Watchlist thiz, const char* symbol);
                 libshared_KBoolean (*contains)(libshared_kref_com_zhiniu_data_local_Watchlist thiz, const char* symbol);
@@ -612,18 +677,45 @@ typedef struct {
               } AgentStage;
               struct {
                 libshared_KType* (*_type)(void);
-                libshared_kref_com_zhiniu_data_remote_AgentChatResult (*AgentChatResult)(const char* content, libshared_KBoolean isLlm, const char* provider);
+                libshared_kref_com_zhiniu_data_remote_AgentChatResult (*AgentChatResult)(const char* content, libshared_KBoolean isLlm, const char* provider, libshared_kref_kotlin_collections_List tools);
                 const char* (*get_content)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
                 libshared_KBoolean (*get_isLlm)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
                 const char* (*get_provider)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
+                libshared_kref_kotlin_collections_List (*get_tools)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
                 const char* (*component1)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
                 libshared_KBoolean (*component2)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
                 const char* (*component3)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
-                libshared_kref_com_zhiniu_data_remote_AgentChatResult (*copy)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz, const char* content, libshared_KBoolean isLlm, const char* provider);
+                libshared_kref_kotlin_collections_List (*component4)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
+                libshared_kref_com_zhiniu_data_remote_AgentChatResult (*copy)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz, const char* content, libshared_KBoolean isLlm, const char* provider, libshared_kref_kotlin_collections_List tools);
                 libshared_KBoolean (*equals)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz, libshared_kref_kotlin_Any other);
                 libshared_KInt (*hashCode)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
                 const char* (*toString)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
               } AgentChatResult;
+              struct {
+                libshared_KType* (*_type)(void);
+                libshared_kref_com_zhiniu_data_remote_AgentToolDirective (*AgentToolDirective)(const char* name, const char* symbol, const char* stockName, const char* symbolB, const char* stockNameB, const char* alertOperator, libshared_KDouble alertPrice, const char* display);
+                const char* (*get_alertOperator)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
+                libshared_KDouble (*get_alertPrice)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
+                const char* (*get_display)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
+                libshared_KBoolean (*get_isValid)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
+                const char* (*get_name)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
+                const char* (*get_stockName)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
+                const char* (*get_stockNameB)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
+                const char* (*get_symbol)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
+                const char* (*get_symbolB)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
+                const char* (*component1)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
+                const char* (*component2)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
+                const char* (*component3)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
+                const char* (*component4)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
+                const char* (*component5)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
+                const char* (*component6)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
+                libshared_KDouble (*component7)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
+                const char* (*component8)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
+                libshared_kref_com_zhiniu_data_remote_AgentToolDirective (*copy)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz, const char* name, const char* symbol, const char* stockName, const char* symbolB, const char* stockNameB, const char* alertOperator, libshared_KDouble alertPrice, const char* display);
+                libshared_KBoolean (*equals)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz, libshared_kref_kotlin_Any other);
+                libshared_KInt (*hashCode)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
+                const char* (*toString)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
+              } AgentToolDirective;
               struct {
                 libshared_KType* (*_type)(void);
                 libshared_kref_com_zhiniu_data_remote_SectorRow (*SectorRow)(const char* code, const char* name, libshared_KDouble changePercent, libshared_KInt upCount, libshared_KInt downCount, const char* leadStock, const char* leadSymbol, libshared_KDouble leadChangePercent, libshared_KInt rank);
@@ -837,6 +929,77 @@ typedef struct {
               } GatewayStatus;
               struct {
                 libshared_KType* (*_type)(void);
+                libshared_kref_com_zhiniu_data_remote_SearchSuggestion (*SearchSuggestion)(const char* symbol, const char* code, const char* name, const char* market);
+                const char* (*get_code)(libshared_kref_com_zhiniu_data_remote_SearchSuggestion thiz);
+                const char* (*get_market)(libshared_kref_com_zhiniu_data_remote_SearchSuggestion thiz);
+                const char* (*get_name)(libshared_kref_com_zhiniu_data_remote_SearchSuggestion thiz);
+                const char* (*get_symbol)(libshared_kref_com_zhiniu_data_remote_SearchSuggestion thiz);
+                const char* (*component1)(libshared_kref_com_zhiniu_data_remote_SearchSuggestion thiz);
+                const char* (*component2)(libshared_kref_com_zhiniu_data_remote_SearchSuggestion thiz);
+                const char* (*component3)(libshared_kref_com_zhiniu_data_remote_SearchSuggestion thiz);
+                const char* (*component4)(libshared_kref_com_zhiniu_data_remote_SearchSuggestion thiz);
+                libshared_kref_com_zhiniu_data_remote_SearchSuggestion (*copy)(libshared_kref_com_zhiniu_data_remote_SearchSuggestion thiz, const char* symbol, const char* code, const char* name, const char* market);
+                libshared_KBoolean (*equals)(libshared_kref_com_zhiniu_data_remote_SearchSuggestion thiz, libshared_kref_kotlin_Any other);
+                libshared_KInt (*hashCode)(libshared_kref_com_zhiniu_data_remote_SearchSuggestion thiz);
+                const char* (*toString)(libshared_kref_com_zhiniu_data_remote_SearchSuggestion thiz);
+              } SearchSuggestion;
+              struct {
+                libshared_KType* (*_type)(void);
+                libshared_kref_com_zhiniu_data_remote_CompareStock (*CompareStock)(const char* symbol, const char* name, libshared_KDouble price, libshared_KDouble changePercent, const char* direction, libshared_KDouble rangeChangePercent, libshared_KDouble rsi14, libshared_kref_kotlin_Double pe, libshared_kref_kotlin_Double pb, libshared_kref_kotlin_Double marketCap, libshared_KBoolean isStale);
+                libshared_KDouble (*get_changePercent)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                const char* (*get_direction)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                libshared_KBoolean (*get_isStale)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                libshared_kref_kotlin_Double (*get_marketCap)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                const char* (*get_name)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                libshared_kref_kotlin_Double (*get_pb)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                libshared_kref_kotlin_Double (*get_pe)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                libshared_KDouble (*get_price)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                libshared_KDouble (*get_rangeChangePercent)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                libshared_KDouble (*get_rsi14)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                const char* (*get_symbol)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                const char* (*component1)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                libshared_kref_kotlin_Double (*component10)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                libshared_KBoolean (*component11)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                const char* (*component2)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                libshared_KDouble (*component3)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                libshared_KDouble (*component4)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                const char* (*component5)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                libshared_KDouble (*component6)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                libshared_KDouble (*component7)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                libshared_kref_kotlin_Double (*component8)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                libshared_kref_kotlin_Double (*component9)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                libshared_kref_com_zhiniu_data_remote_CompareStock (*copy)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz, const char* symbol, const char* name, libshared_KDouble price, libshared_KDouble changePercent, const char* direction, libshared_KDouble rangeChangePercent, libshared_KDouble rsi14, libshared_kref_kotlin_Double pe, libshared_kref_kotlin_Double pb, libshared_kref_kotlin_Double marketCap, libshared_KBoolean isStale);
+                libshared_KBoolean (*equals)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz, libshared_kref_kotlin_Any other);
+                libshared_KInt (*hashCode)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+                const char* (*toString)(libshared_kref_com_zhiniu_data_remote_CompareStock thiz);
+              } CompareStock;
+              struct {
+                libshared_KType* (*_type)(void);
+                libshared_kref_com_zhiniu_data_remote_AgentCompareResult (*AgentCompareResult)(const char* mode, const char* provider, libshared_kref_kotlin_collections_List stocks, const char* summary, const char* stronger, libshared_kref_kotlin_collections_List pointsA, libshared_kref_kotlin_collections_List pointsB, const char* conclusion);
+                const char* (*get_conclusion)(libshared_kref_com_zhiniu_data_remote_AgentCompareResult thiz);
+                libshared_KBoolean (*get_isLlm)(libshared_kref_com_zhiniu_data_remote_AgentCompareResult thiz);
+                const char* (*get_mode)(libshared_kref_com_zhiniu_data_remote_AgentCompareResult thiz);
+                libshared_kref_kotlin_collections_List (*get_pointsA)(libshared_kref_com_zhiniu_data_remote_AgentCompareResult thiz);
+                libshared_kref_kotlin_collections_List (*get_pointsB)(libshared_kref_com_zhiniu_data_remote_AgentCompareResult thiz);
+                const char* (*get_provider)(libshared_kref_com_zhiniu_data_remote_AgentCompareResult thiz);
+                libshared_kref_kotlin_collections_List (*get_stocks)(libshared_kref_com_zhiniu_data_remote_AgentCompareResult thiz);
+                const char* (*get_stronger)(libshared_kref_com_zhiniu_data_remote_AgentCompareResult thiz);
+                const char* (*get_summary)(libshared_kref_com_zhiniu_data_remote_AgentCompareResult thiz);
+                const char* (*component1)(libshared_kref_com_zhiniu_data_remote_AgentCompareResult thiz);
+                const char* (*component2)(libshared_kref_com_zhiniu_data_remote_AgentCompareResult thiz);
+                libshared_kref_kotlin_collections_List (*component3)(libshared_kref_com_zhiniu_data_remote_AgentCompareResult thiz);
+                const char* (*component4)(libshared_kref_com_zhiniu_data_remote_AgentCompareResult thiz);
+                const char* (*component5)(libshared_kref_com_zhiniu_data_remote_AgentCompareResult thiz);
+                libshared_kref_kotlin_collections_List (*component6)(libshared_kref_com_zhiniu_data_remote_AgentCompareResult thiz);
+                libshared_kref_kotlin_collections_List (*component7)(libshared_kref_com_zhiniu_data_remote_AgentCompareResult thiz);
+                const char* (*component8)(libshared_kref_com_zhiniu_data_remote_AgentCompareResult thiz);
+                libshared_kref_com_zhiniu_data_remote_AgentCompareResult (*copy)(libshared_kref_com_zhiniu_data_remote_AgentCompareResult thiz, const char* mode, const char* provider, libshared_kref_kotlin_collections_List stocks, const char* summary, const char* stronger, libshared_kref_kotlin_collections_List pointsA, libshared_kref_kotlin_collections_List pointsB, const char* conclusion);
+                libshared_KBoolean (*equals)(libshared_kref_com_zhiniu_data_remote_AgentCompareResult thiz, libshared_kref_kotlin_Any other);
+                libshared_KInt (*hashCode)(libshared_kref_com_zhiniu_data_remote_AgentCompareResult thiz);
+                const char* (*toString)(libshared_kref_com_zhiniu_data_remote_AgentCompareResult thiz);
+              } AgentCompareResult;
+              struct {
+                libshared_KType* (*_type)(void);
                 libshared_kref_com_zhiniu_data_remote_GatewayMarketClient (*_instance)();
                 const char* (*get_DEFAULT_BASE_URL)(libshared_kref_com_zhiniu_data_remote_GatewayMarketClient thiz);
                 const char* (*get_baseUrl)(libshared_kref_com_zhiniu_data_remote_GatewayMarketClient thiz);
@@ -848,17 +1011,29 @@ typedef struct {
             struct {
               struct {
                 libshared_KType* (*_type)(void);
-                libshared_kref_com_zhiniu_domain_model_AiInsight (*AiInsight)(const char* symbol, const char* verdict, const char* trend, const char* volume, const char* indicator, const char* risk, const char* valuation, const char* earnings, libshared_kref_kotlin_collections_List followUps);
+                libshared_kref_com_zhiniu_domain_model_AiInsight (*AiInsight)(const char* symbol, const char* verdict, const char* trend, const char* volume, const char* indicator, const char* risk, const char* valuation, const char* earnings, libshared_kref_kotlin_collections_List followUps, const char* source, libshared_kref_kotlin_collections_List signals, const char* buyZone, const char* sellZone, const char* riskLabel, const char* riskRationale);
+                const char* (*get_buyZone)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*get_earnings)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 libshared_kref_kotlin_collections_List (*get_followUps)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*get_indicator)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*get_risk)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
+                const char* (*get_riskLabel)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
+                const char* (*get_riskRationale)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
+                const char* (*get_sellZone)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
+                libshared_kref_kotlin_collections_List (*get_signals)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
+                const char* (*get_source)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*get_symbol)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*get_trend)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*get_valuation)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*get_verdict)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*get_volume)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*component1)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
+                const char* (*component10)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
+                libshared_kref_kotlin_collections_List (*component11)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
+                const char* (*component12)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
+                const char* (*component13)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
+                const char* (*component14)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
+                const char* (*component15)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*component2)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*component3)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*component4)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
@@ -867,7 +1042,7 @@ typedef struct {
                 const char* (*component7)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*component8)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 libshared_kref_kotlin_collections_List (*component9)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
-                libshared_kref_com_zhiniu_domain_model_AiInsight (*copy)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz, const char* symbol, const char* verdict, const char* trend, const char* volume, const char* indicator, const char* risk, const char* valuation, const char* earnings, libshared_kref_kotlin_collections_List followUps);
+                libshared_kref_com_zhiniu_domain_model_AiInsight (*copy)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz, const char* symbol, const char* verdict, const char* trend, const char* volume, const char* indicator, const char* risk, const char* valuation, const char* earnings, libshared_kref_kotlin_collections_List followUps, const char* source, libshared_kref_kotlin_collections_List signals, const char* buyZone, const char* sellZone, const char* riskLabel, const char* riskRationale);
                 libshared_KBoolean (*equals)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz, libshared_kref_kotlin_Any other);
                 libshared_KInt (*hashCode)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*toString)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
@@ -1391,6 +1566,22 @@ typedef struct {
                   libshared_KInt (*hashCode)(libshared_kref_com_zhiniu_domain_repository_AiBlock_KLine thiz);
                   const char* (*toString)(libshared_kref_com_zhiniu_domain_repository_AiBlock_KLine thiz);
                 } KLine;
+                struct {
+                  libshared_KType* (*_type)(void);
+                  libshared_kref_com_zhiniu_domain_repository_AiBlock_ToolResult (*ToolResult)(const char* title, const char* detail, const char* action, const char* actionLabel);
+                  const char* (*get_action)(libshared_kref_com_zhiniu_domain_repository_AiBlock_ToolResult thiz);
+                  const char* (*get_actionLabel)(libshared_kref_com_zhiniu_domain_repository_AiBlock_ToolResult thiz);
+                  const char* (*get_detail)(libshared_kref_com_zhiniu_domain_repository_AiBlock_ToolResult thiz);
+                  const char* (*get_title)(libshared_kref_com_zhiniu_domain_repository_AiBlock_ToolResult thiz);
+                  const char* (*component1)(libshared_kref_com_zhiniu_domain_repository_AiBlock_ToolResult thiz);
+                  const char* (*component2)(libshared_kref_com_zhiniu_domain_repository_AiBlock_ToolResult thiz);
+                  const char* (*component3)(libshared_kref_com_zhiniu_domain_repository_AiBlock_ToolResult thiz);
+                  const char* (*component4)(libshared_kref_com_zhiniu_domain_repository_AiBlock_ToolResult thiz);
+                  libshared_kref_com_zhiniu_domain_repository_AiBlock_ToolResult (*copy)(libshared_kref_com_zhiniu_domain_repository_AiBlock_ToolResult thiz, const char* title, const char* detail, const char* action, const char* actionLabel);
+                  libshared_KBoolean (*equals)(libshared_kref_com_zhiniu_domain_repository_AiBlock_ToolResult thiz, libshared_kref_kotlin_Any other);
+                  libshared_KInt (*hashCode)(libshared_kref_com_zhiniu_domain_repository_AiBlock_ToolResult thiz);
+                  const char* (*toString)(libshared_kref_com_zhiniu_domain_repository_AiBlock_ToolResult thiz);
+                } ToolResult;
                 libshared_KType* (*_type)(void);
                 libshared_kref_com_zhiniu_domain_repository_AiBlock (*AiBlock)();
               } AiBlock;
@@ -1580,7 +1771,7 @@ typedef struct {
                   libshared_KType* (*_type)(void);
                   libshared_kref_com_zhiniu_pages_components_ai_MdBlock (*MdBlock)();
                 } MdBlock;
-                void (*AiBlockView)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, libshared_kref_com_zhiniu_domain_repository_AiBlock block, libshared_kref_kotlin_Function1 onOpenStock, libshared_kref_kotlin_Function1 onAsk);
+                void (*AiBlockView)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, libshared_kref_com_zhiniu_domain_repository_AiBlock block, libshared_kref_kotlin_Function1 onOpenStock, libshared_kref_kotlin_Function1 onAsk, libshared_kref_kotlin_Function1 onToolAction);
                 void (*AiStockCard)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, const char* symbol, const char* trend, libshared_KDouble rsi, const char* summary, libshared_kref_kotlin_Function0 onClick);
                 void (*AiInsightPanel)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, libshared_KFloat width, libshared_KFloat height, libshared_kref_kotlin_Function0 quote, libshared_kref_kotlin_Function0 insight, libshared_kref_kotlin_Function0 followUpText, libshared_kref_kotlin_Function0 chatLines, libshared_kref_kotlin_Function1 onFollowUpChange, libshared_kref_kotlin_Function1 onFollowUpSend, libshared_kref_kotlin_Function0 onClose);
                 libshared_kref_kotlin_collections_List (*parseInlineSpans)(const char* s);
@@ -1623,19 +1814,19 @@ typedef struct {
                 void (*SectionHeader)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, const char* title, const char* action, libshared_kref_kotlin_Function0 onAction);
                 void (*SkeletonBar)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, libshared_KFloat width, libshared_KFloat height);
                 libshared_KFloat (*get_BOTTOM_TAB_HEIGHT)();
-                void (*BottomTabBar)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, const char* activeNav, libshared_KFloat bottomInset, libshared_kref_kotlin_Function0 onNavMarket, libshared_kref_kotlin_Function0 onNavWatchlist, libshared_kref_kotlin_Function0 onNavAiResearch);
+                void (*BottomTabBar)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, const char* activeNav, libshared_KFloat bottomInset, libshared_kref_kotlin_Function0 onNavMarket, libshared_kref_kotlin_Function0 onNavWatchlist, libshared_kref_kotlin_Function0 onNavAiResearch, libshared_kref_kotlin_Function0 onNavProfile);
                 void (*FavoriteButton)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, libshared_kref_kotlin_Function0 active, libshared_KFloat height, libshared_kref_kotlin_Function0 onToggle);
                 void (*GhostButton)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, const char* label, libshared_KFloat height, libshared_kref_com_zhiniu_pages_components_IconKind icon, libshared_kref_kotlin_Function0 onClick);
                 void (*IconButton)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, libshared_kref_com_zhiniu_pages_components_IconKind kind, libshared_KFloat size, libshared_KFloat box, libshared_KBoolean active, const char* accessibilityLabel, libshared_kref_kotlin_Function0 onClick);
                 void (*PrimaryButton)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, const char* label, libshared_KFloat height, libshared_kref_com_zhiniu_pages_components_IconKind icon, libshared_kref_kotlin_Function0 onClick);
+                void (*RoundIconButton)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, libshared_kref_com_zhiniu_pages_components_IconKind kind, libshared_KFloat size, libshared_KFloat box, libshared_KBoolean enabled, const char* accessibilityLabel, libshared_kref_kotlin_Function0 onClick);
                 void (*SecondaryButton)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, const char* label, libshared_KFloat height, libshared_kref_com_zhiniu_pages_components_IconKind icon, libshared_kref_kotlin_Function0 onClick);
-                void (*AppHeader)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, const char* activeNav, libshared_KFloat contentWidth, libshared_KFloat topInset, libshared_kref_kotlin_Function0 onNavMarket, libshared_kref_kotlin_Function0 onNavAiResearch, libshared_kref_kotlin_Function0 onNavWatchlist, libshared_kref_kotlin_Function0 onSearch, libshared_kref_kotlin_Function0 onTheme, libshared_kref_kotlin_Function0 onBack);
+                void (*AppHeader)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, const char* activeNav, libshared_KFloat contentWidth, libshared_KFloat topInset, libshared_kref_kotlin_Function0 onNavMarket, libshared_kref_kotlin_Function0 onNavAiResearch, libshared_kref_kotlin_Function0 onNavWatchlist, libshared_kref_kotlin_Function0 onNavProfile, libshared_kref_kotlin_Function0 onSearch, libshared_kref_kotlin_Function0 onBack);
                 void (*AppInput)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, const char* placeholder, const char* text, libshared_KFloat height, libshared_kref_kotlin_Function1 onTextChange, libshared_kref_kotlin_Function0 onReturn, libshared_kref_kotlin_Function1 onRef);
                 void (*SearchField)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, libshared_KFloat width, libshared_kref_kotlin_Function0 onClick);
-                void (*StockSearchOverlay)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, libshared_kref_kotlin_Function0 visible, libshared_kref_kotlin_Function0 query, libshared_kref_kotlin_Function0 recent, libshared_kref_kotlin_Function0 hot, libshared_kref_kotlin_Function0 results, libshared_KFloat left, libshared_KFloat width, libshared_KFloat topInset, libshared_kref_kotlin_Function1 onQueryChange, libshared_kref_kotlin_Function1 onPick, libshared_kref_kotlin_Function0 onClose);
+                void (*StockSearchOverlay)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, libshared_kref_kotlin_Function0 visible, libshared_kref_kotlin_Function0 query, libshared_kref_kotlin_Function0 recent, libshared_kref_kotlin_Function0 hot, libshared_kref_kotlin_Function0 results, libshared_KFloat left, libshared_KFloat width, libshared_KFloat topInset, libshared_KBoolean compact, libshared_kref_kotlin_Function1 onQueryChange, libshared_kref_kotlin_Function1 onPick, libshared_kref_kotlin_Function0 onClose);
                 void (*AppTabs)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, libshared_kref_kotlin_collections_List tabs, libshared_kref_kotlin_Function0 selected, libshared_KFloat itemWidth, libshared_KFloat height, libshared_kref_kotlin_Function1 onSelect);
                 void (*SegmentedTabs)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, libshared_kref_kotlin_collections_List options, libshared_kref_kotlin_Function0 selected, libshared_KFloat height, libshared_kref_kotlin_Function1 onSelect);
-                void (*ThemePopover)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, libshared_kref_kotlin_Function0 visible, libshared_KFloat left, libshared_KFloat width, libshared_KFloat topInset, libshared_kref_kotlin_Function0 gatewayOnline, libshared_kref_kotlin_Function0 agentReady, libshared_kref_kotlin_Function0 onClose);
               } common;
               struct {
                 struct {
@@ -1741,6 +1932,18 @@ typedef struct {
                 struct {
                   libshared_kref_com_zhiniu_pages_components_IconKind (*get)(); /* enum entry for USER. */
                 } USER;
+                struct {
+                  libshared_kref_com_zhiniu_pages_components_IconKind (*get)(); /* enum entry for REFRESH. */
+                } REFRESH;
+                struct {
+                  libshared_kref_com_zhiniu_pages_components_IconKind (*get)(); /* enum entry for BELL. */
+                } BELL;
+                struct {
+                  libshared_kref_com_zhiniu_pages_components_IconKind (*get)(); /* enum entry for INFO. */
+                } INFO;
+                struct {
+                  libshared_kref_com_zhiniu_pages_components_IconKind (*get)(); /* enum entry for SETTING. */
+                } SETTING;
                 libshared_KType* (*_type)(void);
                 const char* (*get_asset)(libshared_kref_com_zhiniu_pages_components_IconKind thiz);
               } IconKind;
@@ -1866,6 +2069,8 @@ typedef struct {
                 void (*set_isDark)(libshared_kref_com_zhiniu_pages_components_AppTheme thiz, libshared_KBoolean set);
                 libshared_kref_com_zhiniu_pages_components_ThemeMode (*get_mode)(libshared_kref_com_zhiniu_pages_components_AppTheme thiz);
                 void (*set_mode)(libshared_kref_com_zhiniu_pages_components_AppTheme thiz, libshared_kref_com_zhiniu_pages_components_ThemeMode set);
+                libshared_KBoolean (*get_swapUpDon)(libshared_kref_com_zhiniu_pages_components_AppTheme thiz);
+                void (*set_swapUpDon)(libshared_kref_com_zhiniu_pages_components_AppTheme thiz, libshared_KBoolean set);
                 void (*applyMode)(libshared_kref_com_zhiniu_pages_components_AppTheme thiz, libshared_kref_com_zhiniu_pages_components_ThemeMode m);
                 libshared_KBoolean (*resolve)(libshared_kref_com_zhiniu_pages_components_AppTheme thiz, libshared_kref_com_zhiniu_pages_components_ThemeMode m);
                 void (*start)(libshared_kref_com_zhiniu_pages_components_AppTheme thiz);

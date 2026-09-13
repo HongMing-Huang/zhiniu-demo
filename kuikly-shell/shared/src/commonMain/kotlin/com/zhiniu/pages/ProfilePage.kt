@@ -32,6 +32,7 @@ import com.zhiniu.pages.components.ca
 import com.zhiniu.pages.components.cssClass
 
 private val APP_VERSION = "v1.0.0"
+private const val UPDOWN_SP_KEY = "zhiniu.prefs.swap-updown.v1"
 
 @Page("Profile", supportInLocal = true)
 internal class ProfilePage : AppBasePage() {
@@ -45,6 +46,19 @@ internal class ProfilePage : AppBasePage() {
         super.created()
         watchCount = Watchlist.symbols().size
         alertCount = AlertStore.alerts().size
+        // 恢复涨跌配色偏好（SP 唯一事实源 → AppTheme 全局生效）
+        val sp = acquireModule<com.tencent.kuikly.core.module.SharedPreferencesModule>(
+            com.tencent.kuikly.core.module.SharedPreferencesModule.MODULE_NAME,
+        )
+        AppTheme.swapUpDon = sp.getString(UPDOWN_SP_KEY) == "1"
+    }
+
+    internal fun toggleSwapUpDon() {
+        AppTheme.swapUpDon = !AppTheme.swapUpDon
+        val sp = acquireModule<com.tencent.kuikly.core.module.SharedPreferencesModule>(
+            com.tencent.kuikly.core.module.SharedPreferencesModule.MODULE_NAME,
+        )
+        sp.setString(UPDOWN_SP_KEY, if (AppTheme.swapUpDon) "1" else "0")
     }
 
     override fun body(): ViewBuilder = {
@@ -165,7 +179,7 @@ private fun ViewContainer<*, *>.profileContent(host: ProfilePage) {
             }
             View {
                 attr {
-                    margin(left = 16f, right = 16f, top = 4f, bottom = 14f)
+                    margin(left = 16f, right = 16f, top = 4f, bottom = 6f)
                     height(36f); padding(all = 3f)
                     flexDirectionRow()
                     backgroundColor(colors.c(colors.surfaceSecondary))
@@ -174,6 +188,23 @@ private fun ViewContainer<*, *>.profileContent(host: ProfilePage) {
                 ThemeSegment(ThemeMode.SYSTEM)
                 ThemeSegment(ThemeMode.LIGHT)
                 ThemeSegment(ThemeMode.DARK)
+            }
+            // 涨跌配色：红涨绿跌（A股默认）↔ 绿涨红跌（海外习惯），双预览色块即时生效
+            View {
+                attr {
+                    flexDirectionRow(); alignItemsCenter()
+                    margin(left = 16f, right = 16f, bottom = 14f)
+                }
+                Icon(IconKind.CHART, 16f)
+                View { attr { width(10f) } }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs14); fontWeightMedium()
+                        color(colors.c(colors.textPrimary)); text("涨跌配色")
+                    }
+                }
+                View { attr { flex(1f) } }
+                UpDownSwapToggle { host.toggleSwapUpDon() }
             }
         }
 
@@ -498,6 +529,56 @@ private fun ViewContainer<*, *>.ServiceStatus(
         }
     }
 }
+
+/** 涨跌配色切换：双段胶囊（红涨绿跌 / 绿涨红跌），当前态高亮；色块预览即时跟随 AppTheme。 */
+private fun ViewContainer<*, *>.UpDownSwapToggle(onToggle: () -> Unit) {
+    val colors = AppTheme.colors
+    View {
+        attr {
+            height(32f); padding(all = 3f)
+            flexDirectionRow()
+            backgroundColor(colors.c(colors.surfaceSecondary))
+            borderRadius(AppRadius.radius6)
+        }
+        listOf(false to "红涨绿跌", true to "绿涨红跌").forEach { (swapped, label) ->
+            val active = AppTheme.swapUpDon == swapped
+            View {
+                attr {
+                    height(26f); paddingLeft(8f); paddingRight(8f)
+                    flexDirectionRow(); alignItemsCenter(); allCenter()
+                    borderRadius(AppRadius.radius5)
+                    backgroundColor(if (active) colors.c(colors.surface) else com.tencent.kuikly.core.base.Color.TRANSPARENT)
+                    if (active) border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+                    accessibility("涨跌配色：$label")
+                    accessibilityRole(AccessibilityRole.BUTTON)
+                    accessibilityInfo(clickable = true, longClickable = false)
+                    cssClass("zn-click")
+                    highlightBackgroundColor(colors.ca(colors.textSecondary, 7))
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+                event { click { if (!active) onToggle() } }
+                // 预览色点：涨色 + 跌色（该档位下的真实取色）
+                val upHex = if (swapped) "#16B364" else "#F04F5F"
+                val downHex = if (swapped) "#F04F5F" else "#16B364"
+                View { attr { width(8f); height(8f); borderRadius(4f); backgroundColor(Color2(upHex)) } }
+                View { attr { width(4f) } }
+                View { attr { width(8f); height(8f); borderRadius(4f); backgroundColor(Color2(downHex)) } }
+                View { attr { width(5f) } }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs12)
+                        fontWeightMedium()
+                        color(colors.c(if (active) colors.textPrimary else colors.textSecondary))
+                        text(label)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun Color2(hex: String): com.tencent.kuikly.core.base.Color =
+    com.tencent.kuikly.core.base.Color((0xFF shl 24) or hex.removePrefix("#").toLong(16).toInt())
 
 /** 外观三段式（跟随系统 / 浅色 / 深色），选中白底描边。 */
 private fun ViewContainer<*, *>.ThemeSegment(mode: ThemeMode) {

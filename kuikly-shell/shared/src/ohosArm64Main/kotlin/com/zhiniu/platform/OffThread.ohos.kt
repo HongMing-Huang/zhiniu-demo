@@ -20,7 +20,9 @@ private suspend fun hopWait(ms: Int) = suspendCoroutine { cont ->
 }
 
 private var pollSeq = 0
-private const val MAX_HOPS = 400 // 30ms × 400 ≈ 12s 上限，防页面销毁后 timer 取消导致挂死
+// 30ms × 5000 ≈ 150s 上限：网络接入后 agent/research 单请求在中转站抖动下可达数十秒；
+// 此轮询仅维持 Context 线程空闲，等待本身在 Worker 上挂起，不占 UI。
+private const val MAX_HOPS = 5000
 
 internal actual suspend fun <T> runOffMainThread(block: suspend () -> T): T {
     val box = AtomicReference<Result<T>?>(null)

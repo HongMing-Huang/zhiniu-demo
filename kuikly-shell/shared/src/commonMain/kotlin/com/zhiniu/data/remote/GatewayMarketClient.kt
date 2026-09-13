@@ -261,11 +261,18 @@ object GatewayMarketClient {
             val price = o.double("price")
             val prevClose = o.double("prevClose")
             val changePct = if (prevClose > 0.0) (price - prevClose) / prevClose * 100.0 else 0.0
+            // 分时迷你走势（后端 5 分钟 K 收盘；缺失时回退 O-L-H-P 四点，避免平线）
+            val spark = o["spark"]?.jsonArray?.mapNotNull { el ->
+                (el as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull()
+            }.orEmpty().filter { it.isFinite() }
+            val fallbackSpark = listOf(o.double("open"), o.double("low"), o.double("high"), price)
+                .filter { it > 0.0 }
             MarketIndex(
                 symbol = o.string("symbol"),
                 name = name,
                 price = price,
                 changePercent = kotlin.math.round(changePct * 100) / 100.0,
+                spark = if (spark.size >= 2) spark else fallbackSpark,
             )
         } ?: emptyList()
         return items.ifEmpty { null }
