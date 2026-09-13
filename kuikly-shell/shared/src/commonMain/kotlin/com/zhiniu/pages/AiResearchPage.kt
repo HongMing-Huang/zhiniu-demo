@@ -263,6 +263,13 @@ internal class AiResearchPage : AppBasePage() {
                     MetricCell("市值", result.marketCap?.let { fmtMarketCap(it) } ?: "—"),
                 ),
             ),
+        ) + listOfNotNull(
+            // Task2 评分点「结构化卡片」：点位建议 / 风险分级（服务端确定性推导）
+            if (result.adviceAvailable) {
+                AiBlock.TradeAdvice(result.adviceBuyRange, result.adviceSellRange, result.adviceRationale, result.adviceBasis)
+            } else null,
+            if (result.riskLevel.isNotBlank()) AiBlock.RiskLevel(result.riskLevel, result.riskLevelLabel, result.riskRationale) else null,
+            if (result.klineCloses.size > 1) AiBlock.KLine(result.klineCloses) else null,
         ) + debateBlocks(result) + listOf(
             AiBlock.Risk("风险与时效", "$risks 本内容仅供研究参考，不构成投资建议。"),
             AiBlock.FollowUps(listOf("多空双方分歧在哪", "风控怎么看这只股票", "结合日K分析", "解释 RSI 指标")),

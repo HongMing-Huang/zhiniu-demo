@@ -67,6 +67,13 @@ open class AppColors(
     open val up: String,
     open val down: String,
     open val flat: String,
+    open val riseBackground: String,   // 涨 chip 浅红底
+    open val fallBackground: String,   // 跌 chip 浅绿底
+    open val riskLow: String,
+    open val riskMediumLow: String,
+    open val riskMedium: String,
+    open val riskMediumHigh: String,
+    open val riskHigh: String,
     open val ma5: String, open val ma10: String, open val ma20: String,
     open val dif: String, open val dea: String, open val rsi: String,
     open val chartBg: String, open val chartGrid: String, open val axisText: String,
@@ -90,6 +97,13 @@ object LightColors : AppColors(
     up = "#F04F5F",
     down = "#16B364",
     flat = "#98A1AB",
+    riseBackground = "#FDEBEC",
+    fallBackground = "#E6F6EE",
+    riskLow = "#16B364",
+    riskMediumLow = "#84B04C",
+    riskMedium = "#E9A23B",
+    riskMediumHigh = "#F2762E",
+    riskHigh = "#F04F5F",
     ma5 = "#E9A23B",
     ma10 = "#4D7CFE",
     ma20 = "#A56BEA",
@@ -118,6 +132,13 @@ object DarkColors : AppColors(
     up = "#F04F5F",
     down = "#16B364",
     flat = "#69727D",
+    riseBackground = "#3A1A1E",
+    fallBackground = "#12291D",
+    riskLow = "#3BC177",
+    riskMediumLow = "#9CC064",
+    riskMedium = "#F0B04C",
+    riskMediumHigh = "#F58A4B",
+    riskHigh = "#F6707D",
     ma5 = "#E9A23B",
     ma10 = "#4D7CFE",
     ma20 = "#A56BEA",
@@ -139,11 +160,21 @@ object DarkColors : AppColors(
 private object AdaptiveColors : AppColors(
     pageBg = "", surface = "", surfaceSecondary = "", surfaceHover = "", elevated = "",
     border = "", borderStrong = "", textPrimary = "", textSecondary = "", textTertiary = "",
-    up = "", down = "", flat = "", ma5 = "", ma10 = "", ma20 = "", dif = "", dea = "",
+    up = "", down = "", flat = "",
+    riseBackground = "", fallBackground = "",
+    riskLow = "", riskMediumLow = "", riskMedium = "", riskMediumHigh = "", riskHigh = "",
+    ma5 = "", ma10 = "", ma20 = "", dif = "", dea = "",
     rsi = "", chartBg = "", chartGrid = "", axisText = "", crosshair = "", aiAccent = "",
     surfaceRaised = "",
 ) {
     private val active: AppColors get() = if (AppTheme.isDark) DarkColors else LightColors
+    override val riseBackground get() = active.riseBackground
+    override val fallBackground get() = active.fallBackground
+    override val riskLow get() = active.riskLow
+    override val riskMediumLow get() = active.riskMediumLow
+    override val riskMedium get() = active.riskMedium
+    override val riskMediumHigh get() = active.riskMediumHigh
+    override val riskHigh get() = active.riskHigh
     override val pageBg get() = active.pageBg
     override val surface get() = active.surface
     override val surfaceSecondary get() = active.surfaceSecondary

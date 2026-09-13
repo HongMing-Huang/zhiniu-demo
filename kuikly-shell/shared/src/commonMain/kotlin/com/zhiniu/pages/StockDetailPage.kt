@@ -415,7 +415,7 @@ private fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.z
             }
         }
         View { attr { height(12f) } }
-        // 两列数据网格（欧易式：label 左 + value 右；4 行 × 2 列）
+        // 两列数据网格（欧易式：卡片化容器，label 左 + value 右；4 行 × 2 列）
         data class Metric(val label: String, val value: String)
         val rows = listOf(
             listOf(
@@ -435,7 +435,14 @@ private fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.z
                 Metric("振幅", com.zhiniu.pages.components.fmtAmplitude(q.high, q.low, q.prevClose)),
             ),
         )
-        rows.forEach { rowItems ->
+        View {
+            attr {
+                borderRadius(AppRadius.radius8)
+                backgroundColor(colors.c(colors.surfaceSecondary))
+                padding(top = 4f, bottom = 4f, left = 14f, right = 14f)
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+            rows.forEach { rowItems ->
             View {
                 attr {
                     flexDirectionRow(); alignItemsCenter()
@@ -467,6 +474,7 @@ private fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.z
                     }
                 }
             }
+        }
         }
         return
     }

@@ -189,7 +189,7 @@ fun ViewContainer<*, *>.StockRow(
         if (compact) {
             ChangeBadge(q.changePercent, compact = true)
         } else {
-            NumCell(fmtPct(q.changePercent), 110f, { if (q.isUp) colors.up else colors.down }, semibold = true)
+            NumCell(fmtPct(q.changePercent), 110f, { if (q.isUp) colors.up else colors.down }, semibold = true, chipBg = { if (q.isUp) colors.riseBackground else colors.fallBackground })
         }
         // 总市值 / 成交量（课题基础字段）
         if (!compact && StockColumns.MARKET_CAP in columns) NumCell(fmtMarketCap(q.marketCap), 110f, { colors.textSecondary })
@@ -412,18 +412,42 @@ fun ViewContainer<*, *>.RankTable(
 
 private fun ViewContainer<*, *>.NumCell(
     value: String, width: Float, colorHex: () -> String, semibold: Boolean = false,
+    chipBg: () -> String? = { null },
 ) {
     val colors = AppTheme.colors
     View {
-        attr { width(width) }
-        Text {
-            attr {
-                fontSize(AppTypography.fs14)
-                fontFamily(NUM_FONT)
-                if (semibold) fontWeightSemiBold()
-                color(colors.c(colorHex()))
-                text(value)
-                textAlignRight()
+        attr { width(width); flexDirectionRow(); alignItemsCenter() }
+        if (chipBg() == null) {
+            View { attr { flex(1f) } }
+            Text {
+                attr {
+                    fontSize(AppTypography.fs14)
+                    fontFamily(NUM_FONT)
+                    if (semibold) fontWeightSemiBold()
+                    color(colors.c(colorHex()))
+                    text(value)
+                    textAlignRight()
+                }
+            }
+        } else {
+            // 欧易式涨跌 chip：浅色底 + 同色文字，扫视效率更高
+            View { attr { flex(1f) } }
+            View {
+                attr {
+                    height(24f); padding(left = 8f, right = 8f); allCenter()
+                    borderRadius(4f)
+                    backgroundColor(colors.c(chipBg() ?: colorHex()))
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs13)
+                        fontFamily(NUM_FONT)
+                        if (semibold) fontWeightSemiBold()
+                        color(colors.c(colorHex()))
+                        text(value)
+                    }
+                }
             }
         }
     }

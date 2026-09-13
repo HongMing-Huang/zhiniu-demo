@@ -4,7 +4,9 @@ package com.zhiniu.pages.components.ai
 
 import com.tencent.kuikly.core.base.Border
 import com.tencent.kuikly.core.base.BorderStyle
+import com.tencent.kuikly.core.base.Color
 import com.tencent.kuikly.core.base.ViewContainer
+import com.tencent.kuikly.core.views.Canvas
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
 import com.zhiniu.domain.model.StockQuote
@@ -20,6 +22,7 @@ import com.zhiniu.pages.components.c
 import com.zhiniu.pages.components.ca
 import com.zhiniu.pages.components.common.Divider
 import com.zhiniu.pages.components.cssClass
+import com.zhiniu.pages.components.drawSparkLine
 import com.zhiniu.pages.components.fmt2
 import com.zhiniu.pages.components.fmtPct
 import com.zhiniu.pages.components.fmtSymbol
@@ -38,6 +41,172 @@ fun ViewContainer<*, *>.AiBlockView(
         is AiBlock.Metrics -> AiMetricsBlock(block.title, block.rows)
         is AiBlock.Risk -> AiRiskBlock(block.title, block.content)
         is AiBlock.FollowUps -> AiFollowUps(block.questions, onAsk)
+        is AiBlock.TradeAdvice -> AiTradeAdviceCard(block)
+        is AiBlock.RiskLevel -> AiRiskLevelChip(block)
+        is AiBlock.KLine -> AiKLineCard(block)
+    }
+}
+
+/** 风险五档 → 语义色。 */
+internal fun riskColorOf(level: String): Color {
+    val colors = AppTheme.colors
+    return colors.c(
+        when (level) {
+            "low" -> colors.riskLow
+            "medium_low" -> colors.riskMediumLow
+            "medium" -> colors.riskMedium
+            "medium_high" -> colors.riskMediumHigh
+            else -> colors.riskHigh
+        }
+    )
+}
+
+/** 买卖观察区间卡：买入（低位·绿）/ 卖出（高位·红）双 chip + 依据（服务端规则推导）。 */
+private fun ViewContainer<*, *>.AiTradeAdviceCard(block: AiBlock.TradeAdvice) {
+    val colors = AppTheme.colors
+    View {
+        attr {
+            borderRadius(AppRadius.radius8)
+            border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+            backgroundColor(colors.c(colors.surface))
+            padding(top = 12f, bottom = 12f, left = 14f, right = 14f)
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+        View {
+            attr { flexDirectionRow(); alignItemsCenter() }
+            Text {
+                attr {
+                    fontSize(AppTypography.fs14); fontWeightSemiBold()
+                    color(colors.c(colors.textPrimary)); text("买卖观察区间")
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+            }
+            View { attr { flex(1f) } }
+            Text {
+                attr {
+                    fontSize(AppTypography.fs11)
+                    color(colors.c(colors.textTertiary)); text("规则推导 · 非投资建议")
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+            }
+        }
+        View { attr { height(10f) } }
+        AdviceRow("买入观察", block.buyRange, colors.c(colors.down), colors.c(colors.fallBackground))
+        View { attr { height(6f) } }
+        AdviceRow("卖出观察", block.sellRange, colors.c(colors.up), colors.c(colors.riseBackground))
+        View { attr { height(8f) } }
+        Text {
+            attr {
+                fontSize(AppTypography.fs12); lineHeight(18f)
+                color(colors.c(colors.textSecondary)); text(block.rationale)
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+        }
+        block.basis.forEach { b ->
+            View { attr { height(2f) } }
+            Text {
+                attr {
+                    fontSize(AppTypography.fs11); color(colors.c(colors.textTertiary))
+                    text("· " + b)
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+            }
+        }
+    }
+}
+
+private fun ViewContainer<*, *>.AdviceRow(label: String, range: String, tint: Color, bg: Color) {
+    View {
+        attr { flexDirectionRow(); alignItemsCenter() }
+        View {
+            attr {
+                height(22f); padding(left = 8f, right = 8f); allCenter()
+                borderRadius(4f); backgroundColor(bg)
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+            Text {
+                attr {
+                    fontSize(AppTypography.fs11); fontWeightMedium(); color(tint); text(label)
+                }
+            }
+        }
+        View { attr { width(10f) } }
+        Text {
+            attr {
+                fontSize(AppTypography.fs14); fontWeightSemiBold()
+                fontFamily(NUM_FONT); color(tint); text(range)
+            }
+        }
+    }
+}
+
+/** 风险分级：五档色 chip + 规则依据。 */
+private fun ViewContainer<*, *>.AiRiskLevelChip(block: AiBlock.RiskLevel) {
+    val colors = AppTheme.colors
+    View {
+        attr { flexDirectionRow(); alignItemsCenter() }
+        Text {
+            attr {
+                fontSize(AppTypography.fs12)
+                color(colors.c(colors.textTertiary))
+                text("风险分级"); marginRight(8f)
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+        }
+        View {
+            attr {
+                height(20f); padding(left = 8f, right = 8f); allCenter()
+                borderRadius(4f); backgroundColor(riskColorOf(block.level))
+            }
+            Text {
+                attr {
+                    fontSize(AppTypography.fs11); fontWeightSemiBold()
+                    color(Color(0xFFFFFFFF)); text(block.label)
+                }
+            }
+        }
+        View { attr { width(8f) } }
+        Text {
+            attr {
+                fontSize(AppTypography.fs12); flex(1f); lineHeight(18f)
+                color(colors.c(colors.textSecondary)); text(block.rationale)
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+        }
+    }
+}
+
+/** 迷你走势卡：服务端研究管线带出的近 60 根收盘价（不二次请求）。 */
+private fun ViewContainer<*, *>.AiKLineCard(block: AiBlock.KLine) {
+    if (block.closes.size < 2) return
+    val colors = AppTheme.colors
+    val isUp = block.closes.last() >= block.closes.first()
+    val lineColor = colors.c(if (isUp) colors.up else colors.down)
+    View {
+        attr { flexDirectionColumn() }
+        View {
+            attr { flexDirectionRow(); alignItemsCenter() }
+            Text {
+                attr {
+                    fontSize(AppTypography.fs12)
+                    color(colors.c(colors.textTertiary))
+                    text("近 " + block.closes.size + " 日收盘")
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+            }
+            View { attr { flex(1f) } }
+            Text {
+                attr {
+                    fontSize(AppTypography.fs12); fontWeightMedium(); fontFamily(NUM_FONT)
+                    color(lineColor); text(fmt2(block.closes.last()))
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+            }
+        }
+        View { attr { height(6f) } }
+        Canvas({ attr { width(480f); height(96f) } }) { context, w, h ->
+            drawSparkLine(context, block.closes, lineColor, w, h, endDot = true)
+        }
     }
 }
 

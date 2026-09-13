@@ -114,6 +114,16 @@ data class AgentResearchResult(
     val traderPlan: String = "",
     val traderEntry: Double? = null,
     val traderStop: Double? = null,
+    // 结构化洞察（服务端确定性推导：风险五档 + 买卖观察区间 + 迷你K线数据）
+    val riskLevel: String = "",
+    val riskLevelLabel: String = "",
+    val riskRationale: String = "",
+    val adviceAvailable: Boolean = false,
+    val adviceBuyRange: String = "",
+    val adviceSellRange: String = "",
+    val adviceRationale: String = "",
+    val adviceBasis: List<String> = emptyList(),
+    val klineCloses: List<Double> = emptyList(),
 )
 
 data class GatewayStatus(
@@ -388,6 +398,9 @@ object GatewayMarketClient {
         val levels = evidence["levels"]?.jsonObject ?: JsonObject(emptyMap())
         val synthesis = root["synthesis"]?.jsonObject ?: JsonObject(emptyMap())
         val trader = synthesis["trader"]?.let { runCatching { it.jsonObject }.getOrNull() } ?: JsonObject(emptyMap())
+        val insight = root["insight"]?.let { runCatching { it.jsonObject }.getOrNull() } ?: JsonObject(emptyMap())
+        val riskLevel = insight["riskLevel"]?.let { runCatching { it.jsonObject }.getOrNull() } ?: JsonObject(emptyMap())
+        val advice = insight["advice"]?.let { runCatching { it.jsonObject }.getOrNull() } ?: JsonObject(emptyMap())
         val prev = quote.double("prevClose")
         val price = quote.double("price")
         return AgentResearchResult(
@@ -426,6 +439,15 @@ object GatewayMarketClient {
             traderPlan = trader.string("plan"),
             traderEntry = trader.nullableDouble("entry"),
             traderStop = trader.nullableDouble("stop"),
+            riskLevel = riskLevel.string("level"),
+            riskLevelLabel = riskLevel.string("label"),
+            riskRationale = riskLevel.string("rationale"),
+            adviceAvailable = advice.boolean("available"),
+            adviceBuyRange = advice.string("buyRange"),
+            adviceSellRange = advice.string("sellRange"),
+            adviceRationale = advice.string("rationale"),
+            adviceBasis = advice.stringList("basis"),
+            klineCloses = insight["klineCloses"]?.jsonArray?.map { it.jsonPrimitive.doubleOrNull ?: 0.0 } ?: emptyList(),
         )
     }
 

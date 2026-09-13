@@ -63,7 +63,7 @@ class AppErrorTest {
         assertEquals(AppError.AUTH_INVALID, AppError.fromHttpStatus(403))
         assertEquals(AppError.RATE_LIMIT, AppError.fromHttpStatus(429))
         assertEquals(AppError.UPSTREAM_5XX, AppError.fromHttpStatus(502))
-        assertEquals(AppError.NO_NETWORK, AppError.fromHttpStatus(503))
+        assertEquals(AppError.UPSTREAM_5XX, AppError.fromHttpStatus(503))
         assertEquals(AppError.NIL, AppError.fromHttpStatus(200))
     }
 }

@@ -101,6 +101,7 @@ def build_insight(
     technical: dict,
     risks: list[str],
     synthesis: dict,
+    kline: dict | None = None,
 ) -> dict[str, Any]:
     """汇总风险分级 + 点位建议，注入研究报告。"""
     levels = synthesis.get("levels") or {}
@@ -109,7 +110,16 @@ def build_insight(
     rsi14 = (technical or {}).get("rsi14")
     change_percent = quote.get("changePct", 0.0) or 0.0
     price = quote.get("price")
+    closes: list[float] = []
+    for bar in (kline or {}).get("data") or []:
+        try:
+            v = float(bar.get("close", 0))
+            if v > 0:
+                closes.append(v)
+        except Exception:
+            continue
     return {
+        "klineCloses": closes[-60:],
         "riskLevel": derive_risk_level(risks, direction, rsi14, change_percent),
         "advice": derive_trade_advice(
             price,

@@ -7,11 +7,14 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF.svg)](https://kotlinlang.org)
 [![Kuikly](https://img.shields.io/badge/Kuikly-Tencent%20TDS-0052D9.svg)](https://github.com/Tencent-TDS/KuiklyUI)
 [![Backend](https://img.shields.io/badge/Backend-FastAPI-009688.svg)](backend)
+[![CI](https://github.com/HongMing-Huang/zhiniu-demo/actions/workflows/ci.yml/badge.svg)](https://github.com/HongMing-Huang/zhiniu-demo/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-| 行情 · Light | 行情 · Dark | 个股详情 | AI 研究归纳 |
-|:---:|:---:|:---:|:---:|
-| ![行情浅色](docs/img/market-light.png) | ![行情深色](docs/img/market-dark.png) | ![个股详情](docs/img/detail-light.png) | ![AI 研究](docs/img/ai-markdown.png) |
+![页面预览](docs/img/pages_preview.png)
+
+| 行情 · Dark | AI 研究归纳 |
+|:---:|:---:|
+| ![行情深色](docs/img/market-dark.png) | ![AI 研究](docs/img/ai-markdown.png) |
 
 </div>
 
@@ -41,6 +44,29 @@
 | 官方字体接入 | 数字等宽 JetBrains Mono（OFL），按 KuiklyUI 官方机制三端注册（见 [docs/typography.md](docs/typography.md)） |
 | 跨端待办基线 | 待办清单页（新增/编辑/删除/完成/清除已完成），持久化走 Kuikly 官方 `SharedPreferencesModule` 三端落地；一套 commonMain 代码，Android APK 构建 + iOS Kotlin 编译 + H5 实测三端验证 |
 | 离线可跑 | 内置确定性 Mock，断网 / 无 Key 均可完整演示 |
+
+## 设计亮点
+
+- **多 Agent 研究管线**：行情 → 技术面 → 财务 → 资讯 → 风险 → 多空辩论 → 研究经理 → 交易员 → 风控 → 归纳，SSE 阶段帧实时推进；对同一标的的结论、依据、来源逐段可追溯。
+- **AI 回复结构化渲染**：Markdown（标题/列表/表格/代码块）与结构化卡片（股票卡 / 关键指标 / **买卖观察区间** / **风险分级五档** / 迷你走势）混排，解析器纯函数实现并带单测。
+- **防幻觉协议**：证券代码必须来自本轮搜索工具；行情/财报/K 线数值由服务端回填卡片，模型不得填写或修改数字；工具失败明示失败项，禁止用未经查询的数据补全。
+- **诚实降级**：LLM 不可用时输出规则引擎结论并标注「规则降级 · 未伪装模型」；行情断网保留最近快照并打 stale 标记。
+- **官方字体/组件接入**：数字等宽 JetBrains Mono 按 KuiklyUI 官方机制三端注册；K 线 Canvas 自绘；持久化用官方 SharedPreferencesModule。
+- **CI 多端产物**：每次 push 自动构建 Android APK / H5 bundle 并上传 Actions 产物（见顶部 CI 徽章）。
+
+## 后端接口概览
+
+| 能力 | 接口 |
+|:--|:--|
+| 健康检查 | `GET /healthz` |
+| 实时行情（多代码批量） | `GET /quote/realtime?codes=sh600519,sz000001` |
+| 日 K / 分时 | `GET /quote/kline?symbol=&scale=&datalen=` |
+| 个股资讯 | `GET /news/list?symbol=` |
+| 人气榜（东财真实排名） | `GET /quote/popularity?count=20` |
+| 行业板块 / 选股 | `GET /quote/sectors` · `GET /quote/screener` |
+| 估值与财报 | `GET /quote/fundamentals?symbol=` |
+| 多 Agent 研究（JSON / SSE） | `POST /agent/research` · `POST /agent/research/stream` |
+| OpenAI 兼容对话 | `POST /v1/chat/completions` |
 
 ## 架构
 
@@ -83,6 +109,12 @@ cd web-host && python3 -m http.server 8082 --bind 127.0.0.1
 ```
 
 Android / iOS / 鸿蒙壳运行方式见 [docs/getting-started.md](docs/getting-started.md)。
+
+### 部署上线（可选）
+
+- **后端**：Render → New → Blueprint（识别仓库根 `render.yaml`），填入 `DATABASE_URL`（Neon 连接串，可选）与 LLM Key 即可；也可用任意 PaaS 以 `uvicorn app.main:app --host 0.0.0.0 --port $PORT` 启动。
+- **H5 前端**：`web-host/` 为纯静态目录，可直接托管到 Vercel / Netlify / gh-pages；线上访问后端用 `?gateway=https://你的网关域名` 覆盖默认地址。
+- **数据库**：设置 `DATABASE_URL` 即启用 Postgres（Neon）持久化——研究结果跨进程缓存 + request_id 幂等；未设置时自动降级纯内存，功能不受影响。
 
 ## 多端支持
 

@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-apk:
+    name: Android debug APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - uses: android-actions/setup-android@v3
+      - name: Build shared + Android shell
+        working-directory: kuikly-shell
+        run: ./gradlew :shared:testDebugUnitTest :androidApp:assembleDebug --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zhiniu-debug-apk
+          path: kuikly-shell/androidApp/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+  h5-bundle:
+    name: H5 production bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build H5 bundle
+        working-directory: kuikly-shell
+        env:
+          CI: 'true'
+        run: ./gradlew :shared:jsBrowserProductionWebpack --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zhiniu-h5-bundle
+          path: kuikly-shell/shared/build/kotlin-webpack/js/productionExecutable/nativevue2.js
+          if-no-files-found: error
+
+  backend-tests:
+    name: Backend unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        working-directory: backend
+        run: pip install -r requirements.txt
+      - name: Run tests
+        working-directory: backend
+        run: python -m unittest discover -s tests -v

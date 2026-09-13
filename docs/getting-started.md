@@ -87,7 +87,14 @@ open iosApp.xcworkspace      # Xcode 选 iosApp target 直接 Run
 
 ---
 
-## 6. 三种数据模式
+## 6. 部署（可选）
+
+- 后端：Render Blueprint（仓库根 `render.yaml`）或任意 PaaS；`DATABASE_URL` 指向 Neon 时启用 Postgres 持久化（研究缓存 + request_id 幂等），不设置则纯内存。
+- H5：`web-host/` 纯静态，托管后用 `?gateway=https://网关域名` 指向后端。
+
+---
+
+## 7. 三种数据模式
 
 | 场景 | 条件 | 效果 |
 |:--|:--|:--|
@@ -97,7 +104,7 @@ open iosApp.xcworkspace      # Xcode 选 iosApp target 直接 Run
 
 ---
 
-## 7. 常见问题
+## 8. 常见问题
 
 - **Gradle 编译失败**：确认 JDK 17 + `env -u NODE_OPTIONS`（见 §0）。
 - **H5 白屏 / 乱码**：`index.html` 启动链三步缺一不可；改过部署链路必须重跑 `scripts/build.sh`。

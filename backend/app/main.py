@@ -30,6 +30,7 @@ from .config import (
 from .discovery import merged_models_for_provider, refresh_models
 from .analytics import record_usage, usage_summary
 from .agent import run_chat, run_research, stream_research
+from . import store
 from .tools import execute_tool_async
 from .gateway import gateway
 from .news import news_detail, news_list
@@ -108,6 +109,7 @@ class ChatCompletionRequest(BaseModel):
 class AgentResearchRequest(BaseModel):
     symbol: str = Field(..., min_length=8, max_length=12, description="如 sh600519")
     keyword: str = Field("", max_length=80)
+    request_id: str = Field("", max_length=64, description="可选幂等键：重复提交返回同一结果")
 
 
 class AgentChatRequest(BaseModel):
@@ -254,11 +256,17 @@ async def admin_refresh_models():
     return {"status": "ok", "providers": result}
 
 
+@app.on_event("startup")
+async def _init_store() -> None:
+    await store.init()
+
+
 @app.get("/healthz")
 async def healthz(_=Depends(require_gateway_key)):
     configured = [name for name, conf in PROVIDERS.items() if os.getenv(conf.api_key_env)]
     return {
         "status": "ok",
+        "database": store.status(),
         "services": {
             "market": {"status": "ready", "provider": "sina+eastmoney"},
             "agent": {

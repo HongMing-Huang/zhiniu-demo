@@ -42,5 +42,8 @@ echo "==> [3/3] 部署 nativevue2.js → web-host/（同源，主入口）+ web-
 cp "$ROOT/kuikly-shell/shared/build/kotlin-webpack/js/productionExecutable/nativevue2.js" "$ROOT/web-host/nativevue2.js"
 cp "$ROOT/kuikly-shell/shared/build/kotlin-webpack/js/productionExecutable/nativevue2.js" "$ROOT/web-8083/nativevue2.js"
 cp "$ROOT/kuikly-shell/shared/build/kotlin-webpack/js/productionExecutable/nativevue2.js.map" "$ROOT/web-8083/nativevue2.js.map" 2>/dev/null || true
+# 缓存穿透：每次部署更新 index.html 的 bundle 版本号（?v=时间戳），浏览器强制拉新
+BUMP="$(date +%s)"
+sed -i '' -E "s|nativevue2\.js\?v=[0-9]+|nativevue2.js?v=$BUMP|" "$ROOT/web-host/index.html"
 ls -la "$ROOT/web-host/nativevue2.js"
-echo "✅ 构建部署完成（单端入口 http://127.0.0.1:8082/index.html?page_name=MarketList&use_spa=1）"
+echo "✅ 构建部署完成（bundle 版本 v=${BUMP}；单端入口 http://127.0.0.1:8082/index.html?page_name=MarketList&use_spa=1）"

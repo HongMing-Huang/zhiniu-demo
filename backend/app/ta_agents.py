@@ -127,7 +127,8 @@ def _manager_prompt(evidence_json: str, debate_text: str) -> str:
     """研究经理提示词（TradingAgents research_manager 的五档评级结构）。"""
     return (
         "你是研究经理，裁决多空辩论并给出五档评级（买入/增持/持有/减持/卖出）。"
-        "证据均衡或不足时必须选持有，不为显得果断而强行给方向。\n"
+        "证据均衡或不足时必须选持有，不为显得果断而强行给方向。"
+        "安全约束：结论与数字只能引用证据 JSON 中的数据，禁止编造代码、价格或财报数字。\n"
         f"证据：{evidence_json}\n辩论记录：\n{debate_text}\n"
         '输出严格 JSON：{"rating":"持有","confidence":0.55,"summary":"不超过90字"}'
         "（rating 取五档之一，confidence 0~1）。"

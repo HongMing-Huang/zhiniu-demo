@@ -1,0 +1,18 @@
+# 知牛 · Render 部署蓝图（后端网关）
+# 用法：Render 控制台 → New → Blueprint → 选择本仓库（或 New Web Service 按下面配置手填）。
+# 环境变量在 Render 控制台填写，勿提交密钥。
+services:
+  - type: web
+    name: zhiniu-gateway
+    env: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATABASE_URL
+        sync: false          # Neon 连接串（可选；不填则纯内存缓存）
+      - key: DEEPSEEK_API_KEY
+        sync: false          # OpenAI 兼容厂商 Key（可选；不填则规则降级）
+      - key: GATEWAY_KEY
+        sync: false          # 网关访问密钥（可选）

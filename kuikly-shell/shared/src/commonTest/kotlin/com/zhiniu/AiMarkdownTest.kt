@@ -68,7 +68,8 @@ class AiMarkdownTest {
 
     @Test fun `inline bold and code spans`() {
         val spans = parseInlineSpans("看 **RSI 超买** 与 `ma20` 值")
-        assertEquals(4, spans.size)
+        // 纯文本 / 加粗 / 纯文本 / 行内码 / 纯文本 = 5 段
+        assertEquals(5, spans.size)
         assertTrue(spans[1].bold)
         assertTrue(spans[3].code)
         assertEquals("RSI 超买", spans[1].text)

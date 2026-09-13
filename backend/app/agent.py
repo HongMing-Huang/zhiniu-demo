@@ -16,6 +16,8 @@ from typing import Any
 from .tools import execute_tool_async
 from .ta_agents import run_debate
 from .gateway import gateway
+from . import store
+from .insight import build_insight
 
 _CHAT_SYSTEM_PROMPT = (
     "你是知牛（ZhiNiu）的股票研究助手，面向 A 股个人投资者，用中文回答。规则：\n"
@@ -23,7 +25,10 @@ _CHAT_SYSTEM_PROMPT = (
     "2. 严禁编造具体价格、财报数字或新闻；若上下文提供了标的快照，数字只能引用该快照。\n"
     "3. 涉及实时行情的问题，提醒用户在行情页查看最新数据。\n"
     "4. 不构成投资建议，涉及决策时提示风险。\n"
-    "5. 回答不超过 300 字。"
+    "5. 回答不超过 300 字。\n"
+    "安全约束：提到的证券代码必须来自本轮工具返回结果，禁止编造、猜测或引用旧对话代码；"
+    "行情/财务/K线数值只能来自工具返回数据，禁止自行填写或修改任何数字；"
+    "工具失败时明确说明失败项，禁止用未经成功查询的数据补全。"
 )
 
 
@@ -238,17 +243,34 @@ async def run_chat(question: str, history: list[dict] | None = None, symbol: str
 
 
 async def run_research(symbol: str, keyword: str = "") -> dict:
+    # 缓存（内存 / 可选 Postgres）命中直接返回；同标的研究进行中则共享结果（并发去重）
+    cached = await store.get_research(symbol, keyword)
+    if cached is not None:
+        return cached
+    inflight = store.begin_inflight(symbol, keyword)
+    if inflight is not None:
+        shared = await store.await_inflight(inflight)
+        if shared is not None:
+            return {**shared, "cached": True, "cache": "inflight"}
     started = time.perf_counter()
-    quote, kline, financials, news = await asyncio.gather(
-        execute_tool_async("get_realtime_quote", {"symbol": symbol}),
-        execute_tool_async("get_kline", {"symbol": symbol, "datalen": 120}),
-        execute_tool_async("get_financials", {"symbol": symbol}),
-        execute_tool_async("search_news", {"symbol": symbol, "keyword": keyword}),
-    )
-    technical = _technical_summary(kline)
-    risks = _risk_flags(quote, technical, news, financials)
-    synthesis = await _synthesize(symbol, keyword, quote, technical, financials, news, risks, kline)
-    return _build_report(symbol, quote, kline, financials, news, synthesis, started)
+    try:
+        quote, kline, financials, news = await asyncio.gather(
+            execute_tool_async("get_realtime_quote", {"symbol": symbol}),
+            execute_tool_async("get_kline", {"symbol": symbol, "datalen": 120}),
+            execute_tool_async("get_financials", {"symbol": symbol}),
+            execute_tool_async("search_news", {"symbol": symbol, "keyword": keyword}),
+        )
+        technical = _technical_summary(kline)
+        risks = _risk_flags(quote, technical, news, financials)
+        synthesis = await _synthesize(symbol, keyword, quote, technical, financials, news, risks, kline)
+        report = _build_report(symbol, quote, kline, financials, news, synthesis, started)
+        report["insight"] = build_insight(quote, technical, risks, synthesis, kline)
+        await store.put_research(symbol, keyword, report)
+        store.finish_inflight(symbol, keyword, report)
+        return report
+    except Exception as exc:
+        store.fail_inflight(symbol, keyword, exc)
+        raise
 
 
 async def stream_research(symbol: str, keyword: str = "") -> AsyncIterator[dict[str, Any]]:
@@ -325,6 +347,8 @@ async def stream_research(symbol: str, keyword: str = "") -> AsyncIterator[dict[
             symbol, evidence["market"], evidence["technical"], evidence["financial"],
             evidence["news"], synthesis, started
         )
+        report["insight"] = build_insight(evidence["market"], technical, risks, synthesis, evidence["technical"])
+        await store.put_research(symbol, keyword, report)
         yield {
             "type": "stage_completed", "runId": run_id, "stage": "synthesis",
             "label": "归纳 Agent", "source": synthesis.get("provider", "rule-engine"),

@@ -26,6 +26,20 @@ sealed class AiBlock {
 
     /** 追问建议。 */
     data class FollowUps(val questions: List<String>) : AiBlock()
+
+    /** 买卖观察区间卡（服务端由交易员计划/关键位确定性推导，非投资建议）。 */
+    data class TradeAdvice(
+        val buyRange: String,
+        val sellRange: String,
+        val rationale: String,
+        val basis: List<String> = emptyList(),
+    ) : AiBlock()
+
+    /** 风险分级（五档：low/medium_low/medium/medium_high/high）。 */
+    data class RiskLevel(val level: String, val label: String, val rationale: String) : AiBlock()
+
+    /** 对话内迷你走势（服务端返回的近 60 根收盘价）。 */
+    data class KLine(val closes: List<Double>) : AiBlock()
 }
 
 /** 指标组内单行。 */
