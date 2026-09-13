@@ -12,9 +12,11 @@ def test_risk_level_low_on_clean_uptrend():
     assert out["level"] == "low"
 
 
-def test_risk_level_medium_with_one_flag():
+def test_risk_level_medium_low_with_one_flag():
+    # 五档设计：单项温和风险 + 中性趋势 = 中低（score 1 → medium_low）
     out = derive_risk_level(["量能异常"], "sideways", 50.0, 0.0)
-    assert out["level"] == "medium"
+    assert out["level"] == "medium_low"
+    assert out["label"] == "中低"
 
 
 def test_advice_from_trader_plan():

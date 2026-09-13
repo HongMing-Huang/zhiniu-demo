@@ -16,6 +16,7 @@ import com.tencent.kuikly.core.reactive.handler.observableList
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
 import com.tencent.kuikly.core.coroutines.launch
+import com.zhiniu.data.remote.AgentCompareResult
 import com.zhiniu.data.remote.GatewayMarketClient
 import com.zhiniu.domain.model.StockQuote
 import com.zhiniu.pages.components.ANIM_THEME
@@ -46,6 +47,11 @@ internal class ComparePage : AppBasePage() {
     internal var loading by observable(true)
     internal var sourceLabel by observable("同步中…")
 
+    /** AI 对比（/agent/compare/stream）：LLM 定性归纳 + 规则基准兜底（来源如实标注）。 */
+    internal var aiResult by observable<AgentCompareResult?>(null)
+    internal var aiLoading by observable(false)
+    internal var aiStage by observable("")
+
     override fun created() {
         super.created()
         // 路由参数：symbolA/symbolB 可指定对比对（缺省 茅台 vs 宁德）
@@ -70,6 +76,25 @@ internal class ComparePage : AppBasePage() {
             sideB.diffUpdate(listOf(rowOf(pairB)))
             sourceLabel = if (live != null) "实时行情" else "本地快照 · 可重试"
             loading = false
+        }
+        refreshAiCompare()
+    }
+
+    /** 双股 AI 对比：首选 SSE 流式（阶段可见、不受移动端 12s 离线超时限制），回退一次性接口。
+     *  开始时置空 aiResult：vif 的 null→非空转换强制内容重建（避免捕获旧结果不刷新）。 */
+    internal fun refreshAiCompare() {
+        aiResult = null
+        aiLoading = true
+        aiStage = ""
+        lifecycleScope.launch {
+            val streamed = runCatching {
+                GatewayMarketClient.compareStream(pairA, pairB) { stage -> aiStage = stage }
+            }.getOrNull()
+            val result = streamed ?: runCatching {
+                GatewayMarketClient.agentCompare(pairA, pairB)
+            }.getOrNull()
+            if (result != null) aiResult = result
+            aiLoading = false
         }
     }
 
@@ -121,6 +146,120 @@ private fun ViewContainer<*, *>.compareContent(host: ComparePage) {
                 compareCard(host, host.sideA.first(), host.sideB.first())
             }
             View { attr { height(24f) } }
+            aiCompareCard(host)
+            View { attr { height(24f) } }
+        }
+    }
+}
+
+/** AI 对比卡：LLM 定性归纳（summary/stronger/双列依据/结论）；规则降级与加载态如实标注。
+ *  响应性约定：vif 条件直接读 host observable（不得捕获局部 val，否则数据到达不刷新）。 */
+private fun ViewContainer<*, *>.aiCompareCard(host: ComparePage) {
+    val colors = AppTheme.colors
+    View {
+        attr {
+            borderRadius(AppRadius.radius8)
+            border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+            backgroundColor(colors.c(colors.surface))
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+        View {
+            attr {
+                flexDirectionRow(); alignItemsCenter()
+                padding(left = 14f, right = 14f, top = 12f, bottom = 12f)
+            }
+            SectionHeader("AI 对比归纳", action = "重新生成", onAction = { host.refreshAiCompare() })
+        }
+        vif({ host.aiLoading && host.aiResult == null }) {
+            View {
+                attr { padding(all = 16f) }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs13)
+                        color(colors.c(colors.textTertiary))
+                        text(if (host.aiStage.isBlank()) "正在生成 AI 对比…" else "正在生成 AI 对比 · ${host.aiStage}…")
+                    }
+                }
+            }
+        }
+        vif({ host.aiResult != null }) {
+            val r = host.aiResult!!
+            View {
+                attr { padding(left = 14f, right = 14f, bottom = 14f); flexDirectionColumn() }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs11)
+                        color(colors.c(colors.textTertiary))
+                        text(if (r.isLlm) "LLM 对比 · ${r.provider} · 数字均来自服务端行情证据" else "规则降级 · 未伪装模型")
+                    }
+                }
+                View { attr { height(6f) } }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs13); lineHeight(20f)
+                        color(colors.c(colors.textSecondary)); text(r.summary)
+                    }
+                }
+                vif({ r.pointsA.isNotEmpty() || r.pointsB.isNotEmpty() }) {
+                    View { attr { height(10f) } }
+                    View {
+                        attr { flexDirectionRow() }
+                        comparePointsColumn("A · ${r.stocks[0].name}", r.pointsA, r.stronger == "A")
+                        View { attr { width(12f) } }
+                        comparePointsColumn("B · ${r.stocks[1].name}", r.pointsB, r.stronger == "B")
+                    }
+                }
+                vif({ r.conclusion.isNotBlank() }) {
+                    View { attr { height(8f) } }
+                    Text {
+                        attr {
+                            fontSize(AppTypography.fs12); lineHeight(18f)
+                            color(colors.c(colors.textTertiary)); text("结论：${r.conclusion}")
+                        }
+                    }
+                }
+                View { attr { height(8f) } }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs11)
+                        color(colors.c(colors.textTertiary)); text("仅供信息分析，不构成投资建议")
+                    }
+                }
+            }
+        }
+        vif({ !host.aiLoading && host.aiResult == null }) {
+            View {
+                attr { padding(all = 16f); flexDirectionRow(); alignItemsCenter() }
+                Text {
+                    attr {
+                        flex(1f); fontSize(AppTypography.fs13)
+                        color(colors.c(colors.textTertiary)); text("AI 对比网关暂不可用")
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 双列依据：stronger 一侧高亮标记。 */
+private fun ViewContainer<*, *>.comparePointsColumn(title: String, points: List<String>, stronger: Boolean) {
+    val colors = AppTheme.colors
+    View {
+        attr { flex(1f); flexDirectionColumn() }
+        Text {
+            attr {
+                fontSize(AppTypography.fs12); fontWeightMedium()
+                color(colors.c(if (stronger) colors.up else colors.textSecondary))
+                text(title + if (stronger) " ★" else "")
+            }
+        }
+        points.forEach { p ->
+            Text {
+                attr {
+                    marginTop(4f); fontSize(AppTypography.fs12); lineHeight(17f)
+                    color(colors.c(colors.textSecondary)); text("· $p")
+                }
+            }
         }
     }
 }

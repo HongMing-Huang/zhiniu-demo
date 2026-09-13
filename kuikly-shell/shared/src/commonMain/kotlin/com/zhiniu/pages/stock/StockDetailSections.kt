@@ -82,7 +82,7 @@ internal fun ViewContainer<*, *>.detailSkeleton(host: StockDetailPage) {
 internal fun ViewContainer<*, *>.detailContent(host: StockDetailPage, q: com.zhiniu.domain.model.StockQuote) {
     val colors = AppTheme.colors
     val pad: Float = PAD
-        val aw: Float = host.pageData.activityWidth
+        val aw: Float = host.viewportWidth()
         val extra: Float = if (aw > 1360f) (aw - 1360f) / 2f else 0f
         val sidePad: Float = pad + extra
     View {
@@ -409,7 +409,7 @@ internal fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.
     // 第三四行：Quote Grid（max 760~860）；换手率取行情快照/基本面真实值，缺失显示 —
     View { attr { height(14f) } }
     View {
-        attr { flexDirectionRow(); alignItemsCenter(); width(if (host.isCompact()) host.pageData.activityWidth - 32f else 800f) }
+        attr { flexDirectionRow(); alignItemsCenter(); width(if (host.isCompact()) host.viewportWidth() - 32f else 800f) }
         QuoteMetric("今开", com.zhiniu.pages.components.fmt2(q.open))
         QuoteMetric("最高", com.zhiniu.pages.components.fmt2(q.high))
         QuoteMetric("最低", com.zhiniu.pages.components.fmt2(q.low))
@@ -417,7 +417,7 @@ internal fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.
     }
     View { attr { height(8f) } }
     View {
-        attr { flexDirectionRow(); alignItemsCenter(); width(if (host.isCompact()) host.pageData.activityWidth - 32f else 800f) }
+        attr { flexDirectionRow(); alignItemsCenter(); width(if (host.isCompact()) host.viewportWidth() - 32f else 800f) }
         QuoteMetric("成交量", com.zhiniu.pages.components.fmtVolHand(q.volume))
         QuoteMetric("成交额", com.zhiniu.pages.components.fmtAmount(q.amount))
         QuoteMetric("换手率") { com.zhiniu.pages.components.fmtOptional(host.facts(q).turnover, "%") }
@@ -542,8 +542,8 @@ internal fun ViewContainer<*, *>.ChartWorkspace(host: StockDetailPage, q: com.zh
                             host.panStartOffset = host.klineOffset
                         } else if (state == "move") {
                             val dx = p.x - host.panStartX
-                            val plotW = if (stacked) host.pageData.activityWidth - 76f
-                                else host.pageData.activityWidth * 0.72f - 58f
+                            val plotW = if (stacked) host.viewportWidth() - 76f
+                                else host.viewportWidth() * 0.72f - 58f
                             val s = plotW / vc
                             val shift = (dx / s).toInt()
                             host.klineOffset = clampViewStart(host.panStartOffset - shift, all.size, vc)
@@ -626,10 +626,10 @@ internal fun ViewContainer<*, *>.ChartWorkspace(host: StockDetailPage, q: com.zh
         // 右：Rail 28%
         vif({ host.isAiPanelVisible }) {
             AiInsightPanel(
-                width = if (stacked) host.pageData.activityWidth - 64f else host.pageData.activityWidth * 0.28f,
+                width = if (stacked) host.viewportWidth() - 64f else host.viewportWidth() * 0.28f,
                 height = if (stacked) railHeight - 1f else 0f,
                 quote = { host.quote() },
-                insight = { host.quote()?.let { MarketStore.aiService.insightFor(it.symbol, host.liveFundamentals.toAiFundamentals()) } },
+                insight = { host.detailInsight() },
                 followUpText = { host.aiDraft },
                 chatLines = { host.aiChat },
                 onFollowUpChange = { host.aiDraft = it },
@@ -640,7 +640,7 @@ internal fun ViewContainer<*, *>.ChartWorkspace(host: StockDetailPage, q: com.zh
         velse {
             RailQuickInsight(
                 host, q,
-                if (stacked) host.pageData.activityWidth - 64f else host.pageData.activityWidth * 0.28f,
+                if (stacked) host.viewportWidth() - 64f else host.viewportWidth() * 0.28f,
                 if (stacked) railHeight - 1f else 0f,
             )
         }
@@ -655,7 +655,7 @@ internal fun ViewContainer<*, *>.RailQuickInsight(
     railHeight: Float,
 ) {
     val colors = AppTheme.colors
-    val insight = MarketStore.aiService.insightFor(q.symbol, host.liveFundamentals.toAiFundamentals())
+    val insight = host.detailInsight() ?: return
     View {
         attr {
             width(railW)
@@ -825,7 +825,7 @@ internal fun StockFundamentals?.toAiFundamentals(): AiInsightFundamentals? = thi
 
 internal fun ViewContainer<*, *>.aiTab(host: StockDetailPage, q: com.zhiniu.domain.model.StockQuote) {
     val colors = AppTheme.colors
-    val insight = MarketStore.aiService.insightFor(q.symbol, host.liveFundamentals.toAiFundamentals())
+    val insight = host.detailInsight() ?: return
     View {
         attr {
             backgroundColor(colors.c(colors.surface))

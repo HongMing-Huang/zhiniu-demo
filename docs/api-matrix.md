@@ -104,7 +104,11 @@
 - **GET /quote/screener?industry=&min_pct=&limit=30**（改真实）
   - 上游：东财 `push2 clist fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23`，按成交额 f6 降序取前 100 为选股池，再做行业（f100 子串）/涨跌幅过滤
   - 出参：`{ industry, min_pct, rows:[{symbol,name,price,changePercent,volume,amount,turnoverRate,pe,marketCap,industry}], source, isStale }`；60s TTL
-- **出站白名单**：所有上游请求经 `quote._guard_external_url`（仅 HTTPS；域名 ∈ push2.eastmoney.com / emappdata.eastmoney.com / hq.sinajs.cn / quotes.sina.cn / qt.gtimg.cn），防 SSRF；人气榜 POST 端点固定，不接受外部 URL
+- **出站白名单**：所有上游请求经 `quote._guard_external_url`（仅 HTTPS；域名 ∈ push2.eastmoney.com / emappdata.eastmoney.com / searchapi.eastmoney.com / datacenter-web.eastmoney.com / hq.sinajs.cn / quotes.sina.cn / qt.gtimg.cn），防 SSRF；人气榜 POST 端点固定，不接受外部 URL
+- **GET /quote/search?keyword=&count=10**（2026-09-13 新增，全市场搜索）
+  - 上游：东财 suggest `searchapi.eastmoney.com/api/suggest/get?input=&type=14&count=`（名称/代码/拼音缩写模糊匹配）
+  - 过滤：仅沪深 A 股（MktNum 0/1 且 Classify=AStock，或科创板独立分类 23+SecurityType 25），港美股/指数/基金剔除
+  - 出参：`{ items:[{symbol:"sh600519",code,name,market:"SH|SZ",securityTypeName}], source:"eastmoney-suggest"|"local-snapshot"|"none", isStale }`；300s TTL；离线回退本地快照名称/代码匹配
 
 ### 3.2 资讯与研究 Agent
 
@@ -113,6 +117,21 @@
 - `POST /agent/research` 并行聚合行情、120 根 K 线、财务与资讯，先输出可审计证据，再进入 **TradingAgents 结构辩论管线**（`backend/app/ta_agents.py`，移植自 TauricResearch/TradingAgents，MIT）：多头研究员 → 空头研究员 → 研究经理五档评级（买入/增持/持有/减持/卖出，JSON）→ 交易员绝对价位观察方案 → 激进/中性/保守风控三方；共 7 次 `zhiniu/quick` 调用，总超时 `ZHINIU_AGENT_TIMEOUT`（默认 75s）。上游模型不可用/超时/评级非法时返回同构的 `mode=deterministic_fallback, provider=rule-engine`，绝不把规则文案伪装成模型回答。
 - `synthesis` 字段：`stance/rating/confidence/summary/trend/pressure/support/bullPoints[]/bearPoints[]/riskNotes[]/trader{entry,stop,plan}/catalysts/risks`；`pressure/support` 由 `agent._levels_from_kline`（近 60 根高低点）确定性计算，模型不得编造价位；`evidence.levels` 同步输出。
 - `/agent/research/stream` 复用同一结果构建器；事件含 `runId/type/final`；辩论各阶段（`bull/bear/manager/trader/risk-aggressive/risk-neutral/risk-conservative/synthesis`）经队列实时转发为 `stage_started/stage_completed`，正常以 `run_finished(final=true)`、异常以 `run_error(final=true)` 收束，客户端无需猜测流是否结束。
+
+### 3.3 AI 诊股 / 流式问答 / 双股对比（2026-09-13 新增，对标课题组仓库）
+
+- **POST /agent/insight**（个股 AI 诊股，详情页 AI 面板数据源）
+  - 服务端取证（实时行情 + 120 根 K 线 + 估值财报）→ 单次 JSON-mode LLM（`zhiniu/quick` 链）输出 `{verdict,summary,trend,valuation,earnings,volume,risk,signals[],buyZone,sellZone,riskLevel,followUps[]}`
+  - **防幻觉校验**（`agent._sanitize_llm_insight`）：verdict 枚举（偏强/中性/偏弱，非法按 direction 归位）；riskLevel 枚举（五档，非法回退规则基准档）；**buyZone/sellZone 必须为 [低,高] 且落在支撑/压力 ±3% 内，否则丢弃置 null（不编造）**；文本字段截断
+  - 缓存/并发去重：复用 store（keyword=`insight:v1`，TTL=RESEARCH_TTL_SECONDS 默认 1h；同标的进行中任务共享结果）
+  - 无模型/超时/解析失败：`mode=deterministic_fallback, provider=rule-engine`，riskLevel/advice 仍由确定性规则输出（数值来自服务端证据）
+- **POST /agent/chat/stream**（通用问答流式）
+  - typed SSE：`chat_started → delta{content}* → chat_finished{mode,provider,content}`；与 `/agent/chat` 同一消息组装（history 8 轮 + 标的快照锚定）
+  - Mock LLM（id=mock-llm）占位文本不透传，直接以规则降级文本收尾（mock ≠ 模型输出的口径与同步版一致）
+- **POST /agent/compare · /agent/compare/stream**（双股对比）
+  - 入参：`{symbols:[sh600519,sz300750], focus?}`（恰好 2 个）；双侧并行取证（行情/60 根 K 线/估值）
+  - 规则基准 `_rule_compare_summary` 永远返回（区间涨跌/RSI/PE 对照，`conclusion="规则降级 · 未伪装模型"`）；LLM 可用时叠加 `{summary,stronger(A|B|none),pointsA[],pointsB[],conclusion}`（JSON-mode，枚举校验）
+  - 流式版帧：`stage(evidence_a/evidence_b/llm) → result → run_finished`；SSE 不经前端 OffThread 包装，无 12s 上限，LLM 延迟抖动下仍可完成
 
 ---
 

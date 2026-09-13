@@ -31,6 +31,7 @@ filter-sort|filter-sort
 error-triangle|error-triangle
 chat-message|chat-message
 data-display|data-display
+user-circle|user-circle
 "
 
 echo "==> 下载 + 预处理（线性轮廓）"

@@ -65,6 +65,9 @@ typedef struct {
 } libshared_kref_kotlin_ULong;
 typedef struct {
   libshared_KNativePtr pinned;
+} libshared_kref_com_zhiniu_base_PendingAsk;
+typedef struct {
+  libshared_KNativePtr pinned;
 } libshared_kref_com_zhiniu_data_local_Watchlist;
 typedef struct {
   libshared_KNativePtr pinned;
@@ -449,6 +452,9 @@ typedef struct {
 } libshared_kref_com_zhiniu_pages_components_IconKind_DATA;
 typedef struct {
   libshared_KNativePtr pinned;
+} libshared_kref_com_zhiniu_pages_components_IconKind_USER;
+typedef struct {
+  libshared_KNativePtr pinned;
 } libshared_kref_com_zhiniu_pages_components_ThemeMode;
 typedef struct {
   libshared_KNativePtr pinned;
@@ -518,6 +524,14 @@ typedef struct {
     struct {
       struct {
         struct {
+          struct {
+            struct {
+              libshared_KType* (*_type)(void);
+              libshared_kref_com_zhiniu_base_PendingAsk (*_instance)();
+              const char* (*get_question)(libshared_kref_com_zhiniu_base_PendingAsk thiz);
+              void (*set_question)(libshared_kref_com_zhiniu_base_PendingAsk thiz, const char* set);
+            } PendingAsk;
+          } base;
           struct {
             struct {
               struct {
@@ -1615,7 +1629,7 @@ typedef struct {
                 void (*IconButton)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, libshared_kref_com_zhiniu_pages_components_IconKind kind, libshared_KFloat size, libshared_KFloat box, libshared_KBoolean active, const char* accessibilityLabel, libshared_kref_kotlin_Function0 onClick);
                 void (*PrimaryButton)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, const char* label, libshared_KFloat height, libshared_kref_com_zhiniu_pages_components_IconKind icon, libshared_kref_kotlin_Function0 onClick);
                 void (*SecondaryButton)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, const char* label, libshared_KFloat height, libshared_kref_com_zhiniu_pages_components_IconKind icon, libshared_kref_kotlin_Function0 onClick);
-                void (*AppHeader)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, const char* activeNav, libshared_KFloat contentWidth, libshared_KFloat topInset, libshared_kref_kotlin_Function0 onNavMarket, libshared_kref_kotlin_Function0 onNavAiResearch, libshared_kref_kotlin_Function0 onNavWatchlist, libshared_kref_kotlin_Function0 onSearch, libshared_kref_kotlin_Function0 onTheme);
+                void (*AppHeader)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, const char* activeNav, libshared_KFloat contentWidth, libshared_KFloat topInset, libshared_kref_kotlin_Function0 onNavMarket, libshared_kref_kotlin_Function0 onNavAiResearch, libshared_kref_kotlin_Function0 onNavWatchlist, libshared_kref_kotlin_Function0 onSearch, libshared_kref_kotlin_Function0 onTheme, libshared_kref_kotlin_Function0 onBack);
                 void (*AppInput)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, const char* placeholder, const char* text, libshared_KFloat height, libshared_kref_kotlin_Function1 onTextChange, libshared_kref_kotlin_Function0 onReturn, libshared_kref_kotlin_Function1 onRef);
                 void (*SearchField)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, libshared_KFloat width, libshared_kref_kotlin_Function0 onClick);
                 void (*StockSearchOverlay)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, libshared_kref_kotlin_Function0 visible, libshared_kref_kotlin_Function0 query, libshared_kref_kotlin_Function0 recent, libshared_kref_kotlin_Function0 hot, libshared_kref_kotlin_Function0 results, libshared_KFloat left, libshared_KFloat width, libshared_KFloat topInset, libshared_kref_kotlin_Function1 onQueryChange, libshared_kref_kotlin_Function1 onPick, libshared_kref_kotlin_Function0 onClose);
@@ -1724,6 +1738,9 @@ typedef struct {
                 struct {
                   libshared_kref_com_zhiniu_pages_components_IconKind (*get)(); /* enum entry for DATA. */
                 } DATA;
+                struct {
+                  libshared_kref_com_zhiniu_pages_components_IconKind (*get)(); /* enum entry for USER. */
+                } USER;
                 libshared_KType* (*_type)(void);
                 const char* (*get_asset)(libshared_kref_com_zhiniu_pages_components_IconKind thiz);
               } IconKind;

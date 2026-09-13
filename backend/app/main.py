@@ -29,7 +29,15 @@ from .config import (
 )
 from .discovery import merged_models_for_provider, refresh_models
 from .analytics import record_usage, usage_summary
-from .agent import run_chat, run_research, stream_research
+from .agent import (
+    run_chat,
+    run_compare,
+    run_insight,
+    run_research,
+    stream_chat,
+    stream_compare,
+    stream_research,
+)
 from . import store
 from .tools import execute_tool_async
 from .gateway import gateway
@@ -41,6 +49,7 @@ from .quote import (
     quote_popularity,
     quote_realtime,
     quote_screener,
+    quote_search,
     quote_sectors,
 )
 
@@ -116,6 +125,11 @@ class AgentChatRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=300)
     history: list[dict] = Field(default_factory=list, description='[{"role":"user|ai","content":"..."}]，最多 20 条')
     symbol: str = Field("", max_length=12, description="可选上下文标的，如 sh600519")
+
+
+class AgentCompareRequest(BaseModel):
+    symbols: list[str] = Field(..., min_items=2, max_items=2, description="两个对比标的，如 ['sh600519','sz300750']")
+    focus: str = Field("", max_length=80, description="可选关注点，如「估值与趋势」")
 
 
 # ---------- SSE 工具（支持 event+data 双行格式） ----------
@@ -335,6 +349,12 @@ async def proxy_quote_popularity(count: int = 20):
     return await quote_popularity(count=count)
 
 
+@app.get("/quote/search", dependencies=[Depends(require_gateway_key)])
+async def proxy_quote_search(keyword: str, count: int = 10):
+    """全市场 A 股搜索（东财 suggest，名称/代码/拼音；离线回退本地快照）。GET /quote/search?keyword=&count="""
+    return await quote_search(keyword=keyword, count=count)
+
+
 @app.get("/news/list", dependencies=[Depends(require_gateway_key)])
 async def proxy_news_list(keyword: str = "", symbol: str = ""):
     """A5：资讯列表（7×24 快讯 + 个股新闻）。GET /news/list?keyword=&symbol="""
@@ -376,6 +396,60 @@ async def agent_research_stream(body: AgentResearchRequest):
     """类型化 SSE：阶段、结果和终止帧，供多端渲染可恢复的研究进度。"""
     async def event_stream():
         async for frame in stream_research(symbol=body.symbol.lower(), keyword=body.keyword):
+            yield _sse(frame, event=frame["type"])
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.post("/agent/insight", dependencies=[Depends(require_gateway_key)])
+async def agent_insight(body: AgentResearchRequest):
+    """个股 AI 诊股：服务端取证 → 单次 LLM 结构化判断（买/卖观察区间 + 风险五档 + 信号）→
+    规则降级兜底；结果缓存 + 同标的并发去重（对标课题组 SaiRen stock-analyses 模式）。"""
+    return await run_insight(symbol=body.symbol.lower())
+
+
+@app.post("/agent/compare", dependencies=[Depends(require_gateway_key)])
+async def agent_compare(body: AgentCompareRequest):
+    """双股对比：双侧真实证据（行情/技术面/估值）→ LLM 定性对比；规则基准始终返回。"""
+    symbols = [s.strip().lower() for s in body.symbols if s.strip()]
+    return await run_compare(symbols=symbols, focus=body.focus.strip())
+
+
+@app.post("/agent/compare/stream", dependencies=[Depends(require_gateway_key)])
+async def agent_compare_stream(body: AgentCompareRequest):
+    """双股对比流式版：stage（双侧证据 / AI 归纳）→ result → 终帧（LLM 延迟抖动下可见进度）。"""
+    symbols = [s.strip().lower() for s in body.symbols if s.strip()]
+
+    async def event_stream():
+        async for frame in stream_compare(symbols=symbols, focus=body.focus.strip()):
+            yield _sse(frame, event=frame["type"])
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.post("/agent/chat/stream", dependencies=[Depends(require_gateway_key)])
+async def agent_chat_stream(body: AgentChatRequest):
+    """通用问答流式版：chat_started → delta* → chat_finished（逐字上屏）。"""
+    quote = None
+    symbol = body.symbol.strip().lower()
+    if symbol:
+        quote = await execute_tool_async("get_realtime_quote", {"symbol": symbol}) or None
+
+    async def event_stream():
+        async for frame in stream_chat(
+            question=body.question[:300],
+            history=body.history[:20],
+            symbol=symbol,
+            quote=quote or None,
+        ):
             yield _sse(frame, event=frame["type"])
 
     return StreamingResponse(

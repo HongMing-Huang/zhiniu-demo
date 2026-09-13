@@ -29,7 +29,8 @@ enum class IconKind(val asset: String) {
     FILTER_SORT("icons/filter-sort.png"),
     ERROR("icons/error-triangle.png"),
     CHAT("icons/chat-message.png"),
-    DATA("icons/data-display.png");
+    DATA("icons/data-display.png"),
+    USER("icons/user-circle.png");
 }
 
 /**

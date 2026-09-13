@@ -101,7 +101,13 @@ fun ViewContainer<*, *>.AppHeader(
                 SearchField(width = 240f, onClick = onSearch)
                 View { attr { width(10f) } }
             }
-            SecondaryButton("设置", height = 36f, icon = IconKind.THEME, onClick = onTheme)
+            if (compact) {
+                IconButton(IconKind.USER, size = 18f, box = 38f, accessibilityLabel = "我的与设置") {
+                    onTheme()
+                }
+            } else {
+                SecondaryButton("我的", height = 36f, icon = IconKind.USER, onClick = onTheme)
+            }
         }
     }
 }

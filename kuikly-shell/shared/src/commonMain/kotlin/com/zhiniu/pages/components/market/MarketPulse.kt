@@ -101,7 +101,8 @@ private fun ViewContainer<*, *>.IndexCard(idx: MarketIndex) {
         View { attr { height(3f) } }
         Text {
             attr {
-                fontSize(AppTypography.fs18); fontWeightSemiBold(); fontFamily(NUM_FONT)
+                fontSize(AppTypography.fs14); fontWeightSemiBold(); fontFamily(NUM_FONT)
+                lines(1); textOverFlowClip()
                 color(colors.c(if (idx.isUp) colors.up else colors.down)); text(fmt2(idx.price))
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
@@ -114,7 +115,7 @@ private fun ViewContainer<*, *>.IndexCard(idx: MarketIndex) {
             }
         }
         View { attr { height(5f) } }
-        Canvas({ attr { width(96f); height(20f) } }) { context, w, h ->
+        Canvas({ attr { width(72f); height(18f) } }) { context, w, h ->
             drawSparkLine(context, idx.spark, colors.c(if (idx.isUp) colors.up else colors.down), w, h)
         }
     }
@@ -150,7 +151,7 @@ private fun ViewContainer<*, *>.CompactBreadthCard(breadth: MarketBreadth) {
         Text {
             attr {
                 fontSize(AppTypography.fs11); color(colors.c(colors.textTertiary))
-                text("成交 " + com.zhiniu.pages.components.fmtAmount(breadth.amountYi * 1e8))
+                text("成交 " + fmtInt(breadth.amountYi) + " 亿")
             }
         }
     }

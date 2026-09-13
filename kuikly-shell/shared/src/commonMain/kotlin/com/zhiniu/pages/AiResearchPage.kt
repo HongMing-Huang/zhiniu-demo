@@ -6,6 +6,7 @@ package com.zhiniu.pages
 
 import com.tencent.kuikly.core.annotations.Page
 import com.tencent.kuikly.core.base.Border
+import com.tencent.kuikly.core.base.attr.AccessibilityRole
 import com.tencent.kuikly.core.base.BorderStyle
 import com.tencent.kuikly.core.base.ViewBuilder
 import com.tencent.kuikly.core.base.ViewContainer
@@ -141,8 +142,8 @@ internal class AiResearchPage : AppBasePage() {
     }
 
     /**
-     * 非个股问题（快捷指令 / 指标解释 / 方法论）→ 后端 /agent/chat 真 LLM 问答；
-     * 网关不可用回退本地 Mock 回复（离线演示不白屏）。
+     * 非个股问题（快捷指令 / 指标解释 / 方法论）→ 后端 /agent/chat/stream 流式 LLM 问答
+     * （打字机逐段上屏）；流式不可用回退一次性 /agent/chat；网关整体不可用回退本地 Mock。
      * 上下文标的取最近一次研究，回答中的价格数字锚定该快照。
      */
     private fun sendGeneralQuestion(text: String) {
@@ -152,7 +153,23 @@ internal class AiResearchPage : AppBasePage() {
         val contextSymbol = lastResearch?.symbol.orEmpty()
         lifecycleScope.launch {
             val history = messages.takeLast(9).dropLast(1).map { (it.role to it.text) }
-            val reply = runCatching {
+            var accumulated = ""
+            val streamed = runCatching {
+                GatewayMarketClient.chatStream(text, history, contextSymbol) { delta ->
+                    accumulated += delta
+                    // 打字机：流中即时渲染已到内容（保持 streaming 以显示进行态）
+                    if (isPending(messageIndex, token)) {
+                        messages[messageIndex] = AiChatMessage(
+                            "ai",
+                            blocks = listOf(AiBlock.Text(accumulated)),
+                            streaming = true,
+                            requestId = token,
+                        )
+                    }
+                }
+            }.getOrNull()
+            // 流式不可用（旧网关/iOS 流断言）→ 一次性问答接口
+            val reply = streamed ?: runCatching {
                 GatewayMarketClient.agentChat(text, history, contextSymbol)
             }.getOrNull()
             if (!isPending(messageIndex, token)) return@launch
@@ -520,11 +537,6 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
         List {
             ref { host.chatListRef = it }
             attr { flex(1f) }
-            event {
-                contentSizeChanged { _, height ->
-                    host.chatListRef?.view?.setContentOffset(0f, height, false)
-                }
-            }
             // 空会话欢迎态（欧易/ChatGPT 式）：品牌 + 推荐问题胶囊，点击直接发送
             vif({ host.messages.isEmpty() }) {
                 View {
@@ -543,7 +555,7 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
                     View { attr { height(12f) } }
                     Text {
                         attr {
-                            fontSize(AppTypography.fs17); fontWeightSemiBold()
+                            fontSize(AppTypography.fs16); fontWeightSemiBold()
                             color(colors.c(colors.textPrimary)); text("你好，我是知牛 AI")
                             animate(ANIM_THEME, value = AppTheme.isDark)
                         }
@@ -599,7 +611,7 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
                             attr {
                                 alignSelfFlexEnd()
                                 maxWidth(560f)
-                                borderRadius(AppRadius.radius6)
+                                borderRadius(18f)
                                 backgroundColor(colors.c(colors.textPrimary))
                                 animate(ANIM_THEME, value = AppTheme.isDark)
                             }
@@ -748,6 +760,6 @@ private fun AiResearchPage.sessionWidth(): Float = when {
 }
 
 private fun AiResearchPage.chatSidePad(): Float {
-    val chatWidth = (pageData.activityWidth - sessionWidth()).coerceAtLeast(0f)
+    val chatWidth = (viewportWidth() - sessionWidth()).coerceAtLeast(0f)
     return ((chatWidth - 960f) / 2f).coerceAtLeast(if (isCompact()) 16f else 32f)
 }

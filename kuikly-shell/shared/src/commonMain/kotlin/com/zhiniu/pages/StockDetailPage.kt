@@ -90,6 +90,9 @@ internal class StockDetailPage : AppBasePage() {
     internal var liveQuote by observable<StockQuote?>(null)
     internal var liveFundamentals by observable<StockFundamentals?>(null)
 
+    /** 网关 LLM 诊股（/agent/insight）：null = 网关不可用，UI 回退本地规则。 */
+    internal var liveInsight by observable<com.zhiniu.domain.model.AiInsight?>(null)
+
     /** 财务/估值快照：行情快照字段优先、基本面接口补充；在 attr 内调用即随 live 数据到达刷新。 */
     internal fun facts(q: StockQuote): com.zhiniu.pages.components.StockFacts =
         com.zhiniu.pages.components.factsOf(liveQuote ?: q, liveFundamentals)
@@ -104,6 +107,12 @@ internal class StockDetailPage : AppBasePage() {
     internal var pinchStartCount = 80
 
     internal fun quote() = liveQuote ?: selectedSymbol()?.let { repo.quoteOf(it) }
+
+    /** AI 面板洞察源：网关诊股（LLM / 服务端规则）优先，离线回退本地规则（来源如实标注）。 */
+    internal fun detailInsight(): com.zhiniu.domain.model.AiInsight? =
+        liveInsight ?: quote()?.let {
+            MarketStore.aiService.insightFor(it.symbol, liveFundamentals.toAiFundamentals())
+        }
     internal fun selectedSymbol() = pageData.params.optString("symbol", "").ifBlank { null }
     /** 当前十字线选中的 K 线（与 drawKLineChart 相同的坐标换算）；无选点返回 null。 */
     internal fun selectedBar(): Candle? {
@@ -111,7 +120,7 @@ internal class StockDetailPage : AppBasePage() {
         val all = bars()
         val vc = viewCountFor(all)
         if (all.isEmpty() || vc <= 0) return null
-        val chartW = if (isMedium()) pageData.activityWidth - 76f else pageData.activityWidth * 0.72f
+        val chartW = if (isMedium()) viewportWidth() - 76f else viewportWidth() * 0.72f
         val slot = (chartW - 58f) / vc
         if (slot <= 0f) return null
         val vs = clampViewStart(klineOffset, all.size, vc)
@@ -248,6 +257,11 @@ internal class StockDetailPage : AppBasePage() {
             lifecycleScope.launch {
                 runCatching { GatewayMarketClient.fundamentals(symbol) }
                     .onSuccess { if (it != null) liveFundamentals = it }
+            }
+            lifecycleScope.launch {
+                // 服务端 LLM 诊股（缓存命中秒回；失败保持 null，面板回退本地规则并如实标注）
+                runCatching { GatewayMarketClient.agentInsight(symbol) }
+                    .onSuccess { if (it != null) liveInsight = it }
             }
         }
         refreshLiveBars()

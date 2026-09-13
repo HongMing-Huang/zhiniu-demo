@@ -1,5 +1,6 @@
 package com.zhiniu.data.remote
 
+import com.zhiniu.domain.model.AiInsight
 import com.zhiniu.domain.model.Candle
 import com.zhiniu.domain.model.FundFlowSnapshot
 import com.zhiniu.domain.model.MarketIndex
@@ -132,6 +133,43 @@ data class GatewayStatus(
     val agentLabel: String = "检查中",
     val agentReady: Boolean = false,
 )
+
+/** 全市场搜索建议（/quote/search）。 */
+data class SearchSuggestion(
+    val symbol: String,
+    val code: String,
+    val name: String,
+    val market: String,
+)
+
+/** 双股对比单侧摘要（/agent/compare stocks[]）。 */
+data class CompareStock(
+    val symbol: String,
+    val name: String,
+    val price: Double,
+    val changePercent: Double,
+    val direction: String,
+    val rangeChangePercent: Double,
+    val rsi14: Double,
+    val pe: Double?,
+    val pb: Double?,
+    val marketCap: Double?,
+    val isStale: Boolean,
+)
+
+/** 双股对比结果：summary 优先 LLM 归纳、缺失时为规则基准；mode 标注是否模型输出。 */
+data class AgentCompareResult(
+    val mode: String,
+    val provider: String,
+    val stocks: List<CompareStock>,
+    val summary: String,
+    val stronger: String,
+    val pointsA: List<String>,
+    val pointsB: List<String>,
+    val conclusion: String,
+) {
+    val isLlm: Boolean get() = mode == "llm"
+}
 
 /** H5/原生共用的行情网关客户端；失败由页面保留本地快照，不让网络抖动破坏主流程。 */
 object GatewayMarketClient {
@@ -311,6 +349,252 @@ object GatewayMarketClient {
             isLlm = root.string("mode") == "llm",
             provider = root.string("provider"),
         )
+    }
+
+    /**
+     * 流式通用问答（/agent/chat/stream）：onDelta 逐段回调（打字机效果），
+     * 返回最终结果；null 表示网关不可用（调用方回退 agentChat / 本地 Mock）。
+     */
+    suspend fun chatStream(
+        question: String,
+        history: List<Pair<String, String>> = emptyList(),
+        symbol: String = "",
+        onDelta: (String) -> Unit,
+    ): AgentChatResult? {
+        if (!sseStreamingSupported) return null
+        val payload = buildJsonObject {
+            put("question", question.take(300))
+            if (history.isNotEmpty()) {
+                put("history", buildJsonArray {
+                    history.takeLast(8).forEach { (role, content) ->
+                        add(buildJsonObject { put("role", role); put("content", content.take(500)) })
+                    }
+                })
+            }
+            if (symbol.isNotBlank()) put("symbol", symbol)
+        }
+        var finalMode = ""
+        var finalContent = ""
+        var finalProvider = ""
+        var pendingEvent: String? = null
+        runCatching {
+            transport.postSse("$baseUrl/agent/chat/stream", payload.toString()) { line ->
+                val frame = SseParser.parseLine(line) ?: return@postSse
+                if (frame.event != null) {
+                    pendingEvent = frame.event
+                    return@postSse
+                }
+                val data = frame.data ?: return@postSse
+                val obj = runCatching { json.parseToJsonElement(data).jsonObject }.getOrNull() ?: return@postSse
+                when (obj.string("type").ifBlank { pendingEvent.orEmpty() }) {
+                    "delta" -> obj.string("content").takeIf { it.isNotBlank() }?.let(onDelta)
+                    "chat_finished" -> {
+                        finalMode = obj.string("mode")
+                        finalContent = obj.string("content")
+                        finalProvider = obj.string("provider")
+                    }
+                }
+                pendingEvent = null
+            }
+        }
+        if (finalContent.isBlank()) return null
+        return AgentChatResult(finalContent, finalMode == "llm", finalProvider)
+    }
+
+    /**
+     * 全市场 A 股搜索（/quote/search，东财 suggest：名称/代码/拼音）；
+     * null 表示网关不可用（调用方保留本地快照搜索）。
+     */
+    suspend fun search(keyword: String, count: Int = 10): List<SearchSuggestion>? {
+        val kw = keyword.trim()
+        if (kw.isEmpty()) return emptyList()
+        val text = runCatching {
+            runOffMainThread { transport.get("$baseUrl/quote/search?keyword=${urlEncode(kw)}&count=$count") }
+        }.getOrNull() ?: return null
+        val root = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull() ?: return null
+        return root["items"]?.jsonArray?.mapNotNull { element ->
+            val o = element.jsonObject
+            val symbol = o.string("symbol")
+            if (symbol.length != 8) return@mapNotNull null
+            SearchSuggestion(
+                symbol = symbol,
+                code = o.string("code").ifBlank { symbol.takeLast(6) },
+                name = o.string("name").ifBlank { symbol },
+                market = o.string("market"),
+            )
+        } ?: emptyList()
+    }
+
+    /**
+     * 双股 AI 对比（/agent/compare）：双侧真实证据 + LLM 定性对比；规则基准始终返回。
+     * null 表示网关不可用。
+     */
+    suspend fun agentCompare(symbolA: String, symbolB: String, focus: String = ""): AgentCompareResult? {
+        val text = runCatching {
+            runOffMainThread { transport.postJson("$baseUrl/agent/compare", comparePayload(symbolA, symbolB, focus)) }
+        }.getOrNull() ?: return null
+        val root = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull() ?: return null
+        return parseCompareObject(root)
+    }
+
+    /**
+     * 双股对比流式版（/agent/compare/stream）：onStage 回调阶段（A/B 证据 / AI 归纳），
+     * result 帧解析完整结果返回；null 表示网关/流不可用（调用方回退 agentCompare）。
+     * SSE 不经 OffThread 包装，无 12s 上限（LLM 延迟抖动下仍可完成）。
+     */
+    suspend fun compareStream(
+        symbolA: String,
+        symbolB: String,
+        focus: String = "",
+        onStage: (String) -> Unit,
+    ): AgentCompareResult? {
+        if (!sseStreamingSupported) return null
+        var result: AgentCompareResult? = null
+        var pendingEvent: String? = null
+        runCatching {
+            transport.postSse("$baseUrl/agent/compare/stream", comparePayload(symbolA, symbolB, focus)) { line ->
+                val frame = SseParser.parseLine(line) ?: return@postSse
+                if (frame.event != null) {
+                    pendingEvent = frame.event
+                    return@postSse
+                }
+                val data = frame.data ?: return@postSse
+                val obj = runCatching { json.parseToJsonElement(data).jsonObject }.getOrNull() ?: return@postSse
+                when (obj.string("type").ifBlank { pendingEvent.orEmpty() }) {
+                    "stage" -> obj.string("label").takeIf { it.isNotBlank() }?.let(onStage)
+                    "result" -> result = obj["result"]?.jsonObject?.let { parseCompareObject(it) }
+                }
+                pendingEvent = null
+            }
+        }
+        return result
+    }
+
+    private fun comparePayload(symbolA: String, symbolB: String, focus: String): String = buildJsonObject {
+        put("symbols", buildJsonArray { add(symbolA); add(symbolB) })
+        if (focus.isNotBlank()) put("focus", focus.take(80))
+    }.toString()
+
+    internal fun parseCompareObject(root: JsonObject): AgentCompareResult? {
+        val stocks = root["stocks"]?.jsonArray?.mapNotNull { element ->
+            val o = element.jsonObject
+            val symbol = o.string("symbol")
+            if (symbol.length != 8) return@mapNotNull null
+            CompareStock(
+                symbol = symbol,
+                name = o.string("name"),
+                price = o.double("price"),
+                changePercent = o.double("changePercent"),
+                direction = o.string("direction"),
+                rangeChangePercent = o.double("rangeChangePercent"),
+                rsi14 = o.double("rsi14"),
+                pe = o.nullableDouble("pe"),
+                pb = o.nullableDouble("pb"),
+                marketCap = o.nullableDouble("marketCap"),
+                isStale = o.boolean("isStale"),
+            )
+        } ?: emptyList()
+        if (stocks.size != 2) return null
+        val llm = root["llm"]?.let { runCatching { it.jsonObject }.getOrNull() }
+        val rule = root["rule"]?.let { runCatching { it.jsonObject }.getOrNull() } ?: JsonObject(emptyMap())
+        return AgentCompareResult(
+            mode = root.string("mode"),
+            provider = root.string("provider"),
+            stocks = stocks,
+            summary = llm?.string("summary").orEmpty().ifBlank { rule.string("summary") },
+            stronger = llm?.string("stronger").orEmpty().ifBlank { rule.string("stronger") },
+            pointsA = (llm?.stringList("pointsA") ?: emptyList()).ifEmpty { rule.stringList("pointsA") },
+            pointsB = (llm?.stringList("pointsB") ?: emptyList()).ifEmpty { rule.stringList("pointsB") },
+            conclusion = llm?.string("conclusion").orEmpty().ifBlank { rule.string("conclusion") },
+        )
+    }
+
+    /**
+     * 个股 AI 诊股（/agent/insight）：服务端取证 + LLM 结构化判断 + 规则降级。
+     * 返回映射后的 AiInsight（source 字段标注来源）；null 表示网关不可用（调用方回退本地规则）。
+     */
+    suspend fun agentInsight(symbol: String): AiInsight? {
+        val payload = buildJsonObject { put("symbol", symbol) }.toString()
+        val text = runCatching {
+            runOffMainThread { transport.postJson("$baseUrl/agent/insight", payload) }
+        }.getOrNull() ?: return null
+        val root = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull() ?: return null
+        val mode = root.string("mode")
+        val llm = root["llm"]?.let { runCatching { it.jsonObject }.getOrNull() }
+        val technical = root["technical"]?.jsonObject ?: JsonObject(emptyMap())
+        val quote = root["quote"]?.jsonObject ?: JsonObject(emptyMap())
+        val risk = root["riskLevel"]?.jsonObject ?: JsonObject(emptyMap())
+        val advice = root["advice"]?.jsonObject ?: JsonObject(emptyMap())
+        val levels = root["levels"]?.jsonObject ?: JsonObject(emptyMap())
+        fun zoneText(key: String): String {
+            val arr = llm?.get(key)?.let { runCatching { it.jsonArray }.getOrNull() } ?: return ""
+            val lo = arr.getOrNull(0)?.jsonPrimitive?.doubleOrNull ?: return ""
+            val hi = arr.getOrNull(1)?.jsonPrimitive?.doubleOrNull ?: return ""
+            if (lo <= 0.0 || hi <= lo) return ""
+            return "${fmtNum(lo)} ~ ${fmtNum(hi)}"
+        }
+        return if (mode == "llm" && llm != null) {
+            val signals = llm.stringList("signals")
+            AiInsight(
+                symbol = symbol,
+                verdict = llm.string("verdict").ifBlank { "中性" },
+                trend = llm.string("trend"),
+                volume = llm.string("volume").ifBlank { "量能证据不足，暂不判断。" },
+                indicator = if (signals.isEmpty()) "" else signals.joinToString("\n") { "· $it" },
+                risk = llm.string("risk"),
+                valuation = llm.string("valuation"),
+                earnings = llm.string("earnings"),
+                followUps = llm.stringList("followUps").ifEmpty {
+                    listOf("为什么说量能不足？", "解释 RSI 指标", "结合日K分析", "关键支撑位在哪")
+                },
+                source = "LLM 诊股 · ${root.string("provider")}/${root.string("model")}",
+                signals = signals,
+                buyZone = zoneText("buyZone"),
+                sellZone = zoneText("sellZone"),
+                riskLabel = risk.string("label"),
+                riskRationale = risk.string("rationale"),
+            )
+        } else {
+            // 服务端规则降级：数字仍来自服务端证据（技术面/关键位），明确标注非模型输出
+            val direction = technical.string("direction")
+            AiInsight(
+                symbol = symbol,
+                verdict = when (direction) { "up" -> "偏强"; "down" -> "偏弱"; else -> "中性" },
+                trend = "近 ${technical.double("sampleSize").toInt()} 根日K：区间涨跌 ${fmtNum(technical.double("changePct"))}%，" +
+                    "MA20 ${fmtNum(technical.double("ma20"))}，RSI(14) ${fmtNum(technical.double("rsi14"))}。" +
+                    if (levels.size > 0) "压力 ${fmtNum(levels.nullableDouble("pressure") ?: 0.0)} / 支撑 ${fmtNum(levels.nullableDouble("support") ?: 0.0)}。" else "",
+                volume = "量能解读需模型网关（当前为服务端规则降级）。",
+                indicator = "现价 ${fmtNum(quote.double("price"))}（${quote.string("source")}）。",
+                risk = risk.string("rationale").ifBlank { "数据不足，暂不给出风险结论。" },
+                valuation = "",
+                earnings = "",
+                followUps = emptyList(),
+                source = "服务端规则降级 · 非模型输出",
+                signals = emptyList(),
+                buyZone = advice.string("buyRange"),
+                sellZone = advice.string("sellRange"),
+                riskLabel = risk.string("label"),
+                riskRationale = risk.string("rationale"),
+            )
+        }
+    }
+
+    /** 查询参数百分号编码（commonMain 无 URLEncoder，按 UTF-8 手写）。 */
+    private fun urlEncode(s: String): String {
+        val sb = StringBuilder()
+        for (b in s.encodeToByteArray()) {
+            val v = b.toInt() and 0xFF
+            val unreserved = v in 0x30..0x39 || v in 0x41..0x5A || v in 0x61..0x7A ||
+                v == 0x2D || v == 0x2E || v == 0x5F || v == 0x7E
+            if (unreserved) sb.append(v.toChar())
+            else sb.append('%').append("0123456789ABCDEF"[v ushr 4]).append("0123456789ABCDEF"[v and 0x0F])
+        }
+        return sb.toString()
+    }
+
+    private fun fmtNum(v: Double): String {
+        val rounded = kotlin.math.round(v * 100) / 100.0
+        return if (rounded == rounded.toLong().toDouble()) rounded.toLong().toString() else rounded.toString()
     }
 
     suspend fun health(): GatewayStatus {

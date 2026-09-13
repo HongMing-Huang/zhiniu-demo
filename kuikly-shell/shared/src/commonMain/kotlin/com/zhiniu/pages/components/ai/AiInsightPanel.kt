@@ -76,13 +76,13 @@ fun ViewContainer<*, *>.AiInsightPanel(
                         text("AI 分析")
                     }
                 }
-                // 来源诚实标注：本面板为本地规则/快照生成，非模型输出（追问走真实研究管线）
+                // 来源诚实标注：网关 LLM 诊股 / 服务端规则降级 / 本地规则（由数据源决定文案）
                 Text {
                     attr {
                         marginTop(1f)
                         fontSize(AppTypography.fs11)
                         color(colors.c(colors.textTertiary))
-                        text("本地规则生成 · 非模型输出 · 追问走研究管线")
+                        text(insight()?.source ?: "本地规则生成 · 非模型输出 · 追问走研究管线")
                     }
                 }
             }
@@ -148,9 +148,21 @@ fun ViewContainer<*, *>.AiInsightPanel(
                 PanelSection("估值判断", view.valuation.ifBlank { "暂未取到估值数据（PE/PB）；网关恢复后自动补充。" })
                 PanelSection("业绩解读", view.earnings.ifBlank { "暂未取到财报数据；网关恢复后自动补充营收/净利解读。" })
                 PanelSection("趋势", view.trend)
-                PanelSection("信号", view.indicator)
+                PanelSection("信号", view.indicator.ifBlank { "RSI 与 MACD 动能" + (if (view.verdict.contains("弱")) " 减弱" else " 稳定") })
                 PanelSection("量能", view.volume)
-                PanelSection("技术指标", "RSI 与 MACD 动能" + (if (view.verdict.contains("弱")) " 减弱" else " 稳定"))
+                // 买卖观察区间 + 风险五档：网关诊股结构化字段（服务端校验回填，模型不得填数）
+                vif({ view.buyZone.isNotBlank() || view.sellZone.isNotBlank() }) {
+                    PanelSection(
+                        "买卖观察区间",
+                        listOfNotNull(
+                            view.buyZone.takeIf { it.isNotBlank() }?.let { "买入观察 $it" },
+                            view.sellZone.takeIf { it.isNotBlank() }?.let { "卖出观察 $it" },
+                        ).joinToString("；") + "（依据服务端关键位，非投资建议）",
+                    )
+                }
+                vif({ view.riskLabel.isNotBlank() }) {
+                    PanelSection("风险分级", "「${view.riskLabel}」 · ${view.riskRationale}", risk = true)
+                }
                 PanelSection("风险", view.risk, risk = true)
                 View { attr { height(14f) } }
                 Text {

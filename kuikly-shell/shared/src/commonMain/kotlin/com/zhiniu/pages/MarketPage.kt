@@ -50,6 +50,7 @@ private const val TAB_POPULAR = "人气榜"
 private const val TAB_GAINERS = "涨幅榜"
 private const val TAB_SECTORS = "板块"
 private val MARKET_TABS = listOf("自选", "全部", "沪市", "深市", "创业板", "科创板", TAB_POPULAR, TAB_GAINERS, TAB_SECTORS)
+private val MARKET_COMPACT_TABS = listOf("自选", "全部", TAB_POPULAR, TAB_GAINERS, TAB_SECTORS)
 
 @Page("MarketList", supportInLocal = true)
 internal class MarketPage : AppBasePage() {
@@ -225,7 +226,7 @@ internal class MarketPage : AppBasePage() {
 private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
     val colors = AppTheme.colors
     val pad: Float = if (host.isCompact()) 16f else PAD
-        val aw: Float = host.pageData.activityWidth
+        val aw: Float = host.viewportWidth()
         val extra: Float = if (aw > 1360f) (aw - 1360f) / 2f else 0f
         val sidePad: Float = pad + extra
     View {
@@ -277,7 +278,7 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
             attr { flexDirectionColumn() }
             View {
                 attr { flexDirectionRow(); alignItemsCenter(); flexWrapWrap() }
-                MARKET_TABS.forEach { t ->
+                (if (host.isCompact()) MARKET_COMPACT_TABS else MARKET_TABS).forEach { t ->
                     MarketTab(t, { host.selectedMarket == t }, host.isCompact()) {
                         host.selectedMarket = t
                         host.isColumnPickerVisible = false
@@ -326,20 +327,24 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
                             host.refreshRows()
                         }
                         View { attr { width(8f) } }
-                        SecondaryButton("字段", height = 34f, icon = IconKind.MORE) {
-                            host.isColumnPickerVisible = !host.isColumnPickerVisible
+                        if (!host.isCompact()) {
+                            SecondaryButton("字段", height = 34f, icon = IconKind.MORE) {
+                                host.isColumnPickerVisible = !host.isColumnPickerVisible
+                            }
+                            View { attr { width(8f) } }
                         }
-                        View { attr { width(8f) } }
                     }
                 }
-                IconButton(IconKind.SEARCH, size = 14f, box = 34f, accessibilityLabel = "搜索股票") {
-                    host.isSearchVisible = true
+                if (!host.isCompact()) {
+                    IconButton(IconKind.SEARCH, size = 14f, box = 34f, accessibilityLabel = "搜索股票") {
+                        host.isSearchVisible = true
+                    }
+                    View { attr { width(8f) } }
                 }
-                View { attr { width(8f) } }
                 SecondaryButton("刷新", height = 34f) { host.refreshLiveQuotes() }
             }
             // 字段选择器：内联芯片行（不是新浮层），勾选即生效（榜单/板块 Tab 不适用）
-            vif({ host.isColumnPickerVisible && !host.isRankTab() && !host.isSectorTab() }) {
+            vif({ !host.isCompact() && host.isColumnPickerVisible && !host.isRankTab() && !host.isSectorTab() }) {
                 View {
                     attr {
                         marginTop(10f); padding(top = 8f, bottom = 8f, left = 10f, right = 10f)

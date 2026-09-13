@@ -37,7 +37,9 @@
 | 真实行情 | 新浪 `hq.sinajs.cn` 实时报价 + 日K/分时 + 东方财富个股资讯，经 FastAPI 网关统一归一化（含来源、TTL、stale 标记），断网自动回退本地快照 |
 | 多 Agent 研究 | 行情 → 技术面 → 财务 → 资讯 → 风险 → 多头 → 空头 → 研究经理 → 交易员 → 风控 → 归纳，四阶段进度实时可见；已接入真实 LLM（OpenAI 兼容多厂商网关，GemAI/DeepSeek 实测跑通），LLM 不可用时明确标记「规则降级 · 未伪装模型」 |
 | Markdown 渲染 | 自研 commonMain Markdown 解析器（标题/列表/表格/代码块/引用/行内加粗），`RichText+Span` 官方组件渲染，commonTest 单测覆盖 |
-| AI 诊股抽屉 | 个股页一键 AI 分析：基本面 / 技术面（MA·RSI·MACD）/ 情绪 / 风险四维结构化输出 |
+| AI 诊股抽屉 | 个股页一键 AI 分析：**服务端 LLM 诊股**（`/agent/insight`，1h 缓存 + 同标的并发去重），输出结论 / 估值 / 业绩 / 趋势 / 信号 / 量能 / **买卖观察区间** / **风险五档**；买卖区间由服务端校验（必须落在支撑/压力 ±3% 内，否则丢弃不编造），LLM 不可用时规则降级明示 |
+| 流式 AI 问答 | 通用问答走 `/agent/chat/stream` typed SSE 逐字上屏（打字机）；双股对比页 `/agent/compare/stream` 流式归纳（stronger 标记 + 双列依据 + 结论），阶段进度可见 |
+| 全市场搜索 | `/quote/search` 东财 suggest（名称/代码/拼音缩写，过滤港美股/指数/基金），离线回退本地快照；结果批量补真实报价，无价不展示假数据 |
 | 图表交互 | Kuikly Canvas 自绘蜡烛图 / 量柱 / MACD / RSI，按钮 + 滚轮 + 拖拽 + 捏合缩放，十字线 OHLCV 联动 |
 | 完整状态机 | Idle / Loading 骨架 / Success / Empty / Error 重试 / Stale 六态覆盖 |
 | Light/Dark/System | 语义色 token + 动态调色板代理，180ms 平滑切换，H5/原生一致 |
@@ -64,8 +66,12 @@
 | 个股资讯 | `GET /news/list?symbol=` |
 | 人气榜（东财真实排名） | `GET /quote/popularity?count=20` |
 | 行业板块 / 选股 | `GET /quote/sectors` · `GET /quote/screener` |
+| 全市场搜索（东财 suggest） | `GET /quote/search?keyword=&count=` |
 | 估值与财报 | `GET /quote/fundamentals?symbol=` |
 | 多 Agent 研究（JSON / SSE） | `POST /agent/research` · `POST /agent/research/stream` |
+| 个股 AI 诊股（缓存+去重） | `POST /agent/insight` |
+| 通用问答（同步 / 流式） | `POST /agent/chat` · `POST /agent/chat/stream` |
+| 双股 AI 对比（同步 / 流式） | `POST /agent/compare` · `POST /agent/compare/stream` |
 | OpenAI 兼容对话 | `POST /v1/chat/completions` |
 
 ## 架构

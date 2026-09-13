@@ -31,6 +31,27 @@ _CHAT_SYSTEM_PROMPT = (
     "工具失败时明确说明失败项，禁止用未经成功查询的数据补全。"
 )
 
+# 个股诊股（/agent/insight）独立缓存键：与用户研究 keyword 空间隔离，复用 store 的缓存/并发去重。
+_INSIGHT_CACHE_KEY = "insight:v1"
+
+_INSIGHT_SYSTEM_PROMPT = (
+    "你是知牛（ZhiNiu）的个股诊股分析师。输入为服务端已获取的真实证据（行情/技术面/估值财报/关键位），"
+    "你只做归纳判断，输出严格 JSON（不要输出 JSON 以外的任何文字）。规则：\n"
+    "1. verdict 只能取 偏强 / 中性 / 偏弱 三值之一。\n"
+    "2. summary 不超过 120 字，数字只能引用输入证据。\n"
+    "3. trend/valuation/earnings/volume/risk 各不超过 80 字；估值与业绩在证据缺失时写「证据不足，暂不判断」。\n"
+    "4. signals 给 3~5 条，每条必须引用输入中的具体数值（如 RSI、PE、涨跌幅、支撑/压力）。\n"
+    "5. buyZone/sellZone 为 [低, 高] 两个数字，边界只能取输入证据给出的支撑/压力/现价附近的值，"
+    "禁止自造价格；判断不了就填 null。\n"
+    "6. riskLevel 只能取 low/medium_low/medium/medium_high/high 五值之一。\n"
+    "7. followUps 给 4 条用户可能想追问的问题。\n"
+    "输出字段：{\"verdict\",\"summary\",\"trend\",\"valuation\",\"earnings\",\"volume\",\"risk\","
+    "\"signals\":[],\"buyZone\":[lo,hi]|null,\"sellZone\":[lo,hi]|null,\"riskLevel\",\"followUps\":[]}"
+)
+
+_INSIGHT_VERDICTS = ("偏强", "中性", "偏弱")
+_INSIGHT_RISK_LEVELS = ("low", "medium_low", "medium", "medium_high", "high")
+
 
 def _technical_summary(kline: dict) -> dict:
     bars = kline.get("data") or []
@@ -189,12 +210,8 @@ def _build_report(
     return report
 
 
-async def run_chat(question: str, history: list[dict] | None = None, symbol: str = "", quote: dict | None = None) -> dict:
-    """通用问答（非个股研究链路）：走 LLM 网关，无模型时显式规则降级。
-
-    history 为 [{role: "user"|"ai", content: str}]，最多取最近 8 轮；
-    symbol/quote 提供时把最新快照注入 system 上下文（防模型编造价格）。
-    """
+def _chat_messages(question: str, history: list[dict] | None, symbol: str, quote: dict | None) -> list[dict]:
+    """run_chat / stream_chat 共用的消息组装：system（含可选标的快照锚定）+ 最近 8 轮 + 本轮问题。"""
     system = _CHAT_SYSTEM_PROMPT
     if symbol and quote:
         name = quote.get("name", "")
@@ -211,6 +228,23 @@ async def run_chat(question: str, history: list[dict] | None = None, symbol: str
         if content:
             messages.append({"role": role, "content": content})
     messages.append({"role": "user", "content": question})
+    return messages
+
+
+_CHAT_FALLBACK_TEXT = (
+    "模型网关当前不可用，已切换规则模式。你可以：\n"
+    "1) 输入股票名称（如「分析宁德时代」）触发多 Agent 研究；\n"
+    "2) 稍后重试通用提问。"
+)
+
+
+async def run_chat(question: str, history: list[dict] | None = None, symbol: str = "", quote: dict | None = None) -> dict:
+    """通用问答（非个股研究链路）：走 LLM 网关，无模型时显式规则降级。
+
+    history 为 [{role: "user"|"ai", content: str}]，最多取最近 8 轮；
+    symbol/quote 提供时把最新快照注入 system 上下文（防模型编造价格）。
+    """
+    messages = _chat_messages(question, history, symbol, quote)
 
     response: dict | None = None
     try:
@@ -234,11 +268,380 @@ async def run_chat(question: str, history: list[dict] | None = None, symbol: str
         "mode": "deterministic_fallback",
         "provider": "rule-engine",
         "model": "none",
-        "content": (
-            "模型网关当前不可用，已切换规则模式。你可以：\n"
-            "1) 输入股票名称（如「分析宁德时代」）触发多 Agent 研究；\n"
-            "2) 稍后重试通用提问。"
+        "content": _CHAT_FALLBACK_TEXT,
+    }
+
+
+async def stream_chat(
+    question: str,
+    history: list[dict] | None = None,
+    symbol: str = "",
+    quote: dict | None = None,
+) -> AsyncIterator[dict[str, Any]]:
+    """通用问答流式版（/agent/chat/stream）：逐 delta 转发模型输出。
+
+    帧协议：chat_started → delta* → chat_finished（终帧含完整内容与 mode）。
+    Mock LLM（id=mock-llm）不透传占位文本，直接以规则降级文本收尾，
+    与 /agent/chat 的语义保持一致（mock ≠ 模型输出）。
+    """
+    messages = _chat_messages(question, history, symbol, quote)
+    yield {"type": "chat_started", "final": False}
+    parts: list[str] = []
+    provider = ""
+    model = ""
+    is_mock = False
+    try:
+        async for chunk in gateway.chat_completions(
+            model="zhiniu/quick", messages=messages, stream=True,
+            temperature=0.4, max_tokens=600,
+        ):
+            provider = chunk.get("provider") or provider
+            model = chunk.get("model") or model
+            if chunk.get("id") == "mock-llm":
+                is_mock = True
+            delta = ((chunk.get("choices") or [{}])[0].get("delta") or {}).get("content")
+            if delta and not is_mock:
+                parts.append(delta)
+                yield {"type": "delta", "content": delta, "final": False}
+    except Exception:  # noqa: BLE001 - 网关异常按降级处理，流式问答永不 500
+        parts = []
+    content = "".join(parts).strip()
+    if content and not is_mock and provider:
+        yield {
+            "type": "chat_finished", "mode": "llm", "provider": provider,
+            "model": model, "content": content[:1200], "final": True,
+        }
+        return
+    yield {
+        "type": "chat_finished", "mode": "deterministic_fallback",
+        "provider": "rule-engine", "model": "none",
+        "content": _CHAT_FALLBACK_TEXT, "final": True,
+    }
+
+
+def _num_or_none(v: Any) -> float | None:
+    try:
+        if isinstance(v, bool):
+            return None
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _validate_zone(zone: Any, support: float | None, pressure: float | None) -> list[float] | None:
+    """买卖区间防幻觉校验：必须是 [低, 高] 且落在支撑/压力附近（±3%），否则丢弃（不编造）。"""
+    if not isinstance(zone, (list, tuple)) or len(zone) != 2:
+        return None
+    lo, hi = _num_or_none(zone[0]), _num_or_none(zone[1])
+    if lo is None or hi is None or not lo < hi:
+        return None
+    if support is None or pressure is None:
+        return None
+    if lo < support * 0.97 or hi > pressure * 1.03:
+        return None
+    return [round(lo, 3), round(hi, 3)]
+
+
+def _sanitize_llm_insight(
+    parsed: dict,
+    technical: dict,
+    rule_risk: dict,
+    support: float | None,
+    pressure: float | None,
+) -> dict:
+    """对模型诊股 JSON 逐字段白名单校验：枚举归位、文本截断、区间数值校验。"""
+    verdict = str(parsed.get("verdict", "")).strip()
+    if verdict not in _INSIGHT_VERDICTS:
+        verdict = {"up": "偏强", "down": "偏弱"}.get(technical.get("direction", ""), "中性")
+    risk_level = str(parsed.get("riskLevel", "")).strip()
+    if risk_level not in _INSIGHT_RISK_LEVELS:
+        risk_level = rule_risk.get("level", "medium")
+    signals = [str(s).strip()[:90] for s in (parsed.get("signals") or []) if str(s).strip()][:5]
+    follow_ups = [str(s).strip()[:40] for s in (parsed.get("followUps") or []) if str(s).strip()][:4]
+    return {
+        "verdict": verdict,
+        "summary": str(parsed.get("summary", "")).strip()[:160],
+        "trend": str(parsed.get("trend", "")).strip()[:100],
+        "valuation": str(parsed.get("valuation", "")).strip()[:100],
+        "earnings": str(parsed.get("earnings", "")).strip()[:100],
+        "volume": str(parsed.get("volume", "")).strip()[:100],
+        "risk": str(parsed.get("risk", "")).strip()[:120],
+        "signals": signals,
+        "buyZone": _validate_zone(parsed.get("buyZone"), support, pressure),
+        "sellZone": _validate_zone(parsed.get("sellZone"), support, pressure),
+        "riskLevel": risk_level,
+        "followUps": follow_ups,
+    }
+
+
+async def _llm_insight(
+    symbol: str,
+    quote: dict,
+    technical: dict,
+    levels: dict,
+    financials: dict,
+    rule_risk_level: str = "medium",
+) -> tuple[dict | None, str, str]:
+    """单次 JSON-mode 调用产出诊股判断；失败/无 Key/解析失败返回 (None, ...) 走规则降级。"""
+    evidence_lines = [
+        f"标的：{quote.get('name', '')}（{symbol}）",
+        f"现价 {quote.get('price')}，涨跌幅 {quote.get('changePct')}%，数据源 {quote.get('source', '')}"
+        + ("（陈旧缓存）" if quote.get("isStale") else ""),
+        f"今日成交量 {round((quote.get('volume') or 0) / 100)} 手，成交额 {round(quote.get('amount') or 0)} 元"
+        + (f"，量比 {quote.get('volumeRatio')}" if quote.get("volumeRatio") else "")
+        + (f"，换手率 {quote.get('turnoverRate')}%" if quote.get("turnoverRate") else ""),
+        f"趋势 direction={technical.get('direction')}，区间涨跌 {technical.get('changePct')}%，"
+        f"RSI(14) {technical.get('rsi14')}，MA20 {technical.get('ma20')}，样本 {technical.get('sampleSize')} 根",
+    ]
+    if levels:
+        evidence_lines.append(f"压力位 {levels.get('pressure')}，支撑位 {levels.get('support')}（近 {levels.get('window')} 根 K 线高低点）")
+    if financials.get("available"):
+        evidence_lines.append(
+            f"PE {financials.get('pe')}，PB {financials.get('pb')}，总市值 {financials.get('marketCap')} 元，"
+            f"报告期 {financials.get('reportDate')}，营收 {financials.get('revenue')} 元，"
+            f"归母净利 {financials.get('netProfit')} 元，ROE {financials.get('roe')}%"
+        )
+    else:
+        evidence_lines.append("估值/财报证据：暂不可用")
+    messages = [
+        {"role": "system", "content": _INSIGHT_SYSTEM_PROMPT},
+        {"role": "user", "content": "证据：\n" + "\n".join(evidence_lines) + "\n\n请输出诊股 JSON。"},
+    ]
+    try:
+        response: dict | None = None
+        async for chunk in gateway.chat_completions(
+            model="zhiniu/quick", messages=messages, stream=False,
+            temperature=0.3, max_tokens=600,
+            response_format={"type": "json_object"},
+        ):
+            response = chunk
+    except Exception:  # noqa: BLE001 - 无模型/超时 → 规则降级
+        return None, "", ""
+    if not response or response.get("id") == "mock-llm":
+        return None, "", ""
+    content = ((response.get("choices") or [{}])[0].get("message") or {}).get("content", "")
+    import json as _json
+
+    try:
+        start, end = content.find("{"), content.rfind("}")
+        parsed = _json.loads(content[start : end + 1] if start >= 0 else content)
+    except Exception:
+        return None, response.get("provider", ""), response.get("model", "")
+    if not isinstance(parsed, dict) or not parsed.get("summary"):
+        return None, response.get("provider", ""), response.get("model", "")
+    return (
+        _sanitize_llm_insight(parsed, technical, {"level": rule_risk_level}, levels.get("support"), levels.get("pressure")),
+        response.get("provider", ""),
+        response.get("model", ""),
+    )
+
+
+async def run_insight(symbol: str) -> dict:
+    """个股 AI 诊股（/agent/insight）：服务端取证 → 单次 LLM 结构化判断 → 规则兜底。
+
+    缓存/并发去重复用 store（keyword=insight:v1）；LLM 不可用时返回确定性规则结果
+    并显式 mode=deterministic_fallback（不伪装模型）。买卖区间由服务端校验回填。
+    """
+    cached = await store.get_research(symbol, _INSIGHT_CACHE_KEY)
+    if cached is not None:
+        return cached
+    inflight = store.begin_inflight(symbol, _INSIGHT_CACHE_KEY)
+    if inflight is not None:
+        shared = await store.await_inflight(inflight)
+        if shared is not None:
+            return {**shared, "cached": True, "cache": "inflight"}
+    started = time.perf_counter()
+    try:
+        quote, kline, financials = await asyncio.gather(
+            execute_tool_async("get_realtime_quote", {"symbol": symbol}),
+            execute_tool_async("get_kline", {"symbol": symbol, "datalen": 120}),
+            execute_tool_async("get_financials", {"symbol": symbol}),
+        )
+        technical = _technical_summary(kline)
+        levels = _levels_from_kline(kline)
+        risks = _risk_flags(quote, technical, {"total": 0, "isStale": False}, financials)
+        base = build_insight(
+            quote, technical, risks,
+            {"mode": "deterministic_fallback", "provider": "rule-engine", "levels": levels, "trader": {}},
+            kline,
+        )
+        llm, provider, model = await _llm_insight(
+            symbol, quote, technical, levels, financials,
+            rule_risk_level=base["riskLevel"]["level"],
+        )
+        risk_block = base["riskLevel"]
+        if llm is not None and llm.get("riskLevel") in _INSIGHT_RISK_LEVELS:
+            labels = {"low": "低", "medium_low": "中低", "medium": "中", "medium_high": "中高", "high": "高"}
+            risk_block = {
+                "level": llm["riskLevel"],
+                "label": labels[llm["riskLevel"]],
+                "rationale": f"模型判定（依据 {len(llm.get('signals', []))} 条信号）；规则基准为「{base['riskLevel']['label']}」",
+            }
+        result = {
+            "symbol": symbol,
+            "name": quote.get("name", ""),
+            "mode": "llm" if llm is not None else "deterministic_fallback",
+            "provider": provider if llm is not None else "rule-engine",
+            "model": model if llm is not None else "none",
+            "generatedAt": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "elapsedMs": round((time.perf_counter() - started) * 1000, 1),
+            "quote": {k: quote.get(k) for k in ("name", "price", "changePct", "date", "time", "source", "isStale")},
+            "technical": technical,
+            "levels": levels,
+            "riskLevel": risk_block,
+            "advice": base["advice"],
+            "llm": llm,
+            "disclaimer": "AI 诊股结果仅供信息分析，不构成投资建议；数值均来自服务端行情证据。",
+        }
+        await store.put_research(symbol, _INSIGHT_CACHE_KEY, result)
+        store.finish_inflight(symbol, _INSIGHT_CACHE_KEY, result)
+        return result
+    except Exception as exc:
+        store.fail_inflight(symbol, _INSIGHT_CACHE_KEY, exc)
+        raise
+
+
+def _rule_compare_summary(stocks: list[dict]) -> dict:
+    """确定性对比基准（无模型时也给出可核对结论，且数字全部来自证据）。"""
+    if len(stocks) != 2:
+        return {"summary": "对比标的不完整。", "stronger": "none", "pointsA": [], "pointsB": [], "conclusion": ""}
+    a, b = stocks
+    a_score = (a.get("changePercent") or 0) - (a.get("rsi14") or 50) / 100
+    b_score = (b.get("changePercent") or 0) - (b.get("rsi14") or 50) / 100
+    stronger = "A" if a_score > b_score else "B" if b_score > a_score else "none"
+    def _points(s: dict) -> list[str]:
+        items = [f"区间涨跌 {s.get('rangeChangePercent')}%，方向 {s.get('direction')}"]
+        if s.get("rsi14"):
+            items.append(f"RSI(14) {s['rsi14']}")
+        if s.get("pe") is not None:
+            items.append(f"PE {s['pe']}")
+        return items
+    return {
+        "summary": (
+            f"{a.get('name')} 区间涨跌 {a.get('rangeChangePercent')}%（RSI {a.get('rsi14')}），"
+            f"{b.get('name')} 区间涨跌 {b.get('rangeChangePercent')}%（RSI {b.get('rsi14')}）。"
+            "以上为规则口径对比；模型可用时补充定性归纳。"
         ),
+        "stronger": stronger,
+        "pointsA": _points(a),
+        "pointsB": _points(b),
+        "conclusion": "规则降级 · 未伪装模型",
+    }
+
+
+async def run_compare(symbols: list[str], focus: str = "") -> dict:
+    """双股对比（/agent/compare）：双侧真实证据 → LLM 定性对比 → 规则基准兜底。"""
+    return await _compare_impl(symbols, focus, None)
+
+
+async def stream_compare(symbols: list[str], focus: str = "") -> AsyncIterator[dict[str, Any]]:
+    """双股对比流式版（/agent/compare/stream）：evidence_a → evidence_b → llm → result → 终帧。"""
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def progress(stage: str, label: str) -> None:
+        await queue.put({"type": "stage", "stage": stage, "label": label, "final": False})
+
+    run_id = uuid.uuid4().hex
+    task = asyncio.create_task(_compare_impl(symbols, focus, progress))
+
+    async def pump_finish() -> dict:
+        result = await task
+        await queue.put({"type": "result", "result": result, "final": False})
+        await queue.put({"type": "run_finished", "runId": run_id, "elapsedMs": result.get("elapsedMs", 0), "final": True})
+        return result
+
+    finish_task = asyncio.create_task(pump_finish())
+    while True:
+        frame = await queue.get()
+        if frame.get("type") == "__end__":
+            break
+        yield frame
+        if frame.get("final"):
+            break
+    await finish_task
+
+
+async def _compare_impl(symbols: list[str], focus: str, progress) -> dict:
+    started = time.perf_counter()
+    stocks: list[dict] = []
+    for index, sym in enumerate(symbols):
+        quote, kline, financials = await asyncio.gather(
+            execute_tool_async("get_realtime_quote", {"symbol": sym}),
+            execute_tool_async("get_kline", {"symbol": sym, "datalen": 60}),
+            execute_tool_async("get_financials", {"symbol": sym}),
+        )
+        technical = _technical_summary(kline)
+        stocks.append({
+            "symbol": sym,
+            "name": quote.get("name", ""),
+            "price": quote.get("price"),
+            "changePercent": quote.get("changePct"),
+            "direction": technical.get("direction"),
+            "rangeChangePercent": technical.get("changePct"),
+            "rsi14": technical.get("rsi14"),
+            "ma20": technical.get("ma20"),
+            "pe": financials.get("pe") if financials.get("available") else None,
+            "pb": financials.get("pb") if financials.get("available") else None,
+            "marketCap": financials.get("marketCap") if financials.get("available") else None,
+            "source": quote.get("source", ""),
+            "isStale": bool(quote.get("isStale")),
+        })
+        if progress is not None:
+            await progress(f"evidence_{chr(97 + index)}", f"{quote.get('name', sym)} 证据")
+    rule = _rule_compare_summary(stocks)
+    llm: dict | None = None
+    provider = model = ""
+    if len(stocks) == 2:
+        a, b = stocks
+        import json as _json
+
+        if progress is not None:
+            await progress("llm", "AI 对比归纳")
+        prompt = (
+            f"对比标的 A：{_json.dumps(a, ensure_ascii=False)}\n"
+            f"对比标的 B：{_json.dumps(b, ensure_ascii=False)}\n"
+            + (f"用户关注点：{focus}\n" if focus else "")
+            + "输出严格 JSON：{\"summary\":\"80字内对比归纳\",\"stronger\":\"A|B|none\","
+              "\"pointsA\":[\"3条内，须引用上述数值\"],\"pointsB\":[],\"conclusion\":\"60字内结论与风险提示\"}"
+        )
+        try:
+            response: dict | None = None
+            async for chunk in gateway.chat_completions(
+                model="zhiniu/quick",
+                messages=[{"role": "system", "content": "你是知牛的双股对比分析师，只输出 JSON，数字只能引用输入证据。"},
+                          {"role": "user", "content": prompt}],
+                stream=False, temperature=0.3, max_tokens=500,
+                response_format={"type": "json_object"},
+            ):
+                response = chunk
+            if response and response.get("id") != "mock-llm":
+                content = ((response.get("choices") or [{}])[0].get("message") or {}).get("content", "")
+                start, end = content.find("{"), content.rfind("}")
+                parsed = _json.loads(content[start : end + 1] if start >= 0 else content)
+                if isinstance(parsed, dict) and parsed.get("summary"):
+                    stronger = str(parsed.get("stronger", "none"))
+                    llm = {
+                        "summary": str(parsed.get("summary", ""))[:120],
+                        "stronger": stronger if stronger in ("A", "B", "none") else "none",
+                        "pointsA": [str(p)[:90] for p in (parsed.get("pointsA") or [])][:3],
+                        "pointsB": [str(p)[:90] for p in (parsed.get("pointsB") or [])][:3],
+                        "conclusion": str(parsed.get("conclusion", ""))[:90],
+                    }
+                    provider = response.get("provider", "")
+                    model = response.get("model", "")
+        except Exception:  # noqa: BLE001 - 对比 LLM 失败 → 规则基准
+            llm = None
+    return {
+        "symbols": list(symbols),
+        "mode": "llm" if llm is not None else "deterministic_fallback",
+        "provider": provider if llm is not None else "rule-engine",
+        "model": model if llm is not None else "none",
+        "generatedAt": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "elapsedMs": round((time.perf_counter() - started) * 1000, 1),
+        "stocks": stocks,
+        "llm": llm,
+        "rule": rule,
+        "disclaimer": "对比结果仅供信息分析，不构成投资建议。",
     }
 
 

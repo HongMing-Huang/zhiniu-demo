@@ -295,7 +295,6 @@ class LLMGateway:
                     args = json.loads((fn.get("arguments") or "{}".encode()).decode() if isinstance(fn.get("arguments"), bytes) else (fn.get("arguments") or "{}"))
                 except Exception:
                     args = {}
-                used_tool_names.append(name)
                 result = await execute_tool_async(name, args)
                 yield {"type": "progress", "step": round_index, "label": name, "tool_call_id": tc.get("id")}
                 history.append({

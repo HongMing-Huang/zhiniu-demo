@@ -69,18 +69,18 @@ fun ViewContainer<*, *>.ThemePopover(
             }
             View {
                 attr { height(38f); flexDirectionRow(); alignItemsCenter(); padding(left = 14f, right = 14f) }
-                Icon(IconKind.THEME, 17f)
+                Icon(IconKind.USER, 17f)
                 View { attr { width(9f) } }
                 Text {
                     attr {
                         fontSize(AppTypography.fs14); fontWeightSemiBold()
-                        color(colors.c(colors.textPrimary)); text("设置")
+                        color(colors.c(colors.textPrimary)); text("我的")
                     }
                 }
             }
             View { attr { height(1f); backgroundColor(colors.c(colors.border)); animate(ANIM_THEME, value = AppTheme.isDark) } }
             // —— 外观 ——
-            GroupLabel("外观")
+            GroupLabel("外观偏好")
             View {
                 attr {
                     margin(left = 14f, right = 14f)

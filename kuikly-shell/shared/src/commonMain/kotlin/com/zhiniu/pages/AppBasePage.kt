@@ -37,50 +37,79 @@ internal abstract class AppBasePage : BasePager() {
     internal var gatewayOnline by observable(false)
     internal var agentReady by observable(false)
 
+    /**
+     * Kuikly H5 的 root view 由宿主画布决定，浏览器响应式宽度来自 activity；
+     * 原生端则相反，activity 可能是物理像素而 pageView 才是可布局区域。
+     */
+    internal fun viewportWidth(): Float =
+        if (pageData.isWeb) pageData.activityWidth else pageData.pageViewWidth
+
+    internal fun viewportHeight(): Float =
+        if (pageData.isWeb) pageData.activityHeight else pageData.pageViewHeight
+
     /** 内容宽（全部显式 Float，避开 Comparable 重载歧义）。 */
     internal fun contentWidth(): Float {
-        val vw: Float = pageData.activityWidth
+        val vw: Float = viewportWidth()
         val cw: Float = if (isCompact()) vw else 1360f   // 手机用满屏宽，桌面限 1360 居中
         val m = kotlin.math.min(vw, cw)
         return if (m.compareTo(0f) < 0) 0f else m
     }
     internal fun isNarrow(): Boolean {
-        val vw: Float = pageData.activityWidth
+        val vw: Float = viewportWidth()
         return vw <= 1280f
     }
 
     /**
-     * 手机布局判定。Kuikly Android/iOS 的 activityWidth 传的是物理像素
-     * （模拟器实测 1080/1179，logcat remeasure 可证），固定 760 阈值在手机上永远
-     * 为 false、整页渲染桌面布局。改用「竖屏宽高比 + 宽度上限」判定：
-     * 手机竖屏（1080x2337、1179x2556）ratio≈2.2 命中；桌面/平板横屏
-     * （1440x900、1024x768）ratio<1.35 不命中；手机横屏按宽屏处理（合理）。
+     * 响应式布局必须基于 Kuikly 官方 root view 尺寸。activityWidth 在部分原生壳
+     * 是设备物理像素，用它计算内容宽度会让 Header、浮层和图表横向溢出。
      */
     internal fun isCompact(): Boolean {
-        val vw: Float = pageData.activityWidth
-        val vh: Float = pageData.activityHeight
+        val vw: Float = viewportWidth()
+        val vh: Float = viewportHeight()
         if (vw <= 0f || vh <= 0f) return false
-        val portrait = vh / vw > 1.35f
-        return portrait && vw <= 1280f
+        return vw <= 760f
     }
-    internal fun isMedium(): Boolean = pageData.activityWidth <= 1024f
+    internal fun isMedium(): Boolean = viewportWidth() <= 1024f
     internal fun safeTopInset(): Float = pageData.safeAreaInsets.top.coerceAtLeast(0f)
     internal fun safeBottomInset(): Float = pageData.safeAreaInsets.bottom.coerceAtLeast(0f)
 
     /** 页面滚动内容底部避让：手机布局加底部 Tab 高度，桌面只避安全区。 */
     internal fun bottomNavInset(): Float =
         if (isCompact()) com.zhiniu.pages.components.common.BOTTOM_TAB_HEIGHT + safeBottomInset() else safeBottomInset()
-    internal fun searchOverlayWidth(): Float = if (isCompact()) (pageData.activityWidth - 32f).coerceAtLeast(280f) else 520f
-    internal fun settingsOverlayWidth(): Float = if (isCompact()) (pageData.activityWidth - 32f).coerceAtLeast(280f) else 304f
+    internal fun searchOverlayWidth(): Float = if (isCompact()) (viewportWidth() - 32f).coerceAtLeast(280f) else 520f
+    internal fun settingsOverlayWidth(): Float = if (isCompact()) (viewportWidth() - 32f).coerceAtLeast(280f) else 304f
     internal fun overlayLeft(width: Float): Float {
-        val vw: Float = pageData.activityWidth
+        val vw: Float = viewportWidth()
         val cw: Float = kotlin.math.min(vw, 1360f)
         val pad: Float = if (vw <= 760f) 16f else 32f
         val contentLeft: Float = (vw - cw) / 2f
         return (contentLeft + cw - pad - width).coerceAtLeast(pad)
     }
 
-    internal fun refreshSearchResults() { searchResults.diffUpdate(repo.search(searchQuery)) }
+    private var searchSeq = 0
+
+    /** 搜索 = 本地快照即时过滤 + 网关全市场搜索（东财 suggest）异步补全；序号防抖避免乱序覆盖。 */
+    internal fun refreshSearchResults() {
+        searchResults.diffUpdate(repo.search(searchQuery))
+        val kw = searchQuery.trim()
+        if (kw.length < 2) return
+        val seq = ++searchSeq
+        lifecycleScope.launch {
+            val suggestions = runCatching { GatewayMarketClient.search(kw) }.getOrNull() ?: return@launch
+            if (seq != searchSeq || suggestions.isEmpty()) return@launch
+            val known = searchResults.map { it.symbol }.toSet()
+            val fresh = suggestions.filter { it.symbol !in known }.take(10 - known.size)
+            if (fresh.isEmpty()) return@launch
+            // 建议命中 → 批量拉实时报价填充价格（拿不到价格的跳过，不显示 0.00 假价格）
+            val quotes = runCatching { GatewayMarketClient.quotes(fresh.map { it.symbol }) }.getOrNull()
+                ?.associateBy { it.symbol } ?: emptyMap()
+            val rows = fresh.mapNotNull { s ->
+                quotes[s.symbol]?.let { it.copy(name = s.name) }
+                    ?: repo.quoteOf(s.symbol)?.copy(name = s.name)
+            }
+            if (rows.isNotEmpty() && seq == searchSeq) searchResults.diffUpdate(searchResults.toList() + rows)
+        }
+    }
     internal fun rememberSearch(symbol: String) {
         val idx = searchRecent.indexOfFirst { it.symbol == symbol }
         if (idx >= 0) searchRecent.removeAt(idx)

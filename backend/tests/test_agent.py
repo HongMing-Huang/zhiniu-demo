@@ -1,8 +1,18 @@
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from app import ta_agents
-from app.agent import _levels_from_kline, _risk_flags, _technical_summary, run_chat, stream_research
+from app import store, ta_agents
+from app.agent import (
+    _levels_from_kline,
+    _risk_flags,
+    _technical_summary,
+    run_chat,
+    run_compare,
+    run_insight,
+    stream_chat,
+    stream_compare,
+    stream_research,
+)
 
 
 class TestNumCoercion(unittest.TestCase):
@@ -238,3 +248,217 @@ class TestRunChat(unittest.IsolatedAsyncioTestCase):
         with patch("app.agent.gateway.chat_completions", new=fake_gateway_chat):
             result = await run_chat(question="随便问")
         self.assertEqual(result["mode"], "deterministic_fallback")
+
+
+class TestRunInsight(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        # insight 复用 store 缓存，测试间必须清空避免相互污染
+        store._research_cache.clear()
+        store._inflight.clear()
+
+    @staticmethod
+    def _tools(symbol: str = "sh600519"):
+        async def fake_tool(name, params):
+            if name == "get_realtime_quote":
+                return {"name": "测试股", "price": 11.0, "prevClose": 10.0, "changePct": 10.0,
+                        "source": "sina", "isStale": False, "date": "2026-09-13", "time": "15:00:00"}
+            if name == "get_kline":
+                return {"data": [{"high": 12.5, "low": 9.8, "close": 11.0} for _ in range(60)],
+                        "source": "sina"}
+            if name == "get_financials":
+                return {"available": True, "pe": 19.5, "pb": 6.3, "marketCap": 1.5e12,
+                        "reportDate": "2026-06-30", "revenue": 9.2e10, "netProfit": 4.4e10,
+                        "roe": 16.8, "source": "eastmoney"}
+            raise ValueError(name)
+
+        return fake_tool
+
+    async def test_llm_insight_keeps_valid_zone_and_drops_hallucinated(self):
+        async def fake_gateway_chat(**_kw):
+            yield {
+                "id": "chat-insight", "provider": "gemai", "model": "deepseek-v4-flash",
+                "choices": [{"message": {"content": (
+                    '{"verdict":"偏强","summary":"量价配合良好","trend":"站上 MA20",'
+                    '"valuation":"PE 19.5 中等","earnings":"净利 440 亿","volume":"温和放量",'
+                    '"risk":"注意高位波动","signals":["RSI 55 中性","PE 19.5"],'
+                    '"buyZone":[9.9,10.5],"sellZone":[99.0,120.0],'
+                    '"riskLevel":"medium","followUps":["跌破支撑怎么办"]}'
+                )}}],
+            }
+
+        with patch("app.agent.execute_tool_async", new=self._tools()), \
+                patch("app.agent.gateway.chat_completions", new=fake_gateway_chat):
+            result = await run_insight("sh600519")
+        self.assertEqual(result["mode"], "llm")
+        self.assertEqual(result["llm"]["verdict"], "偏强")
+        self.assertEqual(result["llm"]["buyZone"], [9.9, 10.5])   # 在支撑 9.8~压力 12.5 附近 → 保留
+        self.assertIsNone(result["llm"]["sellZone"])              # 99~120 超出压力 3% → 防幻觉丢弃
+        self.assertEqual(result["llm"]["riskLevel"], "medium")
+
+    async def test_llm_invalid_enum_coerced_to_rule_baseline(self):
+        async def fake_gateway_chat(**_kw):
+            yield {"id": "chat-2", "provider": "gemai", "model": "m1",
+                   "choices": [{"message": {"content": '{"verdict":"暴涨","summary":"s",'
+                                '"riskLevel":"extreme","signals":[],"followUps":[]}'}}]}
+
+        with patch("app.agent.execute_tool_async", new=self._tools()), \
+                patch("app.agent.gateway.chat_completions", new=fake_gateway_chat):
+            result = await run_insight("sh600519")
+        self.assertEqual(result["llm"]["verdict"], "中性")       # K 线平坦 direction=sideways → 中性
+        self.assertEqual(result["llm"]["riskLevel"], "low")      # 非法枚举 → 规则基准（平坦K线/无风险项 → low）
+        self.assertEqual(result["mode"], "llm")
+
+    async def test_no_model_explicit_rule_fallback(self):
+        async def fake_gateway_chat(**_kw):
+            yield {"id": "mock-llm"}
+
+        with patch("app.agent.execute_tool_async", new=self._tools()), \
+                patch("app.agent.gateway.chat_completions", new=fake_gateway_chat):
+            result = await run_insight("sh600519")
+        self.assertEqual(result["mode"], "deterministic_fallback")
+        self.assertEqual(result["provider"], "rule-engine")
+        self.assertIsNone(result["llm"])
+        self.assertIn("riskLevel", result)
+        self.assertIn("advice", result)
+
+    async def test_second_call_hits_cache(self):
+        async def fake_gateway_chat(**_kw):
+            yield {"id": "chat-3", "provider": "gemai", "model": "m1",
+                   "choices": [{"message": {"content": '{"verdict":"中性","summary":"s","signals":[]}'}}]}
+
+        with patch("app.agent.execute_tool_async", new=self._tools()), \
+                patch("app.agent.gateway.chat_completions", new=fake_gateway_chat):
+            first = await run_insight("sh600519")
+            second = await run_insight("sh600519")
+        self.assertNotIn("cached", first)
+        self.assertTrue(second.get("cached"))
+        self.assertEqual(second["cache"], "memory")
+
+
+class TestStreamChat(unittest.IsolatedAsyncioTestCase):
+    async def _collect(self, **kwargs):
+        frames = []
+        async for frame in stream_chat(**kwargs):
+            frames.append(frame)
+        return frames
+
+    async def test_stream_forwards_deltas_and_finishes_llm(self):
+        async def fake_gateway_chat(**_kw):
+            yield {"id": "chat-s", "provider": "gemai", "model": "m",
+                   "choices": [{"delta": {"role": "assistant"}}]}
+            yield {"id": "chat-s", "provider": "gemai", "model": "m",
+                   "choices": [{"delta": {"content": "RSI 是"}}]}
+            yield {"id": "chat-s", "provider": "gemai", "model": "m",
+                   "choices": [{"delta": {"content": "动量指标。"}, "finish_reason": "stop"}]}
+
+        with patch("app.agent.gateway.chat_completions", new=fake_gateway_chat):
+            frames = await self._collect(question="解释 RSI")
+        types = [f["type"] for f in frames]
+        self.assertEqual(types[0], "chat_started")
+        self.assertEqual(types[-1], "chat_finished")
+        self.assertEqual(frames[-1]["mode"], "llm")
+        self.assertEqual(frames[-1]["content"], "RSI 是动量指标。")
+        deltas = [f["content"] for f in frames if f["type"] == "delta"]
+        self.assertEqual(deltas, ["RSI 是", "动量指标。"])
+
+    async def test_stream_mock_llm_suppressed_into_rule_fallback(self):
+        async def fake_gateway_chat(**_kw):
+            yield {"id": "mock-llm", "choices": [{"delta": {"content": "占位文本不应透传"}}]}
+
+        with patch("app.agent.gateway.chat_completions", new=fake_gateway_chat):
+            frames = await self._collect(question="随便问")
+        deltas = [f for f in frames if f["type"] == "delta"]
+        final = frames[-1]
+        self.assertEqual(final["type"], "chat_finished")
+        self.assertEqual(final["mode"], "deterministic_fallback")
+        self.assertNotIn("占位文本", final["content"])
+        self.assertTrue(all("占位文本" not in d["content"] for d in deltas))
+
+    async def test_stream_gateway_exception_falls_back(self):
+        async def fake_gateway_chat(**_kw):
+            raise RuntimeError("down")
+            yield  # pragma: no cover
+
+        with patch("app.agent.gateway.chat_completions", new=fake_gateway_chat):
+            frames = await self._collect(question="随便问")
+        self.assertEqual(frames[-1]["mode"], "deterministic_fallback")
+
+
+class TestRunCompare(unittest.IsolatedAsyncioTestCase):
+    async def test_compare_rule_baseline_always_present(self):
+        async def fake_tool(name, params):
+            sym = params.get("symbol", "")
+            if name == "get_realtime_quote":
+                return {"name": "股" + sym[-2:], "price": 10.0 + hash(sym) % 5, "prevClose": 10.0,
+                        "changePct": 1.5, "source": "sina", "isStale": False}
+            if name == "get_kline":
+                return {"data": [{"high": 11.0, "low": 9.0, "close": 10.5} for _ in range(60)]}
+            return {"available": False}
+
+        async def fake_gateway_chat(**_kw):
+            yield {"id": "mock-llm"}
+
+        with patch("app.agent.execute_tool_async", new=fake_tool), \
+                patch("app.agent.gateway.chat_completions", new=fake_gateway_chat):
+            result = await run_compare(["sh600519", "sz300750"])
+        self.assertEqual(result["mode"], "deterministic_fallback")
+        self.assertIsNone(result["llm"])
+        self.assertEqual(len(result["stocks"]), 2)
+        self.assertIn("summary", result["rule"])
+        self.assertIn("stronger", result["rule"])
+
+    async def test_compare_llm_json_parsed_and_bounded(self):
+        async def fake_tool(name, params):
+            if name == "get_realtime_quote":
+                return {"name": "A", "price": 10, "prevClose": 9, "changePct": 1.0,
+                        "source": "sina", "isStale": False}
+            if name == "get_kline":
+                return {"data": [{"high": 11, "low": 9, "close": 10} for _ in range(60)]}
+            return {"available": False}
+
+        async def fake_gateway_chat(**_kw):
+            yield {"id": "chat-c", "provider": "gemai", "model": "m",
+                   "choices": [{"message": {"content": (
+                       '{"summary":"A 强于 B","stronger":"X","pointsA":["PE 更低"],"pointsB":[],'
+                       '"conclusion":"均衡配置"}'
+                   )}}]}
+
+        with patch("app.agent.execute_tool_async", new=fake_tool), \
+                patch("app.agent.gateway.chat_completions", new=fake_gateway_chat):
+            result = await run_compare(["sh600519", "sz300750"], focus="估值")
+        self.assertEqual(result["mode"], "llm")
+        self.assertEqual(result["llm"]["stronger"], "none")   # 非法枚举 → none
+        self.assertEqual(result["llm"]["pointsA"], ["PE 更低"])
+
+
+class TestStreamCompare(unittest.IsolatedAsyncioTestCase):
+    async def test_stream_compare_emits_stages_and_result(self):
+        stages: list[str] = []
+
+        async def fake_tool(name, params):
+            if name == "get_realtime_quote":
+                return {"name": "股", "price": 10, "prevClose": 10, "changePct": 0.0,
+                        "source": "sina", "isStale": False}
+            if name == "get_kline":
+                return {"data": [{"high": 11, "low": 9, "close": 10} for _ in range(60)]}
+            return {"available": False}
+
+        async def fake_gateway_chat(**_kw):
+            yield {"id": "mock-llm"}
+
+        with patch("app.agent.execute_tool_async", new=fake_tool), \
+                patch("app.agent.gateway.chat_completions", new=fake_gateway_chat):
+            frames = []
+            async for frame in stream_compare(["sh600519", "sz300750"]):
+                frames.append(frame)
+                if frame.get("type") == "stage":
+                    stages.append(frame["stage"])
+        types = [f["type"] for f in frames]
+        self.assertEqual(types[0], "stage")
+        self.assertIn("evidence_a", stages)
+        self.assertIn("evidence_b", stages)
+        self.assertIn("llm", stages)
+        self.assertEqual(types[-1], "run_finished")
+        self.assertTrue(frames[-1]["final"])
+        result_frame = next(f for f in frames if f["type"] == "result")
+        self.assertEqual(len(result_frame["result"]["stocks"]), 2)

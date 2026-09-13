@@ -22,6 +22,7 @@ from app.quote import (
     quote_indices,
     quote_popularity,
     quote_screener,
+    quote_search,
     quote_sectors,
 )
 
@@ -244,6 +245,65 @@ class TestQuoteExtensions(unittest.TestCase):
             _guard_external_url("https://169.254.169.254/latest/meta-data")  # 云元数据
         with self.assertRaises(ValueError):
             _guard_external_url("https://127.0.0.1:8000/admin")  # 本机服务
+
+
+_SUGGEST_SAMPLE = {
+    "QuotationCodeTable": {
+        "Status": 0,
+        "Data": [
+            {"Code": "600519", "Name": "贵州茅台", "MktNum": "1", "Classify": "AStock",
+             "SecurityType": "25", "SecurityTypeName": "A股"},
+            {"Code": "000001", "Name": "平安银行", "MktNum": "0", "Classify": "AStock",
+             "SecurityType": "25", "SecurityTypeName": "A股"},
+            {"Code": "688981", "Name": "中芯国际", "MktNum": "1", "Classify": "23",
+             "SecurityType": "25", "SecurityTypeName": "A股"},   # 科创板独立分类
+            {"Code": "00700", "Name": "腾讯控股", "MktNum": "116", "Classify": "HK",
+             "SecurityType": "25", "SecurityTypeName": "港股"},  # 港股应被过滤
+            {"Code": "000001", "Name": "上证指数", "MktNum": "1", "Classify": "Index",
+             "SecurityType": "25", "SecurityTypeName": "指数"},  # 指数应被过滤
+        ],
+    }
+}
+
+
+class TestQuoteSearch(unittest.TestCase):
+
+    def setUp(self):
+        quote_module._search_cache = (0.0, "", {"items": [], "source": "", "isStale": False})
+
+    def test_suggest_parser_maps_only_a_shares(self):
+        from app.quote import _parse_eastmoney_suggest
+
+        items = _parse_eastmoney_suggest(_SUGGEST_SAMPLE, 10)
+        symbols = [i["symbol"] for i in items]
+        self.assertEqual(symbols, ["sh600519", "sz000001", "sh688981"])
+        self.assertEqual(items[0]["name"], "贵州茅台")
+        self.assertEqual(items[0]["market"], "SH")
+
+    def test_search_real_sample_cached(self):
+        with mock.patch.object(quote_module, "_http_get", return_value='{"QuotationCodeTable":{"Data":['
+                '{"Code":"600519","Name":"贵州茅台","MktNum":"1","Classify":"AStock","SecurityType":"25"}]}}'):
+            first = _run(quote_search("茅台", 10))
+        self.assertEqual(first["source"], "eastmoney-suggest")
+        self.assertEqual(first["items"][0]["symbol"], "sh600519")
+        self.assertFalse(first["isStale"])
+        # 第二次命中缓存（不再出网）
+        with mock.patch.object(quote_module, "_http_get", side_effect=OSError("should not fetch")):
+            second = _run(quote_search("茅台", 10))
+        self.assertTrue(second.get("cached"))
+        self.assertEqual(second["items"], first["items"])
+
+    def test_search_offline_falls_back_to_local_snapshot(self):
+        with mock.patch.object(quote_module, "_http_get", side_effect=OSError("offline")):
+            result = _run(quote_search("茅台", 10))
+        self.assertTrue(result["isStale"])
+        self.assertEqual(result["source"], "local-snapshot")
+        self.assertTrue(any(i["symbol"].endswith("600519") for i in result["items"]))
+
+    def test_search_invalid_keyword_returns_empty(self):
+        result = _run(quote_search("  ", 10))
+        self.assertEqual(result["items"], [])
+        self.assertEqual(result["source"], "invalid")
 
 
 if __name__ == "__main__":

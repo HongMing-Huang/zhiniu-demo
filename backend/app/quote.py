@@ -347,6 +347,7 @@ _ALLOWED_API_HOSTS = {
     "push2.eastmoney.com",
     "datacenter-web.eastmoney.com",       # 东财行情快照/板块/选股
     "emappdata.eastmoney.com",   # 东财人气榜
+    "searchapi.eastmoney.com",   # 东财全市场搜索建议
     "hq.sinajs.cn",              # 新浪实时
     "quotes.sina.cn",            # 新浪 K 线
     "qt.gtimg.cn",               # 腾讯行情（市值/换手/量比第二真实来源）
@@ -801,3 +802,77 @@ async def quote_popularity(count: int = 20) -> dict:
             "changePercent": round((price - prev) / prev * 100, 2) if prev else 0.0,
         })
     return {"stocks": stocks, "source": "mock", "isStale": True}
+
+
+# ---------- 全市场搜索（东财 suggest，名称/代码/拼音模糊匹配） ----------
+
+_SEARCH_URL = "https://searchapi.eastmoney.com/api/suggest/get"
+_SEARCH_TTL = 300.0
+_search_cache: tuple = (0.0, "", {"items": [], "source": "", "isStale": False})
+
+
+def _parse_eastmoney_suggest(payload: dict, count: int) -> list:
+    """解析东财 suggest：仅保留沪深 A 股（含科创板独立分类 23），映射为 sh/sz + 6 位代码。"""
+    table = payload.get("QuotationCodeTable") or {}
+    rows = table.get("Data") or []
+    if not isinstance(rows, list):
+        return []
+    items: list = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        market = str(row.get("MktNum", ""))
+        classify = str(row.get("Classify", ""))
+        is_star = market == "1" and classify == "23" and str(row.get("SecurityType")) == "25"
+        if market not in ("0", "1") or not (classify == "AStock" or is_star):
+            continue
+        code = str(row.get("Code", ""))
+        name = str(row.get("Name", "")).strip()
+        if len(code) != 6 or not name:
+            continue
+        items.append({
+            "symbol": ("sh" if market == "1" else "sz") + code,
+            "code": code,
+            "name": name,
+            "market": "SH" if market == "1" else "SZ",
+            "securityTypeName": str(row.get("SecurityTypeName", "")).strip(),
+        })
+        if len(items) >= count:
+            break
+    return items
+
+
+async def quote_search(keyword: str, count: int = 10) -> dict:
+    """GET /quote/search?keyword=&count=  全市场 A 股搜索；离线回退本地快照匹配。"""
+    kw = keyword.strip()
+    if not kw or len(kw) > 40 or count < 1:
+        return {"items": [], "source": "invalid", "isStale": False}
+    count = max(1, min(count, 20))
+    now = time.time()
+    if _search_cache[0] and now - _search_cache[0] <= _SEARCH_TTL and _search_cache[1] == kw:
+        return {**_search_cache[2], "cached": True}
+    try:
+        url = _SEARCH_URL + "?" + urlencode({"input": kw, "type": "14", "count": str(count)})
+        raw = await asyncio.to_thread(_http_get, _guard_external_url(url), None, _EASTMONEY_HEADERS)
+        items = _parse_eastmoney_suggest(json.loads(raw), count)
+        if items:
+            result = {"items": items, "source": "eastmoney-suggest", "isStale": False}
+            globals()["_search_cache"] = (now, kw, result)
+            return result
+    except Exception:
+        pass  # 网络/超时 → 本地快照匹配兜底
+    items = []
+    for q in _MOCK_QUOTES.values():
+        name = str(q.get("name", ""))
+        symbol = str(q.get("symbol", ""))
+        if kw in name or kw in symbol or kw in symbol[-6:]:
+            items.append({
+                "symbol": symbol,
+                "code": symbol[-6:],
+                "name": name,
+                "market": symbol[:2].upper(),
+                "securityTypeName": "A股",
+            })
+            if len(items) >= count:
+                break
+    return {"items": items, "source": "local-snapshot" if items else "none", "isStale": True}
