@@ -21,6 +21,8 @@ import com.tencent.kuikly.core.views.List
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
 import com.zhiniu.data.remote.GatewayMarketClient
+import com.zhiniu.data.remote.SectorRow
+import com.zhiniu.domain.model.MarketIndex
 import com.zhiniu.domain.model.StockQuote
 import com.zhiniu.pages.components.ANIM_THEME
 import com.zhiniu.pages.components.AppSpacing
@@ -39,13 +41,15 @@ import com.zhiniu.pages.components.common.SkeletonBar
 import com.zhiniu.pages.components.market.MarketPulse
 import com.zhiniu.pages.components.market.RankRow
 import com.zhiniu.pages.components.market.RankTable
+import com.zhiniu.pages.components.market.SectorTable
 import com.zhiniu.pages.components.market.StockColumns
 import com.zhiniu.pages.components.market.StockTable
 import com.tencent.kuikly.core.coroutines.launch
 
 private const val TAB_POPULAR = "人气榜"
 private const val TAB_GAINERS = "涨幅榜"
-private val MARKET_TABS = listOf("自选", "全部", "沪市", "深市", "创业板", "科创板", TAB_POPULAR, TAB_GAINERS)
+private const val TAB_SECTORS = "板块"
+private val MARKET_TABS = listOf("自选", "全部", "沪市", "深市", "创业板", "科创板", TAB_POPULAR, TAB_GAINERS, TAB_SECTORS)
 
 @Page("MarketList", supportInLocal = true)
 internal class MarketPage : AppBasePage() {
@@ -66,6 +70,12 @@ internal class MarketPage : AppBasePage() {
     internal val rankRows by observableList<RankRow>()
     internal var rankLoading by observable(false)
     internal var rankSource by observable("")
+    // 板块 Tab（东财行业板块）
+    internal val sectorRows by observableList<SectorRow>()
+    internal var sectorLoading by observable(false)
+    internal var sectorSource by observable("")
+    // 指数条（新浪真实指数；网关不可用回退 repo 本地快照）
+    internal val liveIndices by observableList<MarketIndex>()
 
     override fun created() {
         super.created()
@@ -78,6 +88,8 @@ internal class MarketPage : AppBasePage() {
     }
 
     internal fun isRankTab(): Boolean = selectedMarket == TAB_POPULAR || selectedMarket == TAB_GAINERS
+
+    internal fun isSectorTab(): Boolean = selectedMarket == TAB_SECTORS
 
     internal fun refreshLiveQuotes() {
         marketSource = "同步中…"
@@ -98,6 +110,16 @@ internal class MarketPage : AppBasePage() {
                 .onFailure { marketSource = "本地快照 · 可重试" }
         }
         if (selectedMarket == TAB_POPULAR) loadPopularity()
+        if (selectedMarket == TAB_SECTORS && sectorRows.isEmpty()) loadSectors()
+        loadLiveIndices()
+    }
+
+    /** 新浪三大指数实时刷新：指数条是首页视觉锚点，必须显示真实值而非 mock 快照。 */
+    internal fun loadLiveIndices() {
+        lifecycleScope.launch {
+            runCatching { GatewayMarketClient.indices() }
+                .onSuccess { if (!it.isNullOrEmpty()) liveIndices.diffUpdate(it) }
+        }
     }
 
     internal fun refreshRows() {
@@ -112,6 +134,10 @@ internal class MarketPage : AppBasePage() {
             }
             TAB_POPULAR -> {
                 if (rankRows.isEmpty() || !rankSource.startsWith(TAB_POPULAR)) loadPopularity()
+                return
+            }
+            TAB_SECTORS -> {
+                if (sectorRows.isEmpty()) loadSectors()
                 return
             }
         }
@@ -139,6 +165,26 @@ internal class MarketPage : AppBasePage() {
             }
             rankRows.diffUpdate(result.stocks.map { RankRow(it.rank, it.symbol, it.name, it.price, it.changePercent) })
             rankSource = if (result.isStale) "人气榜 · 本地快照" else "人气榜 · 东方财富"
+        }
+    }
+
+    /** 东财行业板块：按当日涨跌幅取前 30；网关不可用保留空态提示。 */
+    internal fun loadSectors() {
+        sectorLoading = true
+        sectorSource = "板块 · 同步中…"
+        lifecycleScope.launch {
+            val result = runCatching { GatewayMarketClient.sectors() }.getOrNull()
+            sectorLoading = false
+            if (result == null) {
+                sectorRows.diffUpdate(emptyList())
+                sectorSource = "板块 · 网关不可用"
+                return@launch
+            }
+            sectorRows.diffUpdate(
+                result.sectors.sortedByDescending { it.changePercent }.take(30)
+                    .mapIndexed { i, s -> s.copy(rank = i + 1) }
+            )
+            sectorSource = if (result.isStale) "板块 · 本地快照" else "板块 · 东方财富"
         }
     }
 
@@ -170,7 +216,7 @@ internal class MarketPage : AppBasePage() {
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
             marketContent(this@MarketPage)
-            View { attr { height(48f + this@MarketPage.safeBottomInset()) } }
+            View { attr { height(48f + this@MarketPage.bottomNavInset()) } }
         }
     }
 }
@@ -202,6 +248,7 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
                     color(colors.c(colors.textTertiary))
                     text(
                         if (host.isRankTab()) host.rankSource
+                        else if (host.isSectorTab()) host.sectorSource
                         else host.marketSource + " · " + (host.marketUniverse.firstOrNull()?.time?.take(5)?.ifBlank { "最近更新" } ?: "最近更新")
                     )
                 }
@@ -218,7 +265,7 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
         // ---- Market Pulse（92px） ----
         View { attr { height(28f) } }
         MarketPulse(
-            indices = host.repo.indices(),
+            indices = if (host.liveIndices.isNotEmpty()) { host.liveIndices.toList() } else host.repo.indices(),
             breadth = host.repo.breadth(),
             narrow = host.isNarrow(),
             compact = host.isCompact(),
@@ -241,8 +288,8 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
             View {
                 attr { flexDirectionRow(); alignItemsCenter() }
                 if (!host.isCompact()) View { attr { flex(1f) } }
-                // 排序 / 只看上涨 / 字段：榜单 Tab 下隐藏（排名为榜单固有顺序）
-                vif({ !host.isRankTab() }) {
+                // 排序 / 只看上涨 / 字段：榜单/板块 Tab 下隐藏（排名为榜单固有顺序）
+                vif({ !host.isRankTab() && !host.isSectorTab() }) {
                     View {
                         attr { flexDirectionRow(); alignItemsCenter() }
                         View {
@@ -290,8 +337,8 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
                 View { attr { width(8f) } }
                 SecondaryButton("刷新", height = 34f) { host.refreshLiveQuotes() }
             }
-            // 字段选择器：内联芯片行（不是新浮层），勾选即生效
-            vif({ host.isColumnPickerVisible && !host.isRankTab() }) {
+            // 字段选择器：内联芯片行（不是新浮层），勾选即生效（榜单/板块 Tab 不适用）
+            vif({ host.isColumnPickerVisible && !host.isRankTab() && !host.isSectorTab() }) {
                 View {
                     attr {
                         marginTop(10f); padding(top = 8f, bottom = 8f, left = 10f, right = 10f)
@@ -322,7 +369,7 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
         }
-        // ---- 行情表 / 榜单表 ----
+        // ---- 行情表 / 榜单表 / 板块表 ----
         vif({ host.isRankTab() }) {
             RankTable(rows = { host.rankRows }, compact = host.isCompact()) { host.openStock(it.symbol) }
             vif({ host.rankLoading }) {
@@ -331,6 +378,21 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
             vif({ !host.rankLoading && host.rankRows.isEmpty() }) {
                 EmptyState(
                     title = "榜单暂不可用",
+                    desc = "请启动本地网关后点击「刷新」重试",
+                )
+            }
+        }
+        velseif({ host.isSectorTab() }) {
+            SectorTable(rows = { host.sectorRows }, compact = host.isCompact()) { row ->
+                // 板块行点击 → 领涨股详情（有真实 symbol 才跳转）
+                if (row.leadSymbol.isNotBlank()) host.openStock(row.leadSymbol)
+            }
+            vif({ host.sectorLoading }) {
+                MarketSkeleton(rows = 6)
+            }
+            vif({ !host.sectorLoading && host.sectorRows.isEmpty() }) {
+                EmptyState(
+                    title = "板块数据暂不可用",
                     desc = "请启动本地网关后点击「刷新」重试",
                 )
             }

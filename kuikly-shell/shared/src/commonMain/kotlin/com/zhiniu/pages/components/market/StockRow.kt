@@ -9,6 +9,7 @@ import com.tencent.kuikly.core.reactive.collection.ObservableList
 import com.tencent.kuikly.core.views.Canvas
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
+import com.zhiniu.data.remote.SectorRow
 import com.zhiniu.domain.model.StockQuote
 import com.zhiniu.pages.components.ANIM_THEME
 import com.zhiniu.pages.components.AppTheme
@@ -196,6 +197,99 @@ data class RankRow(
     val changePercent: Double,
 ) {
     val isUp: Boolean get() = changePercent >= 0
+}
+
+/** 行业板块表（东财真实数据）：# 36 | 板块 flex | 涨跌 90/64 | 领涨股 flex 右对齐。行点击进领涨股详情。 */
+fun ViewContainer<*, *>.SectorTable(
+    rows: () -> ObservableList<SectorRow>,
+    compact: Boolean,
+    onRowClick: (SectorRow) -> Unit,
+) {
+    val colors = AppTheme.colors
+    View {
+        attr { flexDirectionRow(); alignItemsCenter(); height(42f) }
+        View { attr { width(36f) }; ThLabel("#", alignLeft = true) }
+        View { attr { flex(1f) }; ThLabel("行业板块", alignLeft = true) }
+        View { attr { width(if (compact) 64f else 90f) }; ThLabel("涨跌幅", alignLeft = false) }
+        View { attr { width(if (compact) 110f else 180f) }; ThLabel("领涨股", alignLeft = false) }
+    }
+    View {
+        attr {
+            height(1f)
+            backgroundColor(colors.c(colors.border))
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+    }
+    vfor({ rows() }) { row ->
+        View {
+            attr {
+                flexDirectionRow(); alignItemsCenter()
+                height(56f)
+                backgroundColor(colors.c(colors.surface))
+                highlightBackgroundColor(colors.c(colors.surfaceHover))
+                accessibility("第 ${row.rank} 名板块 ${row.name}，涨跌幅 ${fmtPct(row.changePercent)}，领涨股 ${row.leadStock}")
+                accessibilityRole(AccessibilityRole.BUTTON)
+                accessibilityInfo(clickable = true, longClickable = false)
+                cssClass("zn-row zn-click")
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+            event { click { onRowClick(row) } }
+            View {
+                attr { width(36f) }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs13); fontFamily(NUM_FONT); fontWeightSemiBold()
+                        color(colors.c(if (row.rank <= 3) colors.textPrimary else colors.textTertiary))
+                        text(row.rank.toString())
+                    }
+                }
+            }
+            View {
+                attr { flex(1f); flexDirectionColumn() }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs14); fontWeightSemiBold()
+                        color(colors.c(colors.textPrimary))
+                        text(row.name)
+                        animate(ANIM_THEME, value = AppTheme.isDark)
+                    }
+                }
+                Text {
+                    attr {
+                        marginTop(3f)
+                        fontSize(AppTypography.fs12)
+                        color(colors.c(colors.textTertiary))
+                        text("涨 ${row.upCount} / 跌 ${row.downCount}")
+                    }
+                }
+            }
+            NumCell(
+                fmtPct(row.changePercent),
+                if (compact) 64f else 90f,
+                { if (row.isUp) colors.up else colors.down },
+                semibold = true,
+            )
+            View {
+                attr { width(if (compact) 110f else 180f); flexDirectionColumn(); alignItemsFlexEnd() }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs13)
+                        color(colors.c(if (row.leadChangePercent >= 0) colors.up else colors.down))
+                        text(if (row.leadStock.isBlank()) "—" else "${row.leadStock} ${fmtPct(row.leadChangePercent)}")
+                        textAlignRight(); lines(1); textOverFlowClip()
+                    }
+                }
+            }
+            View {
+                attr {
+                    absolutePosition(top = 55f, left = 0f, right = 0f)
+                    height(1f)
+                    backgroundColor(colors.c(colors.border))
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+            }
+        }
+    }
 }
 
 /** 榜单表：# 36 | 股票 flex | 最新价 120/78 | 涨跌幅 110/68。排名为榜单固有属性，不参与排序按钮。 */

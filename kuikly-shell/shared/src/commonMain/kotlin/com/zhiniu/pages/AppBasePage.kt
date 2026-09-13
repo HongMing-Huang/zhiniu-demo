@@ -18,6 +18,7 @@ import com.zhiniu.domain.model.StockQuote
 import com.zhiniu.domain.repository.MarketRepository
 import com.zhiniu.pages.components.AppTheme
 import com.zhiniu.pages.components.common.AppHeader
+import com.zhiniu.pages.components.common.BottomTabBar
 import com.zhiniu.pages.components.common.StockSearchOverlay
 import com.zhiniu.pages.components.common.ThemePopover
 import com.tencent.kuikly.core.coroutines.launch
@@ -39,7 +40,7 @@ internal abstract class AppBasePage : BasePager() {
     /** 内容宽（全部显式 Float，避开 Comparable 重载歧义）。 */
     internal fun contentWidth(): Float {
         val vw: Float = pageData.activityWidth
-        val cw: Float = 1360f
+        val cw: Float = if (isCompact()) vw else 1360f   // 手机用满屏宽，桌面限 1360 居中
         val m = kotlin.math.min(vw, cw)
         return if (m.compareTo(0f) < 0) 0f else m
     }
@@ -47,11 +48,28 @@ internal abstract class AppBasePage : BasePager() {
         val vw: Float = pageData.activityWidth
         return vw <= 1280f
     }
-    /** 760px 以下切换为单列/精简布局，覆盖常见手机横竖屏与窄窗口。 */
-    internal fun isCompact(): Boolean = pageData.activityWidth <= 760f
+
+    /**
+     * 手机布局判定。Kuikly Android/iOS 的 activityWidth 传的是物理像素
+     * （模拟器实测 1080/1179，logcat remeasure 可证），固定 760 阈值在手机上永远
+     * 为 false、整页渲染桌面布局。改用「竖屏宽高比 + 宽度上限」判定：
+     * 手机竖屏（1080x2337、1179x2556）ratio≈2.2 命中；桌面/平板横屏
+     * （1440x900、1024x768）ratio<1.35 不命中；手机横屏按宽屏处理（合理）。
+     */
+    internal fun isCompact(): Boolean {
+        val vw: Float = pageData.activityWidth
+        val vh: Float = pageData.activityHeight
+        if (vw <= 0f || vh <= 0f) return false
+        val portrait = vh / vw > 1.35f
+        return portrait && vw <= 1280f
+    }
     internal fun isMedium(): Boolean = pageData.activityWidth <= 1024f
     internal fun safeTopInset(): Float = pageData.safeAreaInsets.top.coerceAtLeast(0f)
     internal fun safeBottomInset(): Float = pageData.safeAreaInsets.bottom.coerceAtLeast(0f)
+
+    /** 页面滚动内容底部避让：手机布局加底部 Tab 高度，桌面只避安全区。 */
+    internal fun bottomNavInset(): Float =
+        if (isCompact()) com.zhiniu.pages.components.common.BOTTOM_TAB_HEIGHT + safeBottomInset() else safeBottomInset()
     internal fun searchOverlayWidth(): Float = if (isCompact()) (pageData.activityWidth - 32f).coerceAtLeast(280f) else 520f
     internal fun settingsOverlayWidth(): Float = if (isCompact()) (pageData.activityWidth - 32f).coerceAtLeast(280f) else 304f
     internal fun overlayLeft(width: Float): Float {
@@ -104,6 +122,17 @@ internal fun ViewContainer<*, *>.renderCommonOverlays(host: AppBasePage, activeN
         onSearch = { host.isSearchVisible = true },
         onTheme = { host.isThemePopoverVisible = !host.isThemePopoverVisible },
     )
+    // 手机布局：底部 Tab 导航（Android/iOS App 标配）；桌面不渲染
+    if (host.isCompact()) {
+        BottomTabBar(
+            activeNav = activeNav,
+            pageWidth = host.pageData.activityWidth,
+            bottomInset = host.safeBottomInset(),
+            onNavMarket = { host.navMarket() },
+            onNavAiResearch = { host.navAiResearch() },
+            onNavTodo = { host.navTodo() },
+        )
+    }
     StockSearchOverlay(
         visible = { host.isSearchVisible },
         query = { host.searchQuery },

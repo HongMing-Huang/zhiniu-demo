@@ -130,7 +130,7 @@ private fun ViewContainer<*, *>.todoContent(host: TodoListPage) {
             flex(1f); flexDirectionColumn(); alignItemsCenter()
             paddingLeft(if (host.isCompact()) 16f else 32f)
             paddingRight(if (host.isCompact()) 16f else 32f)
-            paddingBottom(host.safeBottomInset() + 48f)
+            paddingBottom(host.bottomNavInset() + 48f)
             backgroundColor(colors.c(colors.pageBg))
             animate(ANIM_THEME, value = AppTheme.isDark)
         }

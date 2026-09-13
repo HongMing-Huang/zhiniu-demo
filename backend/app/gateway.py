@@ -30,7 +30,9 @@ class LLMGateway:
         cache_key = (base_url, api_key or "")
         client = self._clients.get(cache_key)
         if client is None:
-            client = AsyncOpenAI(base_url=base_url, api_key=api_key)
+            # 单请求 45s 超时：中转站延迟抖动大（实测同 prompt 3s~60s），
+            # 默认 600s 会让一次卡顿拖垮整条串行辩论链。
+            client = AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=45.0, max_retries=1)
             self._clients[cache_key] = client
         return client
 

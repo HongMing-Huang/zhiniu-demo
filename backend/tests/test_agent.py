@@ -2,7 +2,17 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 from app import ta_agents
-from app.agent import _levels_from_kline, _risk_flags, _technical_summary, stream_research
+from app.agent import _levels_from_kline, _risk_flags, _technical_summary, run_chat, stream_research
+
+
+class TestNumCoercion(unittest.TestCase):
+    def test_num_coerces_model_string_prices(self):
+        self.assertEqual(ta_agents._num("1,890.5"), 1890.5)
+        self.assertEqual(ta_agents._num(" 178.6 "), 178.6)
+        self.assertEqual(ta_agents._num(10.6), 10.6)
+        self.assertIsNone(ta_agents._num("abc"))
+        self.assertIsNone(ta_agents._num(None))
+        self.assertIsNone(ta_agents._num(True))
 
 
 class TestResearchAgent(unittest.TestCase):
@@ -155,3 +165,76 @@ class TestResearchStream(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(events[-1]["type"], "run_error")
         self.assertEqual(events[-1]["code"], "research_failed")
         self.assertTrue(events[-1]["final"])
+
+
+class TestTraderStringPrices(unittest.IsolatedAsyncioTestCase):
+    _EVIDENCE = {
+        "symbol": "sh600519",
+        "quote": {"name": "贵州茅台", "price": 10.0, "prevClose": 9.5},
+        "technical": {"direction": "sideways", "changePct": 0.2, "rsi14": 50, "ma20": 10.0, "latest": 10.0},
+        "financials": {"available": True},
+        "news": {"total": 0, "items": []},
+        "riskFlags": [],
+        "levels": {"pressure": 12.5, "support": 9.8, "window": 60},
+    }
+
+    async def test_string_trader_prices_are_coerced(self):
+        answers = iter([
+            "多头观点", "空头观点",
+            '{"rating":"持有","confidence":0.5,"summary":"均衡"}',
+            '{"entry": "10.6", "stop": " 9.8 ", "plan":"字符串价格"}',
+            "激进：ok。", "中性：ok。", "保守：ok。",
+        ])
+
+        async def fake_chat(_prompt, max_tokens=300):
+            return next(answers), {"provider": "deepseek", "model": "deepseek-chat"}
+
+        with patch.object(ta_agents, "_chat_once", new=fake_chat):
+            synthesis = await ta_agents.run_debate(dict(self._EVIDENCE))
+        self.assertEqual(synthesis["mode"], "llm")
+        self.assertEqual(synthesis["trader"]["entry"], 10.6)
+        self.assertEqual(synthesis["trader"]["stop"], 9.8)
+        self.assertEqual(synthesis["trader"]["plan"], "字符串价格")
+
+
+class TestRunChat(unittest.IsolatedAsyncioTestCase):
+    async def test_llm_reply_uses_history_and_quote_snapshot(self):
+        captured: dict = {}
+
+        async def fake_gateway_chat(*, model, messages, stream, temperature, max_tokens):
+            captured["messages"] = messages
+            yield {"id": "chat-1", "provider": "gemai", "model": "deepseek-v4-flash",
+                   "choices": [{"message": {"content": "RSI 是动量指标，70 以上超买。"}}]}
+
+        with patch("app.agent.gateway.chat_completions", new=fake_gateway_chat):
+            result = await run_chat(
+                question="解释 RSI",
+                history=[{"role": "user", "content": "之前的问题"}, {"role": "ai", "content": "之前的回答"}],
+                symbol="sh600519",
+                quote={"name": "贵州茅台", "price": 1275.16, "changePct": -0.78},
+            )
+        self.assertEqual(result["mode"], "llm")
+        self.assertIn("RSI", result["content"])
+        roles = [m["role"] for m in captured["messages"]]
+        self.assertEqual(roles, ["system", "user", "assistant", "user"])
+        self.assertIn("贵州茅台", captured["messages"][0]["content"])
+        self.assertIn("1275.16", captured["messages"][0]["content"])
+
+    async def test_no_model_returns_explicit_fallback(self):
+        async def fake_gateway_chat(**_kw):
+            yield {"id": "mock-llm"}
+
+        with patch("app.agent.gateway.chat_completions", new=fake_gateway_chat):
+            result = await run_chat(question="随便问")
+        self.assertEqual(result["mode"], "deterministic_fallback")
+        self.assertEqual(result["provider"], "rule-engine")
+        self.assertIn("多 Agent 研究", result["content"])
+
+    async def test_gateway_exception_never_raises(self):
+        async def fake_gateway_chat(**_kw):
+            raise RuntimeError("network down")
+            yield  # pragma: no cover
+
+        with patch("app.agent.gateway.chat_completions", new=fake_gateway_chat):
+            result = await run_chat(question="随便问")
+        self.assertEqual(result["mode"], "deterministic_fallback")

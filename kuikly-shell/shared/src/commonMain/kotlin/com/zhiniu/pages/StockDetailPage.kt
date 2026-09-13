@@ -165,12 +165,22 @@ internal class StockDetailPage : AppBasePage() {
         val q = quote() ?: return
         aiChat.add(AiPanelChatLine("user", text))
         aiDraft = ""
-        aiChat.add(AiPanelChatLine("ai", "正在调用研究 Agent…"))
+        aiChat.add(AiPanelChatLine("ai", "正在调用模型网关…"))
         val pendingIndex = aiChat.size - 1
         lifecycleScope.launch {
-            val result = runCatching { GatewayMarketClient.research(q.symbol, text) }.getOrNull()
-            val answer = result?.summary?.ifBlank { null } ?: "研究网关暂不可用，请稍后重试。"
-            val mode = if (result?.synthesisMode == "llm") " · ${result.synthesisProvider}" else " · 规则降级"
+            // 追问多为概念/指标问题：走 /agent/chat（带标的行情快照上下文，价格锚定防编造）；
+            // 完整多 Agent 研究由「AI 分析」按钮触发，两者职责分离。
+            val history = aiChat.takeLast(9).dropLast(1).map { (it.role to it.text) }
+            val reply = runCatching {
+                GatewayMarketClient.agentChat(text, history, q.symbol)
+            }.getOrNull()
+            val answer = reply?.content?.ifBlank { null }
+                ?: "模型网关暂不可用，请稍后重试，或点击「AI 分析」查看规则生成的结构化解读。"
+            val mode = when {
+                reply == null -> ""
+                reply.isLlm -> " · ${reply.provider}"
+                else -> " · 规则降级"
+            }
             if (pendingIndex < aiChat.size) aiChat[pendingIndex] = AiPanelChatLine("ai", answer + mode)
         }
     }
@@ -216,7 +226,7 @@ internal class StockDetailPage : AppBasePage() {
             }
             vif({ this@StockDetailPage.detailLoading || this@StockDetailPage.quote() == null }) { detailSkeleton(this@StockDetailPage) }
             velse { detailContent(this@StockDetailPage, this@StockDetailPage.quote()!!) }
-            View { attr { height(48f + this@StockDetailPage.safeBottomInset()) } }
+            View { attr { height(48f + this@StockDetailPage.bottomNavInset()) } }
         }
     }
 }

@@ -78,10 +78,12 @@ fun ViewContainer<*, *>.AppHeader(
                 }
             }
             View { attr { width(if (compact) 12f else 28f) } }
-            // 导航
-            HeaderNav("市场", activeNav == "市场", onClick = onNavMarket)
-            HeaderNav("AI研究", activeNav == "AI研究", onClick = onNavAiResearch)
-            HeaderNav("待办", activeNav == "待办", onClick = onNavTodo)
+            // 导航：桌面在 Header；手机布局移交底部 BottomTabBar（此处隐藏，避免双导航）
+            if (!compact) {
+                HeaderNav("市场", activeNav == "市场", onClick = onNavMarket)
+                HeaderNav("AI研究", activeNav == "AI研究", onClick = onNavAiResearch)
+                HeaderNav("待办", activeNav == "待办", onClick = onNavTodo)
+            }
             View { attr { flex(1f) } }
             // 全局搜索（点击打开 Overlay）
             SearchField(width = if (compact) 120f else 240f, onClick = onSearch)

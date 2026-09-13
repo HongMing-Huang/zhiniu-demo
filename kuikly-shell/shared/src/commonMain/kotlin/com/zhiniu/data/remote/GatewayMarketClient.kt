@@ -2,22 +2,17 @@ package com.zhiniu.data.remote
 
 import com.zhiniu.domain.model.Candle
 import com.zhiniu.domain.model.FundFlowSnapshot
+import com.zhiniu.domain.model.MarketIndex
 import com.zhiniu.domain.model.OrderBookLevel
 import com.zhiniu.domain.model.SseParser
 import com.zhiniu.domain.model.StockFundamentals
 import com.zhiniu.domain.model.StockQuote
-import com.zhiniu.platform.createPlatformHttpClient
-import io.ktor.client.request.get
-import io.ktor.client.request.post
-import io.ktor.client.request.preparePost
-import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsChannel
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
-import io.ktor.utils.io.readUTF8Line
+import com.zhiniu.platform.GatewayTransport
+import com.zhiniu.platform.createPlatformGatewayTransport
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
@@ -37,6 +32,30 @@ data class MarketNewsItem(
 )
 
 data class AgentStage(val label: String, val source: String, val status: String)
+
+/** 通用问答结果（/agent/chat）：isLlm=false 为后端显式规则降级。 */
+data class AgentChatResult(
+    val content: String,
+    val isLlm: Boolean,
+    val provider: String,
+)
+
+/** 东财行业板块行（/quote/sectors）。rank 由页面按涨跌幅排序后赋值。 */
+data class SectorRow(
+    val code: String,
+    val name: String,
+    val changePercent: Double,
+    val upCount: Int,
+    val downCount: Int,
+    val leadStock: String,
+    val leadSymbol: String,
+    val leadChangePercent: Double,
+    val rank: Int = 0,
+) {
+    val isUp: Boolean get() = changePercent >= 0
+}
+
+data class SectorResult(val sectors: List<SectorRow>, val source: String, val isStale: Boolean)
 
 /** 研究流阶段事件（/agent/research/stream 类型化 SSE：stage_started / stage_completed）。 */
 data class ResearchStageEvent(val type: String, val stage: String, val label: String, val source: String)
@@ -106,28 +125,30 @@ data class GatewayStatus(
 object GatewayMarketClient {
     const val DEFAULT_BASE_URL = "http://127.0.0.1:8000"
 
-    /** 网关地址：默认本机；H5 可通过 URL 参数 gateway= 覆盖（真机联调指向电脑 IP）。 */
-    var baseUrl: String = DEFAULT_BASE_URL
+    /** 网关地址：平台默认（Android 模拟器 10.0.2.2）→ H5 可通过 URL 参数 gateway= 覆盖（真机联调指向电脑 IP）。 */
+    var baseUrl: String = com.zhiniu.platform.platformDefaultGateway() ?: DEFAULT_BASE_URL
         set(value) {
             val trimmed = value.trim().trimEnd('/')
             if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) field = trimmed
         }
-    private val client by lazy { createPlatformHttpClient() }
+    /** H5/原生共用的行情网关客户端；失败由页面保留本地快照，不让网络抖动破坏主流程。
+     * 传输经 GatewayTransport 平台抽象（Ktor js/OkHttp/Darwin；ohos 为 napi 桥预留位）。 */
+    private val transport: GatewayTransport by lazy { createPlatformGatewayTransport() }
     private val json = Json { ignoreUnknownKeys = true }
 
     suspend fun quotes(symbols: List<String>): List<StockQuote> {
         if (symbols.isEmpty()) return emptyList()
-        val text = client.get("$baseUrl/quote/realtime?codes=${symbols.joinToString(",")}").bodyAsText()
+        val text = transport.get("$baseUrl/quote/realtime?codes=${symbols.joinToString(",")}")
         return parseQuotes(text, symbols)
     }
 
     suspend fun candles(symbol: String, scale: Int = 240, count: Int = 240): List<Candle> {
-        val text = client.get("$baseUrl/quote/kline?symbol=$symbol&scale=$scale&datalen=$count").bodyAsText()
+        val text = transport.get("$baseUrl/quote/kline?symbol=$symbol&scale=$scale&datalen=$count")
         return parseCandles(text)
     }
 
     suspend fun candleSeries(symbol: String, scale: Int = 240, count: Int = 240): CandleSeriesResult {
-        val text = client.get("$baseUrl/quote/kline?symbol=$symbol&scale=$scale&datalen=$count").bodyAsText()
+        val text = transport.get("$baseUrl/quote/kline?symbol=$symbol&scale=$scale&datalen=$count")
         val root = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull()
             ?: JsonObject(emptyMap())
         return CandleSeriesResult(
@@ -139,26 +160,71 @@ object GatewayMarketClient {
     }
 
     suspend fun fundamentals(symbol: String): StockFundamentals? {
-        val text = client.get("$baseUrl/quote/fundamentals?symbol=$symbol").bodyAsText()
+        val text = transport.get("$baseUrl/quote/fundamentals?symbol=$symbol")
         return parseFundamentals(text)
     }
 
     suspend fun news(symbol: String): List<MarketNewsItem> {
-        val text = client.get("$baseUrl/news/list?symbol=$symbol").bodyAsText()
+        val text = transport.get("$baseUrl/news/list?symbol=$symbol")
         return parseNews(text)
     }
 
     /** 东财人气榜（真实排名）；后端离线时返回 source=mock + isStale。 */
     suspend fun popularity(count: Int = 20): PopularityResult {
-        val text = client.get("$baseUrl/quote/popularity?count=$count").bodyAsText()
+        val text = transport.get("$baseUrl/quote/popularity?count=$count")
         return parsePopularity(text)
     }
 
+    /** 新浪三大指数实时行情（/quote/indices）；网关不可用返回 null（页面回退本地快照）。 */
+    suspend fun indices(): List<MarketIndex>? {
+        val text = runCatching {
+            transport.get("$baseUrl/quote/indices")
+        }.getOrNull() ?: return null
+        val root = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull() ?: return null
+        val items = root["indices"]?.jsonArray?.mapNotNull { element ->
+            val o = element.jsonObject
+            val name = o.string("name")
+            if (name.isBlank()) return@mapNotNull null
+            val price = o.double("price")
+            val prevClose = o.double("prevClose")
+            val changePct = if (prevClose > 0.0) (price - prevClose) / prevClose * 100.0 else 0.0
+            MarketIndex(
+                symbol = o.string("symbol"),
+                name = name,
+                price = price,
+                changePercent = kotlin.math.round(changePct * 100) / 100.0,
+            )
+        } ?: emptyList()
+        return items.ifEmpty { null }
+    }
+
+    /** 东财行业板块（按当日涨跌幅排序）；网关不可用返回 null（页面显示空态提示，不伪造板块）。 */
+    suspend fun sectors(): SectorResult? {
+        val text = runCatching {
+            transport.get("$baseUrl/quote/sectors")
+        }.getOrNull() ?: return null
+        val root = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull() ?: return null
+        val sectors = root["sectors"]?.jsonArray?.mapNotNull { element ->
+            val o = element.jsonObject
+            val name = o.string("name")
+            if (name.isBlank()) return@mapNotNull null
+            SectorRow(
+                code = o.string("code"),
+                name = name,
+                changePercent = o.double("changePercent"),
+                upCount = o.double("upCount").toInt(),
+                downCount = o.double("downCount").toInt(),
+                leadStock = o.string("leadStock"),
+                leadSymbol = o.string("leadSymbol"),
+                leadChangePercent = o.double("leadChangePercent"),
+            )
+        } ?: emptyList()
+        if (sectors.isEmpty()) return null
+        return SectorResult(sectors, root.string("source"), root.boolean("isStale"))
+    }
+
     suspend fun research(symbol: String, keyword: String): AgentResearchResult? {
-        val text = client.post("$baseUrl/agent/research") {
-            contentType(ContentType.Application.Json)
-            setBody(researchPayload(symbol, keyword))
-        }.bodyAsText()
+        val text = transport.postJson("$baseUrl/agent/research", researchPayload(symbol, keyword))
         return parseResearch(text)
     }
 
@@ -172,31 +238,24 @@ object GatewayMarketClient {
         onStage: (ResearchStageEvent) -> Unit,
     ): AgentResearchResult? {
         var result: AgentResearchResult? = null
-        client.preparePost("$baseUrl/agent/research/stream") {
-            contentType(ContentType.Application.Json)
-            setBody(researchPayload(symbol, keyword))
-        }.execute { response ->
-            val channel = response.bodyAsChannel()
-            var pendingEvent: String? = null
-            while (!channel.isClosedForRead) {
-                val line = channel.readUTF8Line() ?: break
-                val frame = SseParser.parseLine(line) ?: continue
-                if (frame.event != null) {
-                    pendingEvent = frame.event
-                    continue
-                }
-                val data = frame.data ?: continue
-                val payload = runCatching { json.parseToJsonElement(data).jsonObject }.getOrNull() ?: continue
-                val type = payload.string("type").ifBlank { pendingEvent.orEmpty() }
-                pendingEvent = null
-                when (type) {
-                    "stage_started", "stage_completed" -> onStage(
-                        ResearchStageEvent(type, payload.string("stage"), payload.string("label"), payload.string("source"))
-                    )
-                    "result" -> result = payload["result"]?.jsonObject?.let { parseResearchObject(it) }
-                    "run_error" -> return@execute
-                    "run_finished" -> return@execute
-                }
+        var pendingEvent: String? = null  // SSE event: 行先于 data: 行到达时挂起（lambda 闭包捕获）
+        transport.postSse("$baseUrl/agent/research/stream", researchPayload(symbol, keyword)) { line ->
+            val frame = SseParser.parseLine(line) ?: return@postSse
+            if (frame.event != null) {
+                pendingEvent = frame.event
+                return@postSse
+            }
+            val data = frame.data ?: return@postSse
+            val payload = runCatching { json.parseToJsonElement(data).jsonObject }.getOrNull() ?: return@postSse
+            val type = payload.string("type").ifBlank { pendingEvent.orEmpty() }
+            pendingEvent = null
+            when (type) {
+                "stage_started", "stage_completed" -> onStage(
+                    ResearchStageEvent(type, payload.string("stage"), payload.string("label"), payload.string("source"))
+                )
+                "result" -> result = payload["result"]?.jsonObject?.let { parseResearchObject(it) }
+                "run_error" -> return@postSse
+                "run_finished" -> return@postSse
             }
         }
         return result
@@ -207,8 +266,42 @@ object GatewayMarketClient {
         put("keyword", keyword.take(80))
     }.toString()
 
+    /**
+     * 通用问答（快捷指令/概念解释等非个股研究问题）。
+     * 返回 null 表示网关不可用（调用方回退本地 Mock 回复，保证离线可演示）；
+     * isLlm=false 为后端显式规则降级（内容可信但非模型输出）。
+     */
+    suspend fun agentChat(
+        question: String,
+        history: List<Pair<String, String>> = emptyList(),
+        symbol: String = "",
+    ): AgentChatResult? {
+        val payload = buildJsonObject {
+            put("question", question.take(300))
+            if (history.isNotEmpty()) {
+                put("history", buildJsonArray {
+                    history.takeLast(8).forEach { (role, content) ->
+                        add(buildJsonObject { put("role", role); put("content", content.take(500)) })
+                    }
+                })
+            }
+            if (symbol.isNotBlank()) put("symbol", symbol)
+        }
+        val text = runCatching {
+            transport.postJson("$baseUrl/agent/chat", payload.toString())
+        }.getOrNull() ?: return null
+        val root = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull() ?: return null
+        val content = root.string("content")
+        if (content.isBlank()) return null
+        return AgentChatResult(
+            content = content,
+            isLlm = root.string("mode") == "llm",
+            provider = root.string("provider"),
+        )
+    }
+
     suspend fun health(): GatewayStatus {
-        val text = client.get("$baseUrl/healthz").bodyAsText()
+        val text = transport.get("$baseUrl/healthz")
         val root = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull()
             ?: return GatewayStatus()
         val services = root["services"]?.jsonObject ?: JsonObject(emptyMap())

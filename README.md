@@ -89,9 +89,9 @@ Android / iOS / 鸿蒙壳运行方式见 [docs/getting-started.md](docs/getting-
 | 平台 | 状态 | 说明 |
 |:--|:--:|:--|
 | Web (H5) | ✅ 主演示端 | 官方渲染宿主 + SPA 路由，四分辨率 + 深浅色验收通过 |
-| Android | ✅ 构建通过 | `:androidApp:assembleDebug` 产出 androidApp-debug.apk（官方 KRView 壳 + 全套适配器）；真机联调见快速开始 |
-| iOS | 🔶 | CocoaPods 壳 + 官方 KRFontHandler/KRRouterHandler，渲染层已对齐 2.25.0；需重新 `pod install` 后 Xcode 构建验收 |
-| HarmonyOS | 🔶 | `ohosApp` 壳与独立构建入口就绪；Ktor 无 ohos 引擎，网络层需 expect/actual 桥接（方案见 `docs/platform-readiness.md`） |
+| Android | ✅ 模拟器实测 | API34 模拟器端到端验收（2026-09-13）：真实行情渲染 + gateway 参数联调宿主机网关 + 离线快照降级验证；`assembleDebug` 产出 APK |
+| iOS | ✅ 模拟器实测 | iPhone 17 Pro 模拟器 install+launch 验收（2026-09-13）：渲染层 2.25.0 对齐后 BUILD SUCCEEDED，指数/行情/导航与 H5/Android 数据一致 |
+| HarmonyOS | 🔶 桥接完成 | 网络层 `GatewayTransport` expect/actual 桥接落地（commonMain 去 Ktor，ohosArm64 编译通过），libshared.so/.h 已产出回填（`scripts/ohos-backfill.sh`）；剩 DevEco 内 hvigor 构建（无 DevEco 环境，方案见 `docs/platform-readiness.md`） |
 | 小程序 / macOS | — | Kuikly 具备能力，本课题未投入验证，不做承诺 |
 
 ## 项目结构

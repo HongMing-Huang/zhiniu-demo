@@ -27,16 +27,24 @@ ProgressFn = Optional[Callable[[str, str, str], Awaitable[None]]]
 
 
 async def _chat_once(prompt: str, max_tokens: int = 300) -> tuple[Optional[str], dict]:
-    """单次网关调用；返回 (content, meta)。meta.id == "mock-llm" 表示无真实模型。"""
+    """单次网关调用；返回 (content, meta)。meta.id == "mock-llm" 表示无真实模型。
+
+    中转站延迟抖动大（同 prompt 3s~60s），失败/超时快速重试一次，
+    两次都不可用返回 None → 调用方降级规则辩论，绝不悬挂 UI。
+    """
     response = None
-    async for chunk in gateway.chat_completions(
-        model="zhiniu/quick",
-        messages=[{"role": "user", "content": prompt}],
-        stream=False,
-        temperature=0.3,
-        max_tokens=max_tokens,
-    ):
-        response = chunk
+    for _attempt in range(2):
+        async for chunk in gateway.chat_completions(
+            model="zhiniu/quick",
+            messages=[{"role": "user", "content": prompt}],
+            stream=False,
+            temperature=0.3,
+            max_tokens=max_tokens,
+        ):
+            response = chunk
+        if response and response.get("provider") and response.get("id") != "mock-llm":
+            break
+        response = None
     if not response or response.get("id") == "mock-llm" or not response.get("provider"):
         return None, {"id": "mock-llm"}
     content = response.get("choices", [{}])[0].get("message", {}).get("content", "")
@@ -91,6 +99,20 @@ def _parse_json_block(content: str) -> Optional[dict]:
         return None
 
 
+def _num(value: object) -> Optional[float]:
+    """宽容数值解析：模型偶发把价格返回成字符串（"1,890.5"），统一转 float。"""
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value.replace(",", "").strip())
+        except ValueError:
+            return None
+    return None
+
+
 def _argument_prompt(role: str, evidence_json: str, opponent: str) -> str:
     """多/空研究员提示词（TradingAgents bull/bear_researcher 的中文 A 股适配）。"""
     return (
@@ -116,9 +138,10 @@ def _trader_prompt(evidence_json: str, plan_json: dict) -> str:
     """交易员提示词（TradingAgents trader：价位必须为绝对价格并锚定技术结构）。"""
     return (
         "你是交易员，把研究计划落成价格化观察方案。价位必须为绝对价格（如 189.5），"
-        "禁止百分比或区间；压力/支撑只能取自证据中的 levels，无法给出时设为 null。\n"
+        "禁止百分比或区间；entry 取证据 levels 的支撑附近、stop 取支撑下沿或压力回破位，"
+        "只有证据中完全没有可用价位时才设为 null。\n"
         f"证据：{evidence_json}\n研究计划：{json.dumps(plan_json, ensure_ascii=False)}\n"
-        '输出严格 JSON：{"entry": null, "stop": null, "plan":"不超过60字观察思路"}'
+        '输出严格 JSON：{"entry": 189.5, "stop": 178.6, "plan":"不超过60字观察思路"}'
         "（entry/stop 为价格数字或 null；本环节只做观察记录，不下达交易指令）。"
     )
 
@@ -268,8 +291,8 @@ async def _run_llm_debate(evidence: dict, progress: ProgressFn) -> dict:
         "bearPoints": [bear_text.strip()[:120]],
         "riskNotes": [note[:120] for note in risk_notes],
         "trader": {
-            "entry": trader.get("entry") if isinstance(trader.get("entry"), (int, float)) else None,
-            "stop": trader.get("stop") if isinstance(trader.get("stop"), (int, float)) else None,
+            "entry": _num(trader.get("entry")),
+            "stop": _num(trader.get("stop")),
             "plan": str(trader.get("plan", ""))[:80],
         },
         "catalysts": [

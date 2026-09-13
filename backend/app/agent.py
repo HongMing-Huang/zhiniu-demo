@@ -15,6 +15,16 @@ from typing import Any
 
 from .tools import execute_tool_async
 from .ta_agents import run_debate
+from .gateway import gateway
+
+_CHAT_SYSTEM_PROMPT = (
+    "你是知牛（ZhiNiu）的股票研究助手，面向 A 股个人投资者，用中文回答。规则：\n"
+    "1. 概念/方法类问题（如指标含义、术语、分析方法）给出专业、简洁、结构化的解释，可用短列表。\n"
+    "2. 严禁编造具体价格、财报数字或新闻；若上下文提供了标的快照，数字只能引用该快照。\n"
+    "3. 涉及实时行情的问题，提醒用户在行情页查看最新数据。\n"
+    "4. 不构成投资建议，涉及决策时提示风险。\n"
+    "5. 回答不超过 300 字。"
+)
 
 
 def _technical_summary(kline: dict) -> dict:
@@ -172,6 +182,59 @@ def _build_report(
         "disclaimer": "研究结果仅供信息分析，不构成投资建议；请核对来源时间与陈旧标记。",
     }
     return report
+
+
+async def run_chat(question: str, history: list[dict] | None = None, symbol: str = "", quote: dict | None = None) -> dict:
+    """通用问答（非个股研究链路）：走 LLM 网关，无模型时显式规则降级。
+
+    history 为 [{role: "user"|"ai", content: str}]，最多取最近 8 轮；
+    symbol/quote 提供时把最新快照注入 system 上下文（防模型编造价格）。
+    """
+    system = _CHAT_SYSTEM_PROMPT
+    if symbol and quote:
+        name = quote.get("name", "")
+        price = quote.get("price")
+        change = quote.get("changePct")
+        system += (
+            f"\n当前上下文标的：{name}（{symbol}），最新价 {price}，涨跌幅 {change}%。"
+            "回答中引用该标的数字时只能使用此快照。"
+        )
+    messages: list[dict] = [{"role": "system", "content": system}]
+    for item in (history or [])[-8:]:
+        role = "assistant" if item.get("role") == "ai" else "user"
+        content = str(item.get("content", ""))[:500]
+        if content:
+            messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": question})
+
+    response: dict | None = None
+    try:
+        async for chunk in gateway.chat_completions(
+            model="zhiniu/quick", messages=messages, stream=False,
+            temperature=0.4, max_tokens=600,
+        ):
+            response = chunk
+    except Exception:  # noqa: BLE001 - 网关异常走降级文案，通用问答永不 500
+        response = None
+    if response and response.get("provider") and response.get("id") != "mock-llm":
+        content = ((response.get("choices") or [{}])[0].get("message") or {}).get("content", "").strip()
+        if content:
+            return {
+                "mode": "llm",
+                "provider": response.get("provider", ""),
+                "model": response.get("model", ""),
+                "content": content[:1200],
+            }
+    return {
+        "mode": "deterministic_fallback",
+        "provider": "rule-engine",
+        "model": "none",
+        "content": (
+            "模型网关当前不可用，已切换规则模式。你可以：\n"
+            "1) 输入股票名称（如「分析宁德时代」）触发多 Agent 研究；\n"
+            "2) 稍后重试通用提问。"
+        ),
+    }
 
 
 async def run_research(symbol: str, keyword: str = "") -> dict:

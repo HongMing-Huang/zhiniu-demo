@@ -106,7 +106,7 @@ internal class AiResearchPage : AppBasePage() {
                 (it.pinyin.isNotBlank() && text.contains(it.pinyin, ignoreCase = true))
         }
         if (target == null) {
-            revealLocalReply(MarketStore.aiService.chatReply(currentSessionId, text))
+            sendGeneralQuestion(text)
             return
         }
 
@@ -135,6 +135,40 @@ internal class AiResearchPage : AppBasePage() {
         }
     }
 
+    /**
+     * 非个股问题（快捷指令 / 指标解释 / 方法论）→ 后端 /agent/chat 真 LLM 问答；
+     * 网关不可用回退本地 Mock 回复（离线演示不白屏）。
+     * 上下文标的取最近一次研究，回答中的价格数字锚定该快照。
+     */
+    private fun sendGeneralQuestion(text: String) {
+        val token = "chat-${++seq}"
+        val messageIndex = messages.size
+        messages.add(AiChatMessage("ai", streaming = true, progress = listOf("模型网关"), requestId = token))
+        val contextSymbol = lastResearch?.symbol.orEmpty()
+        lifecycleScope.launch {
+            val history = messages.takeLast(9).dropLast(1).map { (it.role to it.text) }
+            val reply = runCatching {
+                GatewayMarketClient.agentChat(text, history, contextSymbol)
+            }.getOrNull()
+            if (!isPending(messageIndex, token)) return@launch
+            if (reply != null) {
+                val header = if (reply.isLlm) {
+                    AiBlock.Text("知牛 AI · 通用问答")
+                } else {
+                    AiBlock.Risk("规则降级 · 未伪装模型", reply.content)
+                }
+                val body = if (reply.isLlm) markdownOf(reply.content) else emptyList()
+                messages[messageIndex] = AiChatMessage("ai", blocks = listOf(header) + body, streaming = false)
+            } else {
+                // 离线兜底：本地 Mock（内容确定性，无网络依赖）
+                revealLocalReply(MarketStore.aiService.chatReply(currentSessionId, text), messageIndex, token)
+            }
+        }
+    }
+
+    // AiBlock.Text 渲染端即 MarkdownView（标题/列表/表格/代码块全支持），通用问答直接喂原文
+    private fun markdownOf(content: String): List<AiBlock> = listOf(AiBlock.Text(content))
+
     private fun isPending(index: Int, token: String): Boolean =
         index < messages.size && messages[index].requestId == token
 
@@ -149,6 +183,12 @@ internal class AiResearchPage : AppBasePage() {
         setTimeout(220) {
             if (index < messages.size) messages[index] = AiChatMessage("ai", blocks = blocks)
         }
+    }
+
+    /** 已有占位消息（chat token 持有中）的离线兜底：替换为本地 Mock 回复。 */
+    private fun revealLocalReply(blocks: List<AiBlock>, index: Int, token: String) {
+        if (!isPending(index, token)) return
+        messages[index] = AiChatMessage("ai", blocks = blocks, streaming = false)
     }
 
     /** 研究报告 → 结构化卡片（课题：趋势 / 压力位 / 支撑位 / 投资建议，以卡片、按钮呈现）。 */
@@ -532,7 +572,7 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
             attr {
                 backgroundColor(colors.c(colors.surface))
                 borderTop(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
-                padding(top = 12f, bottom = 12f + host.safeBottomInset(), left = host.chatSidePad(), right = host.chatSidePad())
+                padding(top = 12f, bottom = 12f + host.bottomNavInset(), left = host.chatSidePad(), right = host.chatSidePad())
                 flexDirectionRow(); alignItemsCenter()
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }

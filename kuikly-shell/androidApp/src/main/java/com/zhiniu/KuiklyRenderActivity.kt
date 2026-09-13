@@ -34,7 +34,7 @@ class KuiklyRenderActivity : AppCompatActivity(), KuiklyRenderViewBaseDelegatorD
     private val pageName: String
         get() {
             val pn = intent.getStringExtra(KEY_PAGE_NAME) ?: ""
-            return if (pn.isNotEmpty()) pn else "HelloWorld"
+            return if (pn.isNotEmpty()) pn else "MarketList"
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {

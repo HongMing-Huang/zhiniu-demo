@@ -29,7 +29,8 @@ from .config import (
 )
 from .discovery import merged_models_for_provider, refresh_models
 from .analytics import record_usage, usage_summary
-from .agent import run_research, stream_research
+from .agent import run_chat, run_research, stream_research
+from .tools import execute_tool_async
 from .gateway import gateway
 from .news import news_detail, news_list
 from .quote import (
@@ -107,6 +108,12 @@ class ChatCompletionRequest(BaseModel):
 class AgentResearchRequest(BaseModel):
     symbol: str = Field(..., min_length=8, max_length=12, description="如 sh600519")
     keyword: str = Field("", max_length=80)
+
+
+class AgentChatRequest(BaseModel):
+    question: str = Field(..., min_length=1, max_length=300)
+    history: list[dict] = Field(default_factory=list, description='[{"role":"user|ai","content":"..."}]，最多 20 条')
+    symbol: str = Field("", max_length=12, description="可选上下文标的，如 sh600519")
 
 
 # ---------- SSE 工具（支持 event+data 双行格式） ----------
@@ -336,6 +343,24 @@ async def proxy_news_detail(news_id: str):
 async def agent_research(body: AgentResearchRequest):
     """可审计的多阶段研究管线；无 LLM Key 也能返回真实/降级数据证据。"""
     return await run_research(symbol=body.symbol.lower(), keyword=body.keyword)
+
+
+@app.post("/agent/chat", dependencies=[Depends(require_gateway_key)])
+async def agent_chat(body: AgentChatRequest):
+    """通用问答（快捷指令/概念解释/方法论）：走 LLM 网关，无模型显式规则降级。
+
+    history 每条最多保留 500 字、取最近 8 轮（run_chat 内裁剪）。
+    """
+    quote = None
+    symbol = body.symbol.strip().lower()
+    if symbol:
+        quote = await execute_tool_async("get_realtime_quote", {"symbol": symbol}) or None
+    return await run_chat(
+        question=body.question[:300],
+        history=body.history[:20],
+        symbol=symbol,
+        quote=quote or None,
+    )
 
 
 @app.post("/agent/research/stream", dependencies=[Depends(require_gateway_key)])
