@@ -85,11 +85,10 @@ internal class AiResearchPage : AppBasePage() {
             seedSessions.forEach { chatSessions.add(it) }
         }
         loadSession("s1")
-        // 图表选点 / 详情页 CTA 携问题跳入：自动开始研究（进程内单例传参，URL 直达不支持自定义参数）
-        com.zhiniu.base.PendingAsk.question?.let { pending ->
-            com.zhiniu.base.PendingAsk.question = null
-            send(pending)
-        }
+        // 图表选点 / 详情页 CTA 携问题跳入：等行情刷新回填会话后再自动提问
+        //（直接在刷新前 send 会被 onSuccess 的 loadSession 重置掉）
+        val pendingAsk = com.zhiniu.base.PendingAsk.question
+        com.zhiniu.base.PendingAsk.question = null
         lifecycleScope.launch {
             runCatching { GatewayMarketClient.quotes(repo.stockQuotes().map { it.symbol }) }
                 .onSuccess { live ->
@@ -98,6 +97,7 @@ internal class AiResearchPage : AppBasePage() {
                         loadSession(currentSessionId)
                     }
                 }
+            pendingAsk?.takeIf { it.isNotBlank() }?.let { send(it) }
         }
     }
 
