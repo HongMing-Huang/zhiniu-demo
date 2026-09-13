@@ -18,6 +18,10 @@ internal fun Pager.openStockDetail(symbol: String) =
 
 internal fun Pager.openAiResearchPage() = openZhiniuPage("AiResearch")
 
+/** 携带初始问题跳转 AI 研究（图表选点追问 / 详情页深聊入口）。 */
+internal fun Pager.openAiResearchPage(question: String) =
+    openZhiniuPage("AiResearch", mapOf("question" to question))
+
 internal fun Pager.openWatchlistPage() = openZhiniuPage("Watchlist")
 
 /** 关闭当前页（H5 SPA 下等价浏览器 Back，返回上一页并恢复滚动位置）。 */

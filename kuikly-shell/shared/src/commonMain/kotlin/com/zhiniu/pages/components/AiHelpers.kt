@@ -16,7 +16,7 @@ fun ViewContainer<*, *>.AiMessageHeader(label: String) {
             attr {
                 marginLeft(6f)
                 fontSize(AppTypography.fs12); fontWeightSemiBold()
-                color(colors.c(colors.aiAccent))
+                color(colors.c(colors.textSecondary))
                 text(label)
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }

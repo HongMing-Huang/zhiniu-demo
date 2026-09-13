@@ -85,6 +85,8 @@ internal class AiResearchPage : AppBasePage() {
             seedSessions.forEach { chatSessions.add(it) }
         }
         loadSession("s1")
+        // 图表选点 / 详情页 CTA 携问题跳入：自动开始研究
+        pageData.params.optString("question", "").takeIf { it.isNotBlank() }?.let { send(it) }
         lifecycleScope.launch {
             runCatching { GatewayMarketClient.quotes(repo.stockQuotes().map { it.symbol }) }
                 .onSuccess { live ->
@@ -524,19 +526,21 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
                 View {
                     attr { padding(top = 14f, left = host.chatSidePad(), right = host.chatSidePad()) }
                     if (msg.role == "user") {
+                        // 用户气泡：前景/背景反转（浅色主题深底白字，深色反之），与 AI 卡形成强对比
                         View {
                             attr {
                                 alignSelfFlexEnd()
                                 maxWidth(560f)
                                 borderRadius(AppRadius.radius6)
-                                backgroundColor(colors.c(colors.surfaceSecondary))
+                                backgroundColor(colors.c(colors.textPrimary))
+                                animate(ANIM_THEME, value = AppTheme.isDark)
                             }
                             View {
                                 attr { padding(top = 8f, left = 14f, right = 14f, bottom = 8f) }
                                 Text {
                                     attr {
                                         fontSize(AppTypography.fs14); lineHeight(21f)
-                                        color(colors.c(colors.textPrimary))
+                                        color(colors.c(colors.pageBg))
                                         text(msg.text)
                                     }
                                 }
