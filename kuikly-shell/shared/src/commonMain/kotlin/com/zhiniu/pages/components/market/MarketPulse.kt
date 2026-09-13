@@ -133,24 +133,25 @@ private fun ViewContainer<*, *>.CompactBreadthCard(breadth: MarketBreadth) {
             padding(top = 10f, bottom = 10f, left = 12f, right = 12f)
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
-        Text { attr { fontSize(AppTypography.fs11); color(colors.c(colors.textSecondary)); text("市场宽度") } }
+        Text { attr { fontSize(AppTypography.fs11); lines(1); color(colors.c(colors.textSecondary)); text("市场宽度") } }
         View { attr { width(8f) } }
         Text {
             attr {
-                fontSize(AppTypography.fs13); fontWeightSemiBold(); fontFamily(NUM_FONT)
+                fontSize(AppTypography.fs13); fontWeightSemiBold(); fontFamily(NUM_FONT); lines(1)
                 color(colors.c(colors.up)); text(fmtInt(breadth.upCount) + " 涨")
             }
         }
         Text {
             attr {
-                marginLeft(6f); fontSize(AppTypography.fs13); fontWeightSemiBold(); fontFamily(NUM_FONT)
+                marginLeft(6f); fontSize(AppTypography.fs13); fontWeightSemiBold(); fontFamily(NUM_FONT); lines(1)
                 color(colors.c(colors.down)); text(fmtInt(breadth.downCount) + " 跌")
             }
         }
         View { attr { flex(1f) } }
         Text {
             attr {
-                fontSize(AppTypography.fs11); color(colors.c(colors.textTertiary))
+                fontSize(AppTypography.fs11); lines(1)
+                color(colors.c(colors.textTertiary))
                 text("成交 " + fmtInt(breadth.amountYi) + " 亿")
             }
         }

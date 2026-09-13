@@ -8,6 +8,8 @@ provider is available the same response shape is returned with an explicit
 from __future__ import annotations
 
 import asyncio
+import json
+import re
 import time
 import uuid
 from collections.abc import AsyncIterator
@@ -30,6 +32,198 @@ _CHAT_SYSTEM_PROMPT = (
     "行情/财务/K线数值只能来自工具返回数据，禁止自行填写或修改任何数字；"
     "工具失败时明确说明失败项，禁止用未经成功查询的数据补全。"
 )
+
+# ---------- AI 工具指令协议（AI 操作 App：加自选 / 拉起对比 / 设价格预警） ----------
+# 模型在回复末尾以独立行输出 ⟦TOOL⟧{json} 指令（对标课题组 KuiklyStock ⟦TOOL⟧ 协议）；
+# 服务端解析、白名单校验并做「名称→代码必须搜索解析」防幻觉，客户端执行。
+_CHAT_TOOLS_PROMPT = (
+    "\n6. 工具指令（App 操作）：用户明确要求「加自选 / 对比 / 设预警」时，在回复最后另起一行输出指令，"
+    "格式固定（一行一条，不要放进正文，不要输出代码块围栏）：\n"
+    "⟦TOOL⟧{\"name\":\"add_watchlist\",\"args\":{\"symbol\":\"sz300750\"}}\n"
+    "可用指令：\n"
+    "- add_watchlist：加入自选，args={\"symbol\":\"sz300750\"}（代码必须来自上下文快照；不确定代码时用 {\"name\":\"宁德时代\"} 交由服务端搜索解析）\n"
+    "- open_compare：拉起双股对比页，args={\"symbol_a\":\"sh600519\",\"symbol_b\":\"sz300750\"}\n"
+    "- set_price_alert：价格预警，args={\"symbol\":\"sz300750\",\"operator\":\"above\"|\"below\",\"price\":320.5}（price 必须是具体数字；operator above=突破上方价、below=跌破下方价）\n"
+    "仅当用户明确表达操作意图时输出一条指令，并用一句话在正文说明已为其执行；不明确时不要输出指令。"
+)
+
+_TOOL_MARKERS = ("⟦TOOL⟧", "【TOOL】", "[TOOL]", "「TOOL」")
+_TOOL_NAME_ALIASES = {
+    "add_watchlist": "add_watchlist", "addwatchlist": "add_watchlist", "add_to_watchlist": "add_watchlist",
+    "watch": "add_watchlist", "add_favorite": "add_watchlist", "add_favourite": "add_watchlist",
+    "open_compare": "open_compare", "compare": "open_compare", "compare_stocks": "open_compare",
+    "open_stock_compare": "open_compare", "stock_compare": "open_compare",
+    "set_price_alert": "set_price_alert", "price_alert": "set_price_alert", "set_alert": "set_price_alert",
+    "alert": "set_price_alert", "add_alert": "set_price_alert", "set_price_warning": "set_price_alert",
+}
+_SYMBOL_RE = re.compile(r"^(sh|sz|bj)\d{6}$", re.IGNORECASE)
+
+
+def _parse_tool_json(payload: str) -> dict | None:
+    """宽容解析指令 JSON：剥代码围栏/首尾杂字符；失败时用正则兜底提 name 与顶层字段。"""
+    text = payload.strip().strip("`").strip()
+    start, end = text.find("{"), text.rfind("}")
+    if start >= 0 and end > start:
+        try:
+            parsed = json.loads(text[start : end + 1])
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            pass
+    name_match = re.search(r'["\']?name["\']?\s*[:：]\s*["\']([\w-]+)["\']', text)
+    if not name_match:
+        return None
+    return {"name": name_match.group(1), "_raw": text}
+
+
+def _extract_tool_directives(content: str) -> tuple[str, list[dict]]:
+    """从模型回复中拆出指令行：返回 (无指令正文, [原始指令 dict])。
+
+    兼容多种标记（⟦TOOL⟧/【TOOL】/[TOOL]）与围栏；指令行不进正文展示。
+    """
+    text_lines: list[str] = []
+    directives: list[dict] = []
+    for line in content.splitlines():
+        stripped = line.strip()
+        lowered = stripped.lower().replace(" ", "")
+        hit = next((m for m in _TOOL_MARKERS if m.lower().replace(" ", "") in lowered), None)
+        if hit is None:
+            text_lines.append(line)
+            continue
+        payload = stripped[stripped.find(hit) + len(hit):].strip()
+        parsed = _parse_tool_json(payload)
+        if parsed is not None:
+            directives.append(parsed)
+    return "\n".join(text_lines).strip(), directives
+
+
+async def _resolve_symbol_arg(arg: dict, keys: tuple[str, ...], context_symbol: str) -> tuple[str, str] | None:
+    """把 args 中的标的解析为 (symbol, name)。防幻觉：名称必须经 quote_search 真实解析；
+    直接代码必须符合 sh/sz/bj+6 位格式（提示词约束其来自上下文快照）。"""
+    from .quote import quote_search
+
+    for key in keys:
+        value = str(arg.get(key) or "").strip()
+        if not value:
+            continue
+        if _SYMBOL_RE.match(value):
+            return value.lower(), str(arg.get("name") or value)
+        if len(value) >= 2 and not value.isdigit():
+            result = await quote_search(value, 1)
+            items = result.get("items") or []
+            if items:
+                first = items[0]
+                return first["symbol"], first["name"]
+        return None
+    if context_symbol and _SYMBOL_RE.match(context_symbol):
+        return context_symbol.lower(), ""
+    return None
+
+
+async def _validate_tool_directive(
+    raw: dict, context_symbol: str
+) -> tuple[dict | None, str]:
+    """白名单 + 参数校验 + 名称搜索解析。返回 (合法指令|None, 追加到正文的人话说明)。"""
+    name = str(raw.get("name") or "").strip()
+    canonical = _TOOL_NAME_ALIASES.get(name.lower().replace("-", "_"))
+    if canonical is None:
+        return None, ""
+    args = raw.get("args") if isinstance(raw.get("args"), dict) else raw
+    if canonical == "add_watchlist":
+        resolved = await _resolve_symbol_arg(args, ("symbol", "code", "stock", "name"), context_symbol)
+        if resolved is None:
+            return None, "（未能解析标的代码，本次未执行加自选；可在个股详情页手动添加）"
+        symbol, stock_name = resolved
+        return (
+            {"name": "add_watchlist", "args": {"symbol": symbol, "name": stock_name}, "display": f"加入自选 {stock_name or symbol}"},
+            "",
+        )
+    if canonical == "open_compare":
+        first = await _resolve_symbol_arg(args, ("symbol_a", "symbolA", "a", "symbol"), "")
+        second = await _resolve_symbol_arg(args, ("symbol_b", "symbolB", "b"), "")
+        if first is None or second is None or first[0] == second[0]:
+            return None, "（对比标的不完整或重复，本次未打开对比页；可指明两只股票后重试）"
+        return (
+            {
+                "name": "open_compare",
+                "args": {"symbolA": first[0], "symbolB": second[0], "nameA": first[1], "nameB": second[1]},
+                "display": f"打开对比 {first[1] or first[0]} × {second[1] or second[0]}",
+            },
+            "",
+        )
+    if canonical == "set_price_alert":
+        resolved = await _resolve_symbol_arg(args, ("symbol", "code", "stock", "name"), context_symbol)
+        if resolved is None:
+            return None, "（未能解析预警标的，本次未设置）"
+        operator = str(args.get("operator") or args.get("direction") or "").strip().lower()
+        if operator in ("up", "above", "超过", "突破", "上方", "高于", ">", ">=", "cross_above"):
+            operator = "above"
+        elif operator in ("down", "below", "跌破", "下方", "低于", "<", "<=", "cross_below"):
+            operator = "below"
+        else:
+            return None, "（预警方向不明确（需 above/below），本次未设置）"
+        price = _num_or_none(args.get("price") or args.get("target") or args.get("value"))
+        if price is None or price <= 0:
+            return None, "（预警价格缺失或非数字，本次未设置；请给出具体价格，如「跌破 300 设预警」）"
+        symbol, stock_name = resolved
+        return (
+            {
+                "name": "set_price_alert",
+                "args": {"symbol": symbol, "name": stock_name, "operator": operator, "price": price},
+                "display": f"设置预警 {stock_name or symbol} {'突破' if operator == 'above' else '跌破'} {price:g}",
+            },
+            "",
+        )
+    return None, ""
+
+
+async def _process_chat_tools(content: str, context_symbol: str = "") -> tuple[str, list[dict]]:
+    """拆指令 → 校验解析 → (干净正文, 合法指令列表)；失败说明追加入正文（诚实降级）。"""
+    text, raw_directives = _extract_tool_directives(content)
+    tools: list[dict] = []
+    notes: list[str] = []
+    for raw in raw_directives[:3]:
+        tool, note = await _validate_tool_directive(raw, context_symbol)
+        if tool is not None:
+            tools.append(tool)
+        elif note:
+            notes.append(note)
+    if notes:
+        text = (text + "\n" + "\n".join(notes)).strip()
+    return text, tools
+
+
+_TOOL_NUDGE = (
+    "你说明了操作，但没有按协议输出指令行。请只补一行 ⟦TOOL⟧{json} 指令"
+    "（name/args 按协议；不确定代码就用 name），不要输出其他文字。"
+)
+
+
+def _looks_like_tool_intent(question: str) -> bool:
+    """服务端操作意图识别（与前端路由同一套口径；用于「无指令强重试」判定）。"""
+    watchlist_intent = "自选" in question and any(w in question for w in ("加", "收藏", "添加"))
+    alert_intent = any(w in question for w in ("预警", "提醒我", "报警"))
+    compare_intent = any(w in question for w in ("对比", "比较")) and any(
+        w in question.lower() for w in ("和", "与", "vs", "×")
+    )
+    return watchlist_intent or alert_intent or compare_intent
+
+
+async def _chat_once(messages: list[dict]) -> tuple[str, str, str]:
+    """单次非流式调用；返回 (content, provider, model)。全失败返回空串。"""
+    response: dict | None = None
+    try:
+        async for chunk in gateway.chat_completions(
+            model="zhiniu/quick", messages=messages, stream=False,
+            temperature=0.4, max_tokens=600,
+        ):
+            response = chunk
+    except Exception:  # noqa: BLE001
+        return "", "", ""
+    if not response or response.get("id") == "mock-llm":
+        return "", "", ""
+    content = ((response.get("choices") or [{}])[0].get("message") or {}).get("content", "")
+    return content.strip(), response.get("provider", ""), response.get("model", "")
 
 # 个股诊股（/agent/insight）独立缓存键：与用户研究 keyword 空间隔离，复用 store 的缓存/并发去重。
 _INSIGHT_CACHE_KEY = "insight:v1"
@@ -211,8 +405,8 @@ def _build_report(
 
 
 def _chat_messages(question: str, history: list[dict] | None, symbol: str, quote: dict | None) -> list[dict]:
-    """run_chat / stream_chat 共用的消息组装：system（含可选标的快照锚定）+ 最近 8 轮 + 本轮问题。"""
-    system = _CHAT_SYSTEM_PROMPT
+    """run_chat / stream_chat 共用的消息组装：system（含可选标的快照锚定 + 工具指令协议）+ 最近 8 轮 + 本轮问题。"""
+    system = _CHAT_SYSTEM_PROMPT + _CHAT_TOOLS_PROMPT
     if symbol and quote:
         name = quote.get("name", "")
         price = quote.get("price")
@@ -258,17 +452,30 @@ async def run_chat(question: str, history: list[dict] | None = None, symbol: str
     if response and response.get("provider") and response.get("id") != "mock-llm":
         content = ((response.get("choices") or [{}])[0].get("message") or {}).get("content", "").strip()
         if content:
+            clean_text, tools = await _process_chat_tools(content, symbol)
+            # 无指令强重试（对标 KuiklyStock）：用户明确要操作、模型只说不发指令 → 补一轮只要指令
+            if not tools and _looks_like_tool_intent(question):
+                retry_messages = messages + [
+                    {"role": "assistant", "content": content},
+                    {"role": "user", "content": _TOOL_NUDGE},
+                ]
+                retry_content, _, _ = await _chat_once(retry_messages)
+                if retry_content:
+                    _, retry_tools = await _process_chat_tools(retry_content, symbol)
+                    tools = retry_tools
             return {
                 "mode": "llm",
                 "provider": response.get("provider", ""),
                 "model": response.get("model", ""),
-                "content": content[:1200],
+                "content": clean_text[:1200],
+                "tools": tools,
             }
     return {
         "mode": "deterministic_fallback",
         "provider": "rule-engine",
         "model": "none",
         "content": _CHAT_FALLBACK_TEXT,
+        "tools": [],
     }
 
 
@@ -280,16 +487,26 @@ async def stream_chat(
 ) -> AsyncIterator[dict[str, Any]]:
     """通用问答流式版（/agent/chat/stream）：逐 delta 转发模型输出。
 
-    帧协议：chat_started → delta* → chat_finished（终帧含完整内容与 mode）。
+    帧协议：chat_started → delta* → tool*（App 操作指令，客户端执行）→ chat_finished（终帧含完整正文与 mode）。
     Mock LLM（id=mock-llm）不透传占位文本，直接以规则降级文本收尾，
     与 /agent/chat 的语义保持一致（mock ≠ 模型输出）。
+    工具指令行（⟦TOOL⟧…）不下发为正文：见 marker 即停流转缓冲，终帧输出清洗后的正文。
     """
     messages = _chat_messages(question, history, symbol, quote)
     yield {"type": "chat_started", "final": False}
-    parts: list[str] = []
+    parts: list[str] = []          # 已确定不含指令的正文（含已下发部分）
+    tail = ""                      # 尾部缓冲：可能是被 delta 截断的 marker 前缀
+    rest = ""                      # 命中 marker 之后的全部内容（指令区，不下发）
+    hit_directive = False
     provider = ""
     model = ""
     is_mock = False
+    marker_len = max(len(m) for m in _TOOL_MARKERS)
+
+    def _marker_index(text: str) -> int:
+        found = [text.find(m) for m in _TOOL_MARKERS if text.find(m) >= 0]
+        return min(found) if found else -1
+
     try:
         async for chunk in gateway.chat_completions(
             model="zhiniu/quick", messages=messages, stream=True,
@@ -300,22 +517,66 @@ async def stream_chat(
             if chunk.get("id") == "mock-llm":
                 is_mock = True
             delta = ((chunk.get("choices") or [{}])[0].get("delta") or {}).get("content")
-            if delta and not is_mock:
-                parts.append(delta)
-                yield {"type": "delta", "content": delta, "final": False}
+            if not delta or is_mock:
+                continue
+            if hit_directive:
+                rest += delta
+                continue
+            tail += delta
+            idx = _marker_index(tail)
+            if idx >= 0:
+                body = tail[:idx]
+                if body:
+                    parts.append(body)
+                    yield {"type": "delta", "content": body, "final": False}
+                rest = tail[idx:]
+                tail = ""
+                hit_directive = True
+                continue
+            # 保留 marker_len-1 字符不下发，防止 marker 被 delta 截断后漏出半截指令
+            safe = len(tail) - (marker_len - 1)
+            if safe > 0:
+                body, tail = tail[:safe], tail[safe:]
+                parts.append(body)
+                yield {"type": "delta", "content": body, "final": False}
     except Exception:  # noqa: BLE001 - 网关异常按降级处理，流式问答永不 500
         parts = []
-    content = "".join(parts).strip()
-    if content and not is_mock and provider:
+        tail = ""
+        rest = ""
+        hit_directive = False
+    # 结束：未命中指令时把尾部缓冲（防截断而保留的部分）补发，避免丢字
+    if not hit_directive and tail:
+        parts.append(tail)
+        yield {"type": "delta", "content": tail, "final": False}
+        tail = ""
+    content = "".join(parts)
+    if not is_mock and provider and (content.strip() or rest.strip()):
+        clean_text, tools = await _process_chat_tools(content + ("\n" + rest if rest else ""), symbol)
+        # 无指令强重试：操作意图明确但模型只说不发指令 → 补一轮只要指令（不影响已流出的正文）
+        if not tools and _looks_like_tool_intent(question):
+            retry_messages = messages + [
+                {"role": "assistant", "content": content + ("\n" + rest if rest else "")},
+                {"role": "user", "content": _TOOL_NUDGE},
+            ]
+            retry_content, _, _ = await _chat_once(retry_messages)
+            if retry_content:
+                _, retry_tools = await _process_chat_tools(retry_content, symbol)
+                tools = retry_tools
+        if clean_text:
+            clean_text = clean_text[:1200]
+        else:
+            clean_text = "（本次回复仅包含工具指令）"
+        for tool in tools:
+            yield {"type": "tool", "name": tool["name"], "args": tool["args"], "display": tool["display"], "final": False}
         yield {
             "type": "chat_finished", "mode": "llm", "provider": provider,
-            "model": model, "content": content[:1200], "final": True,
+            "model": model, "content": clean_text, "tools": tools, "final": True,
         }
         return
     yield {
         "type": "chat_finished", "mode": "deterministic_fallback",
         "provider": "rule-engine", "model": "none",
-        "content": _CHAT_FALLBACK_TEXT, "final": True,
+        "content": _CHAT_FALLBACK_TEXT, "tools": [], "final": True,
     }
 
 

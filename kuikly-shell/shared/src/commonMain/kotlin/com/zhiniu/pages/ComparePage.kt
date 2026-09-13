@@ -118,7 +118,7 @@ private fun ViewContainer<*, *>.compareContent(host: ComparePage) {
             flex(1f); flexDirectionColumn()
             paddingLeft(if (host.isCompact()) 16f else 32f)
             paddingRight(if (host.isCompact()) 16f else 32f)
-            paddingBottom(host.bottomNavInset() + 24f)
+            paddingBottom(24f)
             backgroundColor(colors.c(colors.pageBg))
             animate(ANIM_THEME, value = AppTheme.isDark)
         }

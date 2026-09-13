@@ -32,6 +32,10 @@ error-triangle|error-triangle
 chat-message|chat-message
 data-display|data-display
 user-circle|user-circle
+refresh|refresh
+bell|notification-filled
+info|info-circle
+setting|setting
 "
 
 echo "==> 下载 + 预处理（线性轮廓）"

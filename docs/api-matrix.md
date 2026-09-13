@@ -126,8 +126,14 @@
   - 缓存/并发去重：复用 store（keyword=`insight:v1`，TTL=RESEARCH_TTL_SECONDS 默认 1h；同标的进行中任务共享结果）
   - 无模型/超时/解析失败：`mode=deterministic_fallback, provider=rule-engine`，riskLevel/advice 仍由确定性规则输出（数值来自服务端证据）
 - **POST /agent/chat/stream**（通用问答流式）
-  - typed SSE：`chat_started → delta{content}* → chat_finished{mode,provider,content}`；与 `/agent/chat` 同一消息组装（history 8 轮 + 标的快照锚定）
+  - typed SSE：`chat_started → delta{content}* → tool{...}* → chat_finished{mode,provider,content,tools}`；与 `/agent/chat` 同一消息组装（history 8 轮 + 标的快照锚定 + 工具指令协议）
   - Mock LLM（id=mock-llm）占位文本不透传，直接以规则降级文本收尾（mock ≠ 模型输出的口径与同步版一致）
+- **AI 工具指令协议（⟦TOOL⟧，对标 KuiklyStock；chat/stream 同步非同步均支持）**
+  - 模型在回复末尾独立行输出 `⟦TOOL⟧{"name":...,"args":{...}}`；服务端 `_extract_tool_directives` 兼容 ⟦TOOL⟧/【TOOL】/[TOOL]/围栏 + 正则兜底；**指令行不进正文、流式不下发**（尾部缓冲防 marker 截断）
+  - 白名单与别名归一（add_to_watchlist→add_watchlist 等 15 别名）；`set_price_alert` 必须有 above/below 方向（含中文动词归一）与数字价格；`open_compare` 需两只不同标的
+  - **防幻觉**：args 传名称时必须经 `quote_search`（东财 suggest）真实解析为代码，搜索无结果即拒绝执行并把失败原因写回正文；直接代码必须匹配 `^(sh|sz|bj)\d{6}$`
+  - **无指令强重试**：用户明确表达操作意图（服务端意图识别与前端同口径）而模型只说不发指令时，追加一轮「只要指令」重试（对标 KuiklyStock 实测有效的容错）
+  - 客户端执行（加自选/拉起对比/设预警）并以 ToolResult 反馈卡回执；预警持久化（`zhiniu.alert.items.v1`），自选页真实行情到达时自动标记触发
 - **POST /agent/compare · /agent/compare/stream**（双股对比）
   - 入参：`{symbols:[sh600519,sz300750], focus?}`（恰好 2 个）；双侧并行取证（行情/60 根 K 线/估值）
   - 规则基准 `_rule_compare_summary` 永远返回（区间涨跌/RSI/PE 对照，`conclusion="规则降级 · 未伪装模型"`）；LLM 可用时叠加 `{summary,stronger(A|B|none),pointsA[],pointsB[],conclusion}`（JSON-mode，枚举校验）

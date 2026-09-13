@@ -36,12 +36,35 @@ data class MarketNewsItem(
 
 data class AgentStage(val label: String, val source: String, val status: String)
 
-/** 通用问答结果（/agent/chat）：isLlm=false 为后端显式规则降级。 */
+/** 通用问答结果（/agent/chat）：isLlm=false 为后端显式规则降级；tools 为模型请求的 App 操作指令（已服务端校验）。 */
 data class AgentChatResult(
     val content: String,
     val isLlm: Boolean,
     val provider: String,
+    val tools: List<AgentToolDirective> = emptyList(),
 )
+
+/**
+ * AI 工具指令（服务端已解析校验：名称→代码经东财搜索真实解析、白名单/枚举/数值校验）。
+ * 客户端只负责执行：add_watchlist / open_compare / set_price_alert。
+ */
+data class AgentToolDirective(
+    val name: String,
+    val symbol: String = "",
+    val stockName: String = "",
+    val symbolB: String = "",
+    val stockNameB: String = "",
+    val alertOperator: String = "",   // above | below
+    val alertPrice: Double = 0.0,
+    val display: String = "",
+) {
+    val isValid: Boolean get() = when (name) {
+        "add_watchlist" -> symbol.length == 8
+        "open_compare" -> symbol.length == 8 && symbolB.length == 8 && symbol != symbolB
+        "set_price_alert" -> symbol.length == 8 && alertPrice > 0.0 && alertOperator in setOf("above", "below")
+        else -> false
+    }
+}
 
 /** 东财行业板块行（/quote/sectors）。rank 由页面按涨跌幅排序后赋值。 */
 data class SectorRow(
@@ -344,11 +367,47 @@ object GatewayMarketClient {
         val root = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull() ?: return null
         val content = root.string("content")
         if (content.isBlank()) return null
+        val tools = root["tools"]?.jsonArray?.mapNotNull { el ->
+            runCatching { el.jsonObject }.getOrNull()?.let { parseToolDirective(it) }
+        } ?: emptyList()
         return AgentChatResult(
             content = content,
             isLlm = root.string("mode") == "llm",
             provider = root.string("provider"),
+            tools = tools,
         )
+    }
+
+    /** 工具指令帧/数组元素 → 类型化指令；参数不全返回 null（服务端已校验，此处双保险）。 */
+    internal fun parseToolDirective(obj: JsonObject): AgentToolDirective? {
+        val name = obj.string("name")
+        val args = obj["args"]?.let { runCatching { it.jsonObject }.getOrNull() } ?: JsonObject(emptyMap())
+        val directive = when (name) {
+            "add_watchlist" -> AgentToolDirective(
+                name = name,
+                symbol = args.string("symbol"),
+                stockName = args.string("name"),
+                display = obj.string("display"),
+            )
+            "open_compare" -> AgentToolDirective(
+                name = name,
+                symbol = args.string("symbolA"),
+                stockName = args.string("nameA"),
+                symbolB = args.string("symbolB"),
+                stockNameB = args.string("nameB"),
+                display = obj.string("display"),
+            )
+            "set_price_alert" -> AgentToolDirective(
+                name = name,
+                symbol = args.string("symbol"),
+                stockName = args.string("name"),
+                alertOperator = args.string("operator"),
+                alertPrice = args.double("price"),
+                display = obj.string("display"),
+            )
+            else -> null
+        }
+        return directive?.takeIf { it.isValid }
     }
 
     /**
@@ -376,6 +435,7 @@ object GatewayMarketClient {
         var finalMode = ""
         var finalContent = ""
         var finalProvider = ""
+        val tools = mutableListOf<AgentToolDirective>()
         var pendingEvent: String? = null
         runCatching {
             transport.postSse("$baseUrl/agent/chat/stream", payload.toString()) { line ->
@@ -388,17 +448,23 @@ object GatewayMarketClient {
                 val obj = runCatching { json.parseToJsonElement(data).jsonObject }.getOrNull() ?: return@postSse
                 when (obj.string("type").ifBlank { pendingEvent.orEmpty() }) {
                     "delta" -> obj.string("content").takeIf { it.isNotBlank() }?.let(onDelta)
+                    "tool" -> parseToolDirective(obj)?.let { tools.add(it) }
                     "chat_finished" -> {
                         finalMode = obj.string("mode")
                         finalContent = obj.string("content")
                         finalProvider = obj.string("provider")
+                        obj["tools"]?.jsonArray?.forEach { el ->
+                            runCatching { el.jsonObject }.getOrNull()?.let { parseToolDirective(it)?.let(tools::add) }
+                        }
                     }
                 }
                 pendingEvent = null
             }
         }
         if (finalContent.isBlank()) return null
-        return AgentChatResult(finalContent, finalMode == "llm", finalProvider)
+        // tool 帧与 chat_finished.tools 可能各携带一次同一指令，按 name+标的 去重
+        val deduped = tools.distinctBy { it.name + "|" + it.symbol + "|" + it.symbolB + "|" + it.alertPrice }
+        return AgentChatResult(finalContent, finalMode == "llm", finalProvider, deduped)
     }
 
     /**

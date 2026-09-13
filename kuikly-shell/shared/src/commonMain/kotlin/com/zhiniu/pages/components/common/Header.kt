@@ -18,13 +18,12 @@ import com.zhiniu.pages.components.IconKind
 import com.zhiniu.pages.components.c
 import com.zhiniu.pages.components.ca
 import com.zhiniu.pages.components.cssClass
-import com.zhiniu.pages.components.common.IconButton
 
 /**
  * 全局 Header：64px，1px 底描边。
- * @param activeNav 当前一级导航（"市场" / "AI研究" / "待办"）。
+ * @param activeNav 当前一级导航（"市场" / "自选" / "AI研究" / "我的"）。
  * @param onSearch 点击 Header 搜索 → 打开 StockSearchOverlay。
- * @param onTheme  点击主题按钮 → 打开 ThemePopover。
+ * @param onProfile 点击「我的」→ 打开 ProfilePage（外观/服务状态/关于）。
  */
 fun ViewContainer<*, *>.AppHeader(
     activeNav: String,
@@ -33,8 +32,8 @@ fun ViewContainer<*, *>.AppHeader(
     onNavMarket: () -> Unit,
     onNavAiResearch: () -> Unit,
     onNavWatchlist: () -> Unit,
+    onNavProfile: () -> Unit,
     onSearch: () -> Unit,
-    onTheme: () -> Unit,
     onBack: (() -> Unit)? = null,
 ) {
     val colors = AppTheme.colors
@@ -90,6 +89,7 @@ fun ViewContainer<*, *>.AppHeader(
                 HeaderNav("市场", activeNav == "市场", onClick = onNavMarket)
                 HeaderNav("AI研究", activeNav == "AI研究", onClick = onNavAiResearch)
                 HeaderNav("自选", activeNav == "自选", onClick = onNavWatchlist)
+                HeaderNav("我的", activeNav == "我的", onClick = onNavProfile)
             }
             View { attr { flex(1f) } }
             // 全局搜索（点击打开 Overlay）：手机用图标按钮（占位文字窄屏被裁），桌面用宽搜索框
@@ -103,10 +103,10 @@ fun ViewContainer<*, *>.AppHeader(
             }
             if (compact) {
                 IconButton(IconKind.USER, size = 18f, box = 38f, accessibilityLabel = "我的与设置") {
-                    onTheme()
+                    onNavProfile()
                 }
             } else {
-                SecondaryButton("我的", height = 36f, icon = IconKind.USER, onClick = onTheme)
+                SecondaryButton("我的", height = 36f, icon = IconKind.USER, onClick = onNavProfile)
             }
         }
     }

@@ -22,6 +22,7 @@ import com.tencent.kuikly.core.views.InputView
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
 import com.zhiniu.data.mock.MarketStore
+import com.zhiniu.base.openComparePage
 import com.zhiniu.data.remote.GatewayMarketClient
 import com.zhiniu.data.remote.AgentResearchResult
 import com.zhiniu.domain.model.ChatSession
@@ -43,8 +44,8 @@ import com.zhiniu.pages.components.fmtPct
 import com.zhiniu.pages.components.ai.AiBlockView
 import com.zhiniu.pages.components.AiMessageHeader
 import com.zhiniu.pages.components.common.AppInput
+import com.zhiniu.pages.components.common.RoundIconButton
 import com.zhiniu.pages.components.common.Divider
-import com.zhiniu.pages.components.common.PrimaryButton
 import com.zhiniu.pages.components.common.SecondaryButton
 import com.zhiniu.pages.components.common.SectionHeader
 import com.tencent.kuikly.core.coroutines.launch
@@ -58,6 +59,10 @@ data class AiChatMessage(
     val progress: List<String> = emptyList(),
     val requestId: String = "",
 )
+
+// 与 WatchlistPage 共用的持久化键（AI 从本页改自选/预警时同步落 SP）
+private const val WATCHLIST_SP_KEY = "zhiniu.watchlist.symbols.v1"
+private const val ALERTS_SP_KEY = "zhiniu.alert.items.v1"
 
 @Page("AiResearch", supportInLocal = true)
 internal class AiResearchPage : AppBasePage() {
@@ -102,11 +107,79 @@ internal class AiResearchPage : AppBasePage() {
         }
     }
 
+    // ---------- AI 工具指令执行（⟦TOOL⟧ 协议：AI 操作 App，服务端已校验解析） ----------
+
+    private val prefs by lazy {
+        acquireModule<com.tencent.kuikly.core.module.SharedPreferencesModule>(com.tencent.kuikly.core.module.SharedPreferencesModule.MODULE_NAME)
+    }
+
+    /** 执行服务端校验过的指令并返回反馈块（指令无效时双保险跳过并如实说明）。 */
+    internal fun executeToolDirectives(tools: List<com.zhiniu.data.remote.AgentToolDirective>): List<AiBlock> {
+        val blocks = mutableListOf<AiBlock>()
+        for (tool in tools) {
+            if (!tool.isValid) continue
+            when (tool.name) {
+                "add_watchlist" -> {
+                    com.zhiniu.data.local.Watchlist.add(tool.symbol)
+                    prefs.setString(WATCHLIST_SP_KEY, com.zhiniu.data.local.Watchlist.serialize())
+                    blocks += AiBlock.ToolResult(
+                        title = "已加入自选",
+                        detail = "${tool.stockName.ifBlank { tool.symbol }}（${tool.symbol}）",
+                        action = "watchlist", actionLabel = "查看自选",
+                    )
+                }
+                "open_compare" -> {
+                    blocks += AiBlock.ToolResult(
+                        title = "对比已就绪",
+                        detail = "${tool.stockName.ifBlank { tool.symbol }} × ${tool.stockNameB.ifBlank { tool.symbolB }}",
+                        action = "compare:${tool.symbol}|${tool.symbolB}", actionLabel = "打开对比",
+                    )
+                }
+                "set_price_alert" -> {
+                    com.zhiniu.data.local.AlertStore.add(tool.symbol, tool.stockName, tool.alertOperator, tool.alertPrice)
+                    prefs.setString(ALERTS_SP_KEY, com.zhiniu.data.local.AlertStore.serialize())
+                    blocks += AiBlock.ToolResult(
+                        title = "预警已设置",
+                        detail = "${tool.stockName.ifBlank { tool.symbol }} ${if (tool.alertOperator == "above") "突破" else "跌破"} ${com.zhiniu.pages.components.fmt2(tool.alertPrice)}（自选页可查看/删除）",
+                        action = "alert", actionLabel = "查看预警",
+                    )
+                }
+            }
+        }
+        return blocks
+    }
+
+    /** 工具反馈卡按钮：watchlist/alert → 自选页；compare:symA|symB → 对比页。 */
+    internal fun handleToolAction(action: String) {
+        when {
+            action == "watchlist" || action == "alert" -> navWatchlist()
+            action.startsWith("compare:") -> {
+                val syms = action.removePrefix("compare:").split("|")
+                if (syms.size == 2) openComparePage(syms[0], syms[1])
+            }
+        }
+    }
+
+    /** 显式意图才进工具链路；双方对比需「和/与/vs」连接词（单标的「对比X」仍走研究管线）。 */
+    private fun isToolIntent(text: String): Boolean {
+        val watchlistIntent = text.contains("自选") && (text.contains("加") || text.contains("收藏") || text.contains("添加"))
+        val alertIntent = text.contains("预警") || text.contains("提醒我") || text.contains("报警")
+        val compareIntent = (text.contains("对比") || text.contains("比较")) &&
+            (text.contains("和") || text.contains("与") || text.contains("vs") || text.contains("VS") || text.contains("×"))
+        return watchlistIntent || alertIntent || compareIntent
+    }
+
     internal fun send(question: String) {
         val text = question.trim()
         if (text.isEmpty()) return
         messages.add(AiChatMessage("user", text = text))
         draft = ""
+        // 操作意图（加自选/设预警/双方对比）优先走带 ⟦TOOL⟧ 协议的通用问答——AI 直接操作 App；
+        // 注意「对比宁德时代」这类单标的表述仍走研究管线（open_compare 需要两只标的）。
+        if (isToolIntent(text)) {
+            sendGeneralQuestion(text)
+            return
+        }
         val target = repo.stockQuotes().firstOrNull {
             text.contains(it.name) || text.contains(it.code) ||
                 (it.pinyin.isNotBlank() && text.contains(it.pinyin, ignoreCase = true))
@@ -174,13 +247,16 @@ internal class AiResearchPage : AppBasePage() {
             }.getOrNull()
             if (!isPending(messageIndex, token)) return@launch
             if (reply != null) {
+                val toolBlocks = if (reply.isLlm) executeToolDirectives(reply.tools) else emptyList()
                 val header = if (reply.isLlm) {
                     AiBlock.Text("知牛 AI · 通用问答")
                 } else {
                     AiBlock.Risk("规则降级 · 未伪装模型", reply.content)
                 }
                 val body = if (reply.isLlm) markdownOf(reply.content) else emptyList()
-                messages[messageIndex] = AiChatMessage("ai", blocks = listOf(header) + body, streaming = false)
+                messages[messageIndex] = AiChatMessage(
+                    "ai", blocks = listOf(header) + body + toolBlocks, streaming = false,
+                )
             } else {
                 // 离线兜底：本地 Mock（内容确定性，无网络依赖）
                 revealLocalReply(MarketStore.aiService.chatReply(currentSessionId, text), messageIndex, token)
@@ -505,28 +581,30 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
             flex(1f); flexDirectionColumn()
             backgroundColor(colors.c(colors.pageBg))
         }
-        // 角色视图切换（TradingAgents 启发：Analyst / 辩论 / 风控）
+        // 角色视图切换（TradingAgents 启发：Analyst / 辩论 / 风控）；手机 = 胶囊，桌面 = 下划线
         View {
             attr {
-                height(40f); flexDirectionRow(); alignItemsCenter()
-                padding(left = host.chatSidePad())
+                height(44f); flexDirectionRow(); alignItemsCenter()
+                paddingLeft(host.chatSidePad()); paddingRight(host.chatSidePad())
                 borderBottom(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
             listOf("分析", "多空对抗", "风控").forEach { view ->
-                RoleTab(label = view, active = { host.roleView == view }) {
+                RoleTab(label = view, active = { host.roleView == view }, compact = host.isCompact()) {
                     host.roleView = view
                     host.selectRoleView(view)
                 }
             }
             View { attr { flex(1f) } }
             if (host.isCompact()) {
-                SecondaryButton("新建", height = 30f, icon = IconKind.CHAT) { host.newSession() }
-                View { attr { width(host.chatSidePad()) } }
+                // 手机：圆形图标按钮新建会话（对标移动端 IM 顶栏操作）
+                RoundIconButton(
+                    IconKind.CHAT, size = 15f, box = 30f,
+                    accessibilityLabel = "新建会话",
+                ) { host.newSession() }
             } else {
                 Text {
                     attr {
-                        marginRight(host.chatSidePad())
                         fontSize(AppTypography.fs11)
                         color(colors.c(colors.textTertiary))
                         text("多 Agent 辩论研究 · 来源可追溯")
@@ -571,34 +649,29 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
                         }
                     }
                     View { attr { height(18f) } }
-                    listOf(
+                    // 快捷问句：手机两列网格（对标移动端 AI 助手预设问题），桌面居中单列
+                    val quickQuestions = listOf(
                         "分析贵州茅台",
                         "分析宁德时代",
                         "解释 RSI 指标",
                         "结合日K分析五粮液",
-                    ).forEach { q ->
-                        View {
-                            attr {
-                                marginBottom(8f)
-                                padding(left = 14f, right = 14f, top = 9f, bottom = 9f)
-                                borderRadius(18f)
-                                border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
-                                backgroundColor(colors.c(colors.surface))
-                                cssClass("zn-click")
-                                highlightBackgroundColor(colors.ca(colors.textSecondary, 6))
-                                accessibility("发送问题 $q")
-                                accessibilityRole(AccessibilityRole.BUTTON)
-                                animate(ANIM_THEME, value = AppTheme.isDark)
-                            }
-                            event { click { host.send(q) } }
-                            Text {
-                                attr {
-                                    fontSize(AppTypography.fs13)
-                                    color(colors.c(colors.textSecondary)); text(q)
-                                    animate(ANIM_THEME, value = AppTheme.isDark)
+                    )
+                    if (host.isCompact()) {
+                        quickQuestions.chunked(2).forEach { pair ->
+                            View {
+                                attr { flexDirectionRow(); alignSelfStretch() }
+                                pair.forEach { q ->
+                                    View {
+                                        attr { flex(1f); padding(all = 3f) }
+                                        QuickQuestionChip(q, colors) { host.send(q) }
+                                    }
                                 }
+                                // 奇数行补位，保持两列等宽
+                                if (pair.size == 1) View { attr { flex(1f); padding(all = 3f) } }
                             }
                         }
+                    } else {
+                        quickQuestions.forEach { q -> QuickQuestionChip(q, colors) { host.send(q) } }
                     }
                 }
             }
@@ -649,6 +722,7 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
                                         block,
                                         onOpenStock = { sym -> host.openStock(sym) },
                                         onAsk = { q -> host.send(q) },
+                                        onToolAction = { action -> host.handleToolAction(action) },
                                     )
                                 }
                             }
@@ -664,7 +738,7 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
             attr {
                 backgroundColor(colors.c(colors.surface))
                 borderTop(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
-                padding(top = 12f, bottom = 12f + host.bottomNavInset(), left = host.chatSidePad(), right = host.chatSidePad())
+                padding(top = 12f, bottom = 12f, left = host.chatSidePad(), right = host.chatSidePad())
                 flexDirectionRow(); alignItemsCenter()
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
@@ -682,12 +756,48 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
                 onRef = { composerRef = it },
             )
             View { attr { width(8f) } }
-            PrimaryButton("发送", height = 36f, icon = IconKind.SEND) {
-                    val question = host.draft
-                    if (question.isNotBlank()) {
-                        host.send(question)
-                        composerRef?.view?.setText("")
-                    }
+            // 圆形发送按钮（对标移动端 IM Composer），无内容时禁用态
+            RoundIconButton(
+                IconKind.SEND, size = 16f, box = 38f,
+                enabled = host.draft.isNotBlank(),
+                accessibilityLabel = "发送问题",
+            ) {
+                val question = host.draft
+                if (question.isNotBlank()) {
+                    host.send(question)
+                    composerRef?.view?.setText("")
+                }
+            }
+        }
+    }
+}
+
+/** 快捷问句胶囊：36px 高圆角芯片（欢迎态）。 */
+private fun ViewContainer<*, *>.QuickQuestionChip(
+    q: String,
+    colors: com.zhiniu.pages.components.Palette,
+    onClick: () -> Unit,
+) {
+    View {
+        attr {
+            height(36f); allCenter()
+            paddingLeft(10f); paddingRight(10f)
+            marginTop(4f); marginBottom(4f)
+            borderRadius(18f)
+            border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+            backgroundColor(colors.c(colors.surface))
+            cssClass("zn-click")
+            highlightBackgroundColor(colors.ca(colors.textSecondary, 6))
+            accessibility("发送问题 $q")
+            accessibilityRole(AccessibilityRole.BUTTON)
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+        event { click { onClick() } }
+        Text {
+            attr {
+                fontSize(AppTypography.fs13); lines(1)
+                color(colors.c(colors.textSecondary)); text(q)
+                animate(ANIM_THEME, value = AppTheme.isDark)
             }
         }
     }
@@ -720,12 +830,45 @@ private fun ViewContainer<*, *>.AgentProgressRow(steps: List<String>) {
     }
 }
 
-/** 角色视图 Tab：文字 + 2px 底部指示器（TradingAgents 角色分工：Analyst/辩论/风控）；active 在 attr 内读取保持响应式。 */
-private fun ViewContainer<*, *>.RoleTab(label: String, active: () -> Boolean, onClick: () -> Unit) {
+/** 角色视图 Tab：手机 = 胶囊（触控友好），桌面 = 文字 + 2px 底部指示器；active 在 attr 内读取保持响应式。 */
+private fun ViewContainer<*, *>.RoleTab(label: String, active: () -> Boolean, compact: Boolean, onClick: () -> Unit) {
     val colors = AppTheme.colors
+    if (compact) {
+        View {
+            attr {
+                height(30f); paddingLeft(12f); paddingRight(12f); marginRight(8f)
+                allCenter()
+                borderRadius(15f)
+                backgroundColor(colors.c(if (active()) colors.surfaceHover else colors.pageBg))
+                border(
+                    Border(
+                        1f, BorderStyle.SOLID,
+                        colors.c(if (active()) colors.borderStrong else colors.border),
+                    )
+                )
+                accessibility(label)
+                accessibilityRole(AccessibilityRole.BUTTON)
+                accessibilityInfo(clickable = true, longClickable = false)
+                cssClass("zn-click")
+                highlightBackgroundColor(colors.ca(colors.textSecondary, 6))
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+            event { click { onClick() } }
+            Text {
+                attr {
+                    fontSize(AppTypography.fs13)
+                    fontWeight600(); lines(1)
+                    color(colors.c(if (active()) colors.textPrimary else colors.textSecondary))
+                    text(label)
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+            }
+        }
+        return
+    }
     View {
         attr {
-            height(40f); padding(left = 4f, right = 4f); marginRight(20f)
+            height(44f); padding(left = 4f, right = 4f); marginRight(20f)
             flexDirectionColumn(); alignItemsCenter(); justifyContentCenter()
             cssClass("zn-click")
         }
@@ -740,7 +883,7 @@ private fun ViewContainer<*, *>.RoleTab(label: String, active: () -> Boolean, on
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
         }
-        View { attr { height(4f) } }
+        View { attr { height(6f) } }
         View {
             attr {
                 height(2f); width(16f)

@@ -9,7 +9,9 @@ import com.tencent.kuikly.core.reactive.handler.observableList
 import com.zhiniu.base.BasePager
 import com.zhiniu.base.closeCurrentPage
 import com.zhiniu.base.openAiResearchPage
+import com.zhiniu.base.openComparePage
 import com.zhiniu.base.openMarketPage
+import com.zhiniu.base.openProfilePage
 import com.zhiniu.base.openStockDetail
 import com.zhiniu.base.openWatchlistPage
 import com.zhiniu.data.mock.MarketStore
@@ -20,7 +22,6 @@ import com.zhiniu.pages.components.AppTheme
 import com.zhiniu.pages.components.common.AppHeader
 import com.zhiniu.pages.components.common.BottomTabBar
 import com.zhiniu.pages.components.common.StockSearchOverlay
-import com.zhiniu.pages.components.common.ThemePopover
 import com.tencent.kuikly.core.coroutines.launch
 
 /** 页面公共基类（所有一级页面继承）。 */
@@ -33,7 +34,6 @@ internal abstract class AppBasePage : BasePager() {
     internal val searchRecent by observableList<StockQuote>()
     internal val searchHot by observableList<StockQuote>()
     internal val searchResults by observableList<StockQuote>()
-    internal var isThemePopoverVisible by observable(false)
     internal var gatewayOnline by observable(false)
     internal var agentReady by observable(false)
 
@@ -72,12 +72,7 @@ internal abstract class AppBasePage : BasePager() {
     internal fun isMedium(): Boolean = viewportWidth() <= 1024f
     internal fun safeTopInset(): Float = pageData.safeAreaInsets.top.coerceAtLeast(0f)
     internal fun safeBottomInset(): Float = pageData.safeAreaInsets.bottom.coerceAtLeast(0f)
-
-    /** 页面滚动内容底部避让：手机布局加底部 Tab 高度，桌面只避安全区。 */
-    internal fun bottomNavInset(): Float =
-        if (isCompact()) com.zhiniu.pages.components.common.BOTTOM_TAB_HEIGHT + safeBottomInset() else safeBottomInset()
     internal fun searchOverlayWidth(): Float = if (isCompact()) (viewportWidth() - 32f).coerceAtLeast(280f) else 520f
-    internal fun settingsOverlayWidth(): Float = if (isCompact()) (viewportWidth() - 32f).coerceAtLeast(280f) else 304f
     internal fun overlayLeft(width: Float): Float {
         val vw: Float = viewportWidth()
         val cw: Float = kotlin.math.min(vw, 1360f)
@@ -123,6 +118,7 @@ internal abstract class AppBasePage : BasePager() {
     internal fun navMarket() = openMarketPage()
     internal fun navAiResearch() = openAiResearchPage()
     internal fun navWatchlist() = openWatchlistPage()
+    internal fun navProfile() = openProfilePage()
     internal fun openStock(symbol: String) = openStockDetail(symbol)
     internal fun goBack() = closeCurrentPage()
 
@@ -148,6 +144,7 @@ internal fun ViewContainer<*, *>.renderBottomTab(host: AppBasePage, activeNav: S
         onNavMarket = { host.navMarket() },
         onNavWatchlist = { host.navWatchlist() },
         onNavAiResearch = { host.navAiResearch() },
+        onNavProfile = { host.navProfile() },
     )
 }
 
@@ -160,8 +157,8 @@ internal fun ViewContainer<*, *>.renderCommonOverlays(host: AppBasePage, activeN
         onNavMarket = { host.navMarket() },
         onNavAiResearch = { host.navAiResearch() },
         onNavWatchlist = { host.navWatchlist() },
+        onNavProfile = { host.navProfile() },
         onSearch = { host.isSearchVisible = true },
-        onTheme = { host.isThemePopoverVisible = !host.isThemePopoverVisible },
         onBack = if (showBack) { { host.goBack() } } else null,
     )
     // 手机布局的底部 Tab 由各页面在 body 末尾经 renderBottomTab 渲染（流式布局，ohos 兼容）
@@ -180,14 +177,5 @@ internal fun ViewContainer<*, *>.renderCommonOverlays(host: AppBasePage, activeN
             host.openStock(q.symbol)
         },
         onClose = { host.isSearchVisible = false },
-    )
-    ThemePopover(
-        visible = { host.isThemePopoverVisible },
-        left = host.overlayLeft(host.settingsOverlayWidth()),
-        width = host.settingsOverlayWidth(),
-        topInset = host.safeTopInset(),
-        gatewayOnline = { host.gatewayOnline },
-        agentReady = { host.agentReady },
-        onClose = { host.isThemePopoverVisible = false },
     )
 }

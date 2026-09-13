@@ -231,8 +231,13 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
         val sidePad: Float = pad + extra
     View {
         attr { padding(left = sidePad, right = sidePad) }
+        // ---- 顶部搜索栏（手机布局：对标移动端行情 App 首页大搜索框） ----
+        if (host.isCompact()) {
+            View { attr { height(12f) } }
+            MarketSearchBar { host.isSearchVisible = true }
+        }
         // ---- 标题区（72px） ----
-        View { attr { marginTop(28f) } }
+        View { attr { marginTop(if (host.isCompact()) 16f else 28f) } }
         View {
             attr { flexDirectionRow(); alignItemsCenter() }
             Text {
@@ -243,29 +248,40 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
                     animate(ANIM_THEME, value = AppTheme.isDark)
                 }
             }
-            View { attr { flex(1f) } }
-            Text {
-                attr {
-                    fontSize(AppTypography.fs12)
-                    color(colors.c(colors.textTertiary))
-                    text(
-                        if (host.isRankTab()) host.rankSource
-                        else if (host.isSectorTab()) host.sectorSource
-                        else host.marketSource + " · " + (host.marketUniverse.firstOrNull()?.time?.take(5)?.ifBlank { "最近更新" } ?: "最近更新")
-                    )
+            if (!host.isCompact()) {
+                View { attr { width(12f) } }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs13)
+                        color(colors.c(colors.textSecondary))
+                        text("沪深 A 股行情")
+                    }
                 }
             }
-        }
-        View { attr { height(4f) } }
-        Text {
-            attr {
-                fontSize(AppTypography.fs13)
-                color(colors.c(colors.textSecondary))
-                text("沪深 A 股行情")
-            }
+            View { attr { flex(1f) } }
+            // 数据源状态 chip：色点 + 短标签（实时=绿 / 快照=琥珀 / 同步中=灰），替代长拼接文本
+            SourceChip(
+                label = when {
+                    host.isRankTab() -> host.rankSource.substringAfter(" · ")
+                    host.isSectorTab() -> host.sectorSource.substringAfter(" · ")
+                    host.marketSource == "实时行情" -> "实时行情"
+                    host.marketSource == "同步中…" -> "同步中…"
+                    else -> "本地快照"
+                },
+                state = when {
+                    host.marketSource == "实时行情" || host.rankSource.endsWith("东方财富") || host.sectorSource.endsWith("东方财富") -> "live"
+                    host.marketSource == "同步中…" || host.rankSource.contains("同步") || host.sectorSource.contains("同步") -> "syncing"
+                    else -> "stale"
+                },
+            )
+            View { attr { width(8f) } }
+            IconButton(
+                IconKind.REFRESH, size = 15f, box = 32f,
+                accessibilityLabel = "刷新行情",
+            ) { host.refreshLiveQuotes() }
         }
         // ---- Market Pulse（92px） ----
-        View { attr { height(28f) } }
+        View { attr { height(if (host.isCompact()) 16f else 28f) } }
         MarketPulse(
             indices = if (host.liveIndices.isNotEmpty()) { host.liveIndices.toList() } else host.repo.indices(),
             breadth = host.repo.breadth(),
@@ -273,7 +289,7 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
             compact = host.isCompact(),
         )
         // ---- 工具条 28px 间距 ----
-        View { attr { height(28f) } }
+        View { attr { height(if (host.isCompact()) 16f else 28f) } }
         View {
             attr { flexDirectionColumn() }
             View {
@@ -296,10 +312,10 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
                         attr { flexDirectionRow(); alignItemsCenter() }
                         View {
                             attr {
-                                height(34f); padding(left = 10f, right = 8f)
-                                borderRadius(6f); flexDirectionRow(); alignItemsCenter()
-                                backgroundColor(colors.c(colors.surfaceSecondary))
-                                border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+                                height(32f); padding(left = 10f, right = 8f)
+                                borderRadius(16f); flexDirectionRow(); alignItemsCenter()
+                                backgroundColor(colors.c(if (host.sortMode != "默认排序") colors.surfaceHover else colors.surface))
+                                border(Border(1f, BorderStyle.SOLID, colors.c(if (host.sortMode != "默认排序") colors.borderStrong else colors.border)))
                                 accessibility("排序方式：${host.sortMode}")
                                 accessibilityRole(AccessibilityRole.BUTTON)
                                 accessibilityInfo(clickable = true, longClickable = false)
@@ -314,13 +330,22 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
                                 }
                                 host.refreshRows()
                             } }
-                            Text { attr { fontSize(AppTypography.fs13); lines(1); color(colors.c(colors.textPrimary)); text(host.sortMode) } }
+                            Icon(IconKind.FILTER_SORT, 12f)
                             View { attr { width(4f) } }
-                            Icon(if (host.sortMode == "默认排序") IconKind.FILTER_SORT else IconKind.CHEVRON_DOWN, 11f)
+                            Text {
+                                attr {
+                                    fontSize(AppTypography.fs13); lines(1)
+                                    color(colors.c(if (host.sortMode != "默认排序") colors.textPrimary else colors.textSecondary))
+                                    text(if (host.isCompact() && host.sortMode == "默认排序") "排序" else host.sortMode)
+                                }
+                            }
+                            if (!host.isCompact()) {
+                                Icon(if (host.sortMode == "默认排序") IconKind.CHEVRON_DOWN else IconKind.CHEVRON_UP, 10f)
+                            }
                         }
                         View { attr { width(8f) } }
                         IconButton(
-                            IconKind.FILTER, size = 14f, box = 34f, active = host.filterUpOnly,
+                            IconKind.FILTER, size = 14f, box = 32f, active = host.filterUpOnly,
                             accessibilityLabel = if (host.filterUpOnly) "取消只看上涨" else "只看上涨",
                         ) {
                             host.filterUpOnly = !host.filterUpOnly
@@ -328,7 +353,7 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
                         }
                         View { attr { width(8f) } }
                         if (!host.isCompact()) {
-                            SecondaryButton("字段", height = 34f, icon = IconKind.MORE) {
+                            SecondaryButton("字段", height = 32f, icon = IconKind.MORE) {
                                 host.isColumnPickerVisible = !host.isColumnPickerVisible
                             }
                             View { attr { width(8f) } }
@@ -336,12 +361,12 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
                     }
                 }
                 if (!host.isCompact()) {
-                    IconButton(IconKind.SEARCH, size = 14f, box = 34f, accessibilityLabel = "搜索股票") {
+                    IconButton(IconKind.SEARCH, size = 14f, box = 32f, accessibilityLabel = "搜索股票") {
                         host.isSearchVisible = true
                     }
                     View { attr { width(8f) } }
+                    SecondaryButton("刷新", height = 32f) { host.refreshLiveQuotes() }
                 }
-                SecondaryButton("刷新", height = 34f) { host.refreshLiveQuotes() }
             }
             // 字段选择器：内联芯片行（不是新浮层），勾选即生效（榜单/板块 Tab 不适用）
             vif({ !host.isCompact() && host.isColumnPickerVisible && !host.isRankTab() && !host.isSectorTab() }) {
@@ -415,6 +440,71 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
                     title = "没有符合条件的股票",
                     desc = "切换上方 Tab 或调整筛选条件",
                 )
+            }
+        }
+    }
+}
+
+/** 手机顶部搜索栏：大圆角胶囊（点击打开全屏搜索 Overlay，对标同花顺/雪球首页）。 */
+private fun ViewContainer<*, *>.MarketSearchBar(onClick: () -> Unit) {
+    val colors = AppTheme.colors
+    View {
+        attr {
+            height(38f); borderRadius(19f)
+            flexDirectionRow(); alignItemsCenter()
+            paddingLeft(14f); paddingRight(14f)
+            backgroundColor(colors.c(colors.surfaceSecondary))
+            border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+            accessibility("搜索股票名称、代码或拼音")
+            accessibilityRole(AccessibilityRole.BUTTON)
+            accessibilityInfo(clickable = true, longClickable = false)
+            cssClass("zn-click")
+            highlightBackgroundColor(colors.ca(colors.textSecondary, 6))
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+        event { click { onClick() } }
+        Icon(IconKind.SEARCH, 15f)
+        View { attr { width(8f) } }
+        Text {
+            attr {
+                flex(1f)
+                fontSize(AppTypography.fs13)
+                color(colors.c(colors.textTertiary))
+                text("搜索股票名称 / 代码 / 拼音")
+            }
+        }
+    }
+}
+
+/** 数据源状态 chip：色点 + 短标签（解决原长文本在手机上截断的问题）。 */
+private fun ViewContainer<*, *>.SourceChip(label: String, state: String) {
+    val colors = AppTheme.colors
+    val dotColor = when (state) {
+        "live" -> colors.down      // 绿 = 实时（跌色系=绿，A股语义绿=健康在线）
+        "syncing" -> colors.textTertiary
+        else -> colors.ma5         // 琥珀 = 本地快照
+    }
+    View {
+        attr {
+            height(24f); paddingLeft(8f); paddingRight(9f)
+            borderRadius(12f); flexDirectionRow(); alignItemsCenter()
+            backgroundColor(colors.c(colors.surfaceSecondary))
+            accessibility("数据源：$label")
+            accessibilityRole(AccessibilityRole.TEXT)
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+        View {
+            attr {
+                width(6f); height(6f); borderRadius(3f)
+                backgroundColor(colors.c(dotColor))
+            }
+        }
+        View { attr { width(5f) } }
+        Text {
+            attr {
+                fontSize(AppTypography.fs11); lines(1)
+                color(colors.c(colors.textSecondary)); text(label)
+                animate(ANIM_THEME, value = AppTheme.isDark)
             }
         }
     }

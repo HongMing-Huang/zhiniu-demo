@@ -32,6 +32,7 @@ fun ViewContainer<*, *>.AiBlockView(
     block: AiBlock,
     onOpenStock: (String) -> Unit,
     onAsk: (String) -> Unit,
+    onToolAction: (String) -> Unit = {},
 ) {
     when (block) {
         is AiBlock.Text -> AiTextBlock(block.content)
@@ -44,6 +45,59 @@ fun ViewContainer<*, *>.AiBlockView(
         is AiBlock.TradeAdvice -> AiTradeAdviceCard(block)
         is AiBlock.RiskLevel -> AiRiskLevelChip(block)
         is AiBlock.KLine -> AiKLineCard(block)
+        is AiBlock.ToolResult -> AiToolResultCard(block) { onToolAction(it) }
+    }
+}
+
+/** AI 工具指令执行反馈卡（AI 操作 App 的可见证据：已完成什么、去哪里查看）。 */
+private fun ViewContainer<*, *>.AiToolResultCard(block: AiBlock.ToolResult, onAction: (String) -> Unit) {
+    val colors = AppTheme.colors
+    View {
+        attr {
+            flexDirectionRow(); alignItemsCenter()
+            marginTop(8f); borderRadius(AppRadius.radius6)
+            padding(left = 12f, right = 8f, top = 9f, bottom = 9f)
+            backgroundColor(colors.ca(colors.aiAccent, 12))
+            border(Border(1f, BorderStyle.SOLID, colors.ca(colors.aiAccent, 40)))
+            cssClass("zn-card")
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+        Icon(IconKind.CHECK, 13f)
+        View { attr { width(8f) } }
+        View {
+            attr { flex(1f); flexDirectionColumn() }
+            Text {
+                attr {
+                    fontSize(AppTypography.fs13); fontWeightSemiBold()
+                    color(colors.c(colors.textPrimary)); text(block.title)
+                }
+            }
+            if (block.detail.isNotBlank()) {
+                Text {
+                    attr {
+                        marginTop(1f); fontSize(AppTypography.fs11)
+                        color(colors.c(colors.textSecondary)); text(block.detail)
+                    }
+                }
+            }
+        }
+        if (block.action.isNotBlank() && block.actionLabel.isNotBlank()) {
+            View {
+                attr {
+                    height(26f); borderRadius(13f); marginLeft(8f)
+                    padding(left = 10f, right = 10f); allCenter()
+                    backgroundColor(colors.c(colors.surface)); cssClass("zn-click")
+                    accessibility(block.actionLabel)
+                }
+                event { click { onAction(block.action) } }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs11); fontWeightMedium()
+                        color(colors.c(colors.textSecondary)); text(block.actionLabel)
+                    }
+                }
+            }
+        }
     }
 }
 

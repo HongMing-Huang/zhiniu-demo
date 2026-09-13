@@ -1,11 +1,15 @@
 import unittest
+from unittest import mock
 from unittest.mock import AsyncMock, patch
 
 from app import store, ta_agents
 from app.agent import (
+    _extract_tool_directives,
     _levels_from_kline,
+    _process_chat_tools,
     _risk_flags,
     _technical_summary,
+    _validate_tool_directive,
     run_chat,
     run_compare,
     run_insight,
@@ -462,3 +466,116 @@ class TestStreamCompare(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(frames[-1]["final"])
         result_frame = next(f for f in frames if f["type"] == "result")
         self.assertEqual(len(result_frame["result"]["stocks"]), 2)
+
+
+class TestChatToolProtocol(unittest.IsolatedAsyncioTestCase):
+    async def test_extract_directives_supports_marker_variants(self):
+        text, tools = _extract_tool_directives(
+            "好的，已为你加入自选。\n"
+            "⟦TOOL⟧{\"name\":\"add_watchlist\",\"args\":{\"symbol\":\"sz300750\"}}\n"
+            "【TOOL】{\"name\":\"set_price_alert\",\"args\":{\"symbol\":\"sz300750\",\"operator\":\"below\",\"price\":300}}\n"
+            "```[TOOL]{\"name\":\"open_compare\",\"args\":{\"symbol_a\":\"sh600519\",\"symbol_b\":\"sz300750\"}}```"
+        )
+        self.assertEqual(text, "好的，已为你加入自选。")
+        self.assertEqual([t["name"] for t in tools], ["add_watchlist", "set_price_alert", "open_compare"])
+
+    async def test_extract_keeps_plain_text(self):
+        text, tools = _extract_tool_directives("RSI 是动量指标，70 以上超买。\n第二行也不会误伤。")
+        self.assertEqual(len(tools), 0)
+        self.assertIn("RSI", text)
+
+    async def test_direct_symbol_and_alias_pass_validation(self):
+        text, raw = _extract_tool_directives(
+            "完成。\n⟦TOOL⟧{\"name\":\"add_to_watchlist\",\"args\":{\"symbol\":\"SH600519\"}}"
+        )
+        tool, note = await _validate_tool_directive(raw[0], "")
+        self.assertEqual(tool["name"], "add_watchlist")       # 别名归一
+        self.assertEqual(tool["args"]["symbol"], "sh600519")  # 大写归一
+
+    async def test_name_resolved_via_real_search_only(self):
+        async def fake_search(keyword, count=1):
+            return {"items": [{"symbol": "sz300750", "name": "宁德时代"}]}
+
+        text, raw = _extract_tool_directives('⟦TOOL⟧{"name":"add_watchlist","args":{"name":"宁德时代"}}')
+        with mock.patch("app.quote.quote_search", new=fake_search):
+            tool, note = await _validate_tool_directive(raw[0], "")
+        self.assertEqual(tool["args"]["symbol"], "sz300750")
+        self.assertEqual(tool["args"]["name"], "宁德时代")
+
+        # 搜索无结果 → 拒绝执行并给出人话说明（不编造代码）
+        async def empty_search(keyword, count=1):
+            return {"items": []}
+
+        with mock.patch("app.quote.quote_search", new=empty_search):
+            tool, note = await _validate_tool_directive(raw[0], "")
+        self.assertIsNone(tool)
+        self.assertIn("未执行", note)
+
+    async def test_alert_requires_direction_and_price(self):
+        base = '{"name":"set_price_alert","args":%s}'
+        for args, should_pass in [
+            ('{"symbol":"sz300750","operator":"跌破","price":300}', True),
+            ('{"symbol":"sz300750","operator":"above","price":320.5}', True),
+            ('{"symbol":"sz300750","price":300}', False),            # 无方向
+            ('{"symbol":"sz300750","operator":"below","price":"高"}', False),  # 价格非数字
+        ]:
+            _, raw = _extract_tool_directives("⟦TOOL⟧" + base % args)
+            tool, note = await _validate_tool_directive(raw[0], "")
+            self.assertEqual(tool is not None, should_pass, args)
+
+    async def test_unknown_tool_dropped_silently(self):
+        _, raw = _extract_tool_directives('⟦TOOL⟧{"name":"delete_everything","args":{}}')
+        tool, note = await _validate_tool_directive(raw[0], "")
+        self.assertIsNone(tool)
+        self.assertEqual(note, "")
+
+    async def test_run_chat_returns_tools_and_clean_content(self):
+        async def fake_gateway_chat(**_kw):
+            yield {"id": "chat-t", "provider": "gemai", "model": "m",
+                   "choices": [{"message": {"content": "已加入自选。\n⟦TOOL⟧{\"name\":\"add_watchlist\",\"args\":{\"symbol\":\"sz300750\"}}"}}]}
+
+        with mock.patch("app.agent.gateway.chat_completions", new=fake_gateway_chat):
+            result = await run_chat(question="把宁德时代加自选")
+        self.assertEqual(result["mode"], "llm")
+        self.assertNotIn("TOOL", result["content"])
+        self.assertEqual(len(result["tools"]), 1)
+        self.assertEqual(result["tools"][0]["args"]["symbol"], "sz300750")
+
+
+class TestStreamChatTools(unittest.IsolatedAsyncioTestCase):
+    async def _collect(self, **kwargs):
+        frames = []
+        async for frame in stream_chat(**kwargs):
+            frames.append(frame)
+        return frames
+
+    async def test_directive_line_not_streamed_and_tool_frame_emitted(self):
+        async def fake_gateway_chat(**_kw):
+            # 指令行会被拆成多个 delta（含 marker 截断），验证缓冲逻辑
+            yield {"id": "c1", "provider": "gemai", "model": "m", "choices": [{"delta": {"content": "已为你设置。"}}]}
+            yield {"id": "c1", "provider": "gemai", "model": "m", "choices": [{"delta": {"content": "\n⟦TOO"}}]}
+            yield {"id": "c1", "provider": "gemai", "model": "m", "choices": [{"delta": {"content": "L⟧{\"name\":\"add_watchlist\",\"args\":{\"symbol\":\"sz300750\"}}"}}]}
+
+        with mock.patch("app.agent.gateway.chat_completions", new=fake_gateway_chat):
+            frames = await self._collect(question="宁德时代加自选")
+        deltas = "".join(f["content"] for f in frames if f["type"] == "delta")
+        self.assertNotIn("TOOL", deltas)                      # 指令不作为正文下发
+        self.assertNotIn("⟦", deltas)
+        tool_frames = [f for f in frames if f["type"] == "tool"]
+        self.assertEqual(len(tool_frames), 1)
+        self.assertEqual(tool_frames[0]["name"], "add_watchlist")
+        final = frames[-1]
+        self.assertEqual(final["type"], "chat_finished")
+        self.assertEqual(final["mode"], "llm")
+        self.assertNotIn("TOOL", final["content"])
+        self.assertEqual(final["tools"][0]["args"]["symbol"], "sz300750")
+
+    async def test_no_directive_flow_unchanged(self):
+        async def fake_gateway_chat(**_kw):
+            yield {"id": "c2", "provider": "gemai", "model": "m",
+                   "choices": [{"delta": {"content": "RSI 是动量指标。"}, "finish_reason": "stop"}]}
+
+        with mock.patch("app.agent.gateway.chat_completions", new=fake_gateway_chat):
+            frames = await self._collect(question="解释 RSI")
+        self.assertEqual([f["type"] for f in frames if f["type"] != "delta"], ["chat_started", "chat_finished"])
+        self.assertEqual(frames[-1]["tools"], [])

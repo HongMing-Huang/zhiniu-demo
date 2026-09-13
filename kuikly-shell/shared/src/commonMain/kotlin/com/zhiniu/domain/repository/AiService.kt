@@ -40,6 +40,14 @@ sealed class AiBlock {
 
     /** 对话内迷你走势（服务端返回的近 60 根收盘价）。 */
     data class KLine(val closes: List<Double>) : AiBlock()
+
+    /** AI 工具指令执行反馈（⟦TOOL⟧ 协议：加自选/拉起对比/设预警）。action ∈ watchlist/compare/alert。 */
+    data class ToolResult(
+        val title: String,
+        val detail: String,
+        val action: String = "",
+        val actionLabel: String = "",
+    ) : AiBlock()
 }
 
 /** 指标组内单行。 */

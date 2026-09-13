@@ -27,6 +27,7 @@ import com.zhiniu.data.remote.GatewayMarketClient
 import com.zhiniu.data.remote.MarketNewsItem
 import com.zhiniu.domain.model.Candle
 import com.zhiniu.base.openAiResearchPage
+import com.zhiniu.base.openComparePage
 import com.zhiniu.domain.model.StockFundamentals
 import com.zhiniu.domain.repository.AiInsightFundamentals
 import com.zhiniu.domain.model.StockQuote
@@ -234,6 +235,37 @@ internal class StockDetailPage : AppBasePage() {
                 else -> " · 规则降级"
             }
             if (pendingIndex < aiChat.size) aiChat[pendingIndex] = AiPanelChatLine("ai", answer + mode)
+            // ⟦TOOL⟧ 工具指令（AI 操作 App）：本页至少支持加自选/设预警（标的锚定当前详情）
+            if (reply != null && reply.isLlm) {
+                executeFollowUpTools(reply.tools)
+            }
+        }
+    }
+
+    /** 追问产生的工具指令在本页执行：加自选 / 设预警即时生效，对比则直接拉起对比页。 */
+    private fun executeFollowUpTools(tools: List<com.zhiniu.data.remote.AgentToolDirective>) {
+        val prefs = runCatching {
+            acquireModule<com.tencent.kuikly.core.module.SharedPreferencesModule>(com.tencent.kuikly.core.module.SharedPreferencesModule.MODULE_NAME)
+        }.getOrNull()
+        for (tool in tools) {
+            if (!tool.isValid) continue
+            when (tool.name) {
+                "add_watchlist" -> {
+                    com.zhiniu.data.local.Watchlist.add(tool.symbol)
+                    if (tool.symbol == (quote()?.symbol ?: "")) watchlisted = true
+                    prefs?.setString("zhiniu.watchlist.symbols.v1", com.zhiniu.data.local.Watchlist.serialize())
+                    aiChat.add(AiPanelChatLine("ai", "✓ 已将 ${tool.stockName.ifBlank { tool.symbol }} 加入自选"))
+                }
+                "set_price_alert" -> {
+                    com.zhiniu.data.local.AlertStore.add(tool.symbol, tool.stockName, tool.alertOperator, tool.alertPrice)
+                    prefs?.setString("zhiniu.alert.items.v1", com.zhiniu.data.local.AlertStore.serialize())
+                    aiChat.add(AiPanelChatLine("ai", "✓ 预警已设置：${tool.stockName.ifBlank { tool.symbol }} ${if (tool.alertOperator == "above") "突破" else "跌破"} ${tool.alertPrice}（自选页可管理）"))
+                }
+                "open_compare" -> {
+                    aiChat.add(AiPanelChatLine("ai", "✓ 正在打开对比页…"))
+                    this.openComparePage(tool.symbol, tool.symbolB)
+                }
+            }
         }
     }
 

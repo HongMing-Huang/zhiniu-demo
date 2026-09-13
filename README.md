@@ -39,6 +39,7 @@
 | Markdown 渲染 | 自研 commonMain Markdown 解析器（标题/列表/表格/代码块/引用/行内加粗），`RichText+Span` 官方组件渲染，commonTest 单测覆盖 |
 | AI 诊股抽屉 | 个股页一键 AI 分析：**服务端 LLM 诊股**（`/agent/insight`，1h 缓存 + 同标的并发去重），输出结论 / 估值 / 业绩 / 趋势 / 信号 / 量能 / **买卖观察区间** / **风险五档**；买卖区间由服务端校验（必须落在支撑/压力 ±3% 内，否则丢弃不编造），LLM 不可用时规则降级明示 |
 | 流式 AI 问答 | 通用问答走 `/agent/chat/stream` typed SSE 逐字上屏（打字机）；双股对比页 `/agent/compare/stream` 流式归纳（stronger 标记 + 双列依据 + 结论），阶段进度可见 |
+| **AI Agent 工具指令** | 对知牛说「把比亚迪加到自选」「宁德时代跌破 300 提醒我」「对比茅台和宁德」——模型按 ⟦TOOL⟧ 协议输出指令，服务端白名单校验 + **名称→代码经东财搜索真实解析（拒绝编造）** + 无指令强重试，客户端执行并回执反馈卡；价格预警落 SharedPreferences 持久化，自选页可管理、真实行情到达自动标记「已触发」 |
 | 全市场搜索 | `/quote/search` 东财 suggest（名称/代码/拼音缩写，过滤港美股/指数/基金），离线回退本地快照；结果批量补真实报价，无价不展示假数据 |
 | 图表交互 | Kuikly Canvas 自绘蜡烛图 / 量柱 / MACD / RSI，按钮 + 滚轮 + 拖拽 + 捏合缩放，十字线 OHLCV 联动 |
 | 完整状态机 | Idle / Loading 骨架 / Success / Empty / Error 重试 / Stale 六态覆盖 |

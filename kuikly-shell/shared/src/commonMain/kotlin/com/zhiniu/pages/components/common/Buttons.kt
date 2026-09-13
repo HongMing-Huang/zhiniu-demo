@@ -162,6 +162,35 @@ fun ViewContainer<*, *>.IconButton(
     }
 }
 
+/** 圆形主色图标按钮（Composer 发送 / 移动端主操作），禁用态降不透明度。 */
+fun ViewContainer<*, *>.RoundIconButton(
+    kind: IconKind,
+    size: Float = 17f,
+    box: Float = 38f,
+    enabled: Boolean = true,
+    accessibilityLabel: String = kind.name,
+    onClick: () -> Unit,
+) {
+    val colors = AppTheme.colors
+    View {
+        attr {
+            width(box); height(box)
+            borderRadius(box / 2f)
+            allCenter()
+            backgroundColor(colors.c(colors.textPrimary))
+            opacity(if (enabled) 1f else 0.4f)
+            highlightBackgroundColor(colors.ca(colors.textSecondary, 18))
+            accessibility(if (enabled) accessibilityLabel else "$accessibilityLabel（不可用）")
+            accessibilityRole(AccessibilityRole.BUTTON)
+            accessibilityInfo(clickable = enabled, longClickable = false)
+            cssClass("zn-iconbtn zn-click")
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+        event { click { if (enabled) onClick() } }
+        Icon(kind, size)
+    }
+}
+
 
 /** 自选按钮：星标切换（调用方传入收藏切换逻辑）。 */
 fun ViewContainer<*, *>.FavoriteButton(active: () -> Boolean, height: Float = 34f, onToggle: () -> Unit) {

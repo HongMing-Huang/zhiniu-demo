@@ -24,6 +24,13 @@ internal fun Pager.openAiResearchPage(question: String) =
 
 internal fun Pager.openWatchlistPage() = openZhiniuPage("Watchlist")
 
+/** 「我的」页（用户卡 / 外观偏好 / 服务状态 / 关于）。 */
+internal fun Pager.openProfilePage() = openZhiniuPage("Profile")
+
+/** 拉起双股对比页（AI 工具指令 open_compare / 快捷入口）。 */
+internal fun Pager.openComparePage(symbolA: String, symbolB: String) =
+    openZhiniuPage("Compare", mapOf("symbolA" to symbolA, "symbolB" to symbolB))
+
 /** 关闭当前页（H5 SPA 下等价浏览器 Back，返回上一页并恢复滚动位置）。 */
 internal fun Pager.closeCurrentPage() {
     acquireModule<RouterModule>(RouterModule.MODULE_NAME).closePage()

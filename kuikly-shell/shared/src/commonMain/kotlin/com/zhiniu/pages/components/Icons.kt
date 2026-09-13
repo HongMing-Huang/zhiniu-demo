@@ -30,7 +30,11 @@ enum class IconKind(val asset: String) {
     ERROR("icons/error-triangle.png"),
     CHAT("icons/chat-message.png"),
     DATA("icons/data-display.png"),
-    USER("icons/user-circle.png");
+    USER("icons/user-circle.png"),
+    REFRESH("icons/refresh.png"),
+    BELL("icons/bell.png"),
+    INFO("icons/info.png"),
+    SETTING("icons/setting.png");
 }
 
 /**
