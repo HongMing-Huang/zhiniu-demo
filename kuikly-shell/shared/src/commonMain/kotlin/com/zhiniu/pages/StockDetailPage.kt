@@ -441,9 +441,12 @@ private fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.z
                     flexDirectionRow(); alignItemsCenter()
                     padding(top = 6f, bottom = 6f)
                 }
-                rowItems.forEach { m ->
+                rowItems.forEachIndexed { mi, m ->
                     View {
-                        attr { flex(1f); flexDirectionRow(); alignItemsCenter() }
+                        attr {
+                            flex(1f); flexDirectionRow(); alignItemsCenter()
+                            if (mi == 0) paddingRight(24f)
+                        }
                         Text {
                             attr {
                                 fontSize(AppTypography.fs12)
