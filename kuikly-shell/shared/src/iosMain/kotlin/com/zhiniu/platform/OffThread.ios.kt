@@ -22,6 +22,7 @@ private suspend fun hopWait(ms: Int) = suspendCoroutine { cont ->
 }
 
 private var pollSeq = 0
+private const val MAX_HOPS = 400 // 30ms × 400 ≈ 12s 上限，防页面销毁后 timer 取消导致挂死
 
 internal actual suspend fun <T> runOffMainThread(block: suspend () -> T): T {
     val box = AtomicReference<Result<T>?>(null)
@@ -30,7 +31,15 @@ internal actual suspend fun <T> runOffMainThread(block: suspend () -> T): T {
     worker.executeAfter(0L) {
         box.value = runCatching { runBlocking { block() } }
     }
-    while (box.value == null) hopWait(30)
+    var hops = 0
+    while (box.value == null) {
+        hops += 1
+        if (hops > MAX_HOPS) {
+            box.value = Result.failure(RuntimeException("off-thread timeout"))
+            break
+        }
+        hopWait(30)
+    }
     worker.requestTermination(processScheduledJobs = false)
     return box.value!!.getOrThrow()
 }

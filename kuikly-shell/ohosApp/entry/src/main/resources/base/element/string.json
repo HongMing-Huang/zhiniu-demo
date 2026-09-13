@@ -2,15 +2,15 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "Kuikly Entry Module"
+      "value": "知牛"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "Kuikly Entry Ability"
+      "value": "知牛"
     },
     {
       "name": "EntryAbility_label",
-      "value": "Kuikly"
+      "value": "知牛"
     }
   ]
 }
