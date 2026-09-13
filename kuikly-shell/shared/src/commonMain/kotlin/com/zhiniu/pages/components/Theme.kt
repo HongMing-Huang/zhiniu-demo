@@ -16,6 +16,14 @@ enum class ThemeMode(val label: String) {
     SYSTEM("跟随系统"), LIGHT("浅色"), DARK("深色"),
 }
 
+/** 外观偏好持久化键（SharedPreferences 值 = ThemeMode 枚举名）。
+ *  「我的」页三段式/快捷切换与 AI 指令 set_appearance 共用，保证单一事实源。 */
+internal const val THEME_MODE_SP_KEY = "zhiniu.prefs.theme-mode.v1"
+
+/** 涨跌配色持久化键（"1" = 绿涨红跌反转）。
+ *  「我的」页双段胶囊与 AI 指令 set_color_mode 共用。 */
+internal const val UPDOWN_SP_KEY = "zhiniu.prefs.swap-updown.v1"
+
 // ---------- 排版 / 间距 / 圆角 / 尺寸 ----------
 object AppTypography {
     const val fs32 = 32f
@@ -212,6 +220,10 @@ object AppTheme {
     var swapUpDon by observable(false)
     val colors: AppColors get() = AdaptiveColors
 
+    /** 外观持久化钩子：首页/我的页 created 时注入（写 SharedPreferences），
+     *  让「我的」页切换与 AI 指令 set_appearance 共用同一落盘路径。 */
+    internal var persistHook: ((ThemeMode) -> Unit)? = null
+
     fun start() {
         systemDark = systemPrefersDark()
         applyDark(resolvedDark())
@@ -231,6 +243,11 @@ object AppTheme {
     fun applyMode(m: ThemeMode) {
         mode = m
         applyDark(if (m != ThemeMode.SYSTEM) resolve(m) else systemDark)
+    }
+    /** 切换外观并落盘（浅色/深色/跟随系统；重启后恢复）。 */
+    fun applyModePersisted(m: ThemeMode) {
+        applyMode(m)
+        persistHook?.invoke(m)
     }
     private fun applyDark(v: Boolean) { isDark = v; applyHostTheme(v) }
     private var themeWatchRegistered = false

@@ -83,6 +83,21 @@ typedef struct {
 } libshared_kref_kotlin_Function1;
 typedef struct {
   libshared_KNativePtr pinned;
+} libshared_kref_com_zhiniu_data_local_ChatRecord;
+typedef struct {
+  libshared_KNativePtr pinned;
+} libshared_kref_com_zhiniu_data_local_ChatArchiveSession;
+typedef struct {
+  libshared_KNativePtr pinned;
+} libshared_kref_com_zhiniu_data_local_ChatArchive;
+typedef struct {
+  libshared_KNativePtr pinned;
+} libshared_kref_com_zhiniu_data_local_ViewHistory;
+typedef struct {
+  libshared_KNativePtr pinned;
+} libshared_kref_com_zhiniu_data_local_HistoryItem;
+typedef struct {
+  libshared_KNativePtr pinned;
 } libshared_kref_com_zhiniu_data_local_Watchlist;
 typedef struct {
   libshared_KNativePtr pinned;
@@ -120,6 +135,9 @@ typedef struct {
 typedef struct {
   libshared_KNativePtr pinned;
 } libshared_kref_com_zhiniu_data_remote_AgentStage;
+typedef struct {
+  libshared_KNativePtr pinned;
+} libshared_kref_com_zhiniu_data_remote_AgentVerdict;
 typedef struct {
   libshared_KNativePtr pinned;
 } libshared_kref_com_zhiniu_data_remote_AgentChatResult;
@@ -315,6 +333,9 @@ typedef struct {
 typedef struct {
   libshared_KNativePtr pinned;
 } libshared_kref_com_zhiniu_domain_repository_AiBlock_KLine;
+typedef struct {
+  libshared_KNativePtr pinned;
+} libshared_kref_com_zhiniu_domain_repository_AiBlock_Verdict;
 typedef struct {
   libshared_KNativePtr pinned;
 } libshared_kref_com_zhiniu_domain_repository_AiBlock_ToolResult;
@@ -601,6 +622,80 @@ typedef struct {
               } AlertStore;
               struct {
                 libshared_KType* (*_type)(void);
+                libshared_kref_com_zhiniu_data_local_ChatRecord (*ChatRecord)(const char* role, const char* text, const char* toolTitle, const char* toolDetail, const char* toolAction, libshared_KBoolean degraded, const char* verdictRisk, const char* verdictAction);
+                libshared_KBoolean (*get_degraded)(libshared_kref_com_zhiniu_data_local_ChatRecord thiz);
+                const char* (*get_role)(libshared_kref_com_zhiniu_data_local_ChatRecord thiz);
+                const char* (*get_text)(libshared_kref_com_zhiniu_data_local_ChatRecord thiz);
+                const char* (*get_toolAction)(libshared_kref_com_zhiniu_data_local_ChatRecord thiz);
+                const char* (*get_toolDetail)(libshared_kref_com_zhiniu_data_local_ChatRecord thiz);
+                const char* (*get_toolTitle)(libshared_kref_com_zhiniu_data_local_ChatRecord thiz);
+                const char* (*get_verdictAction)(libshared_kref_com_zhiniu_data_local_ChatRecord thiz);
+                const char* (*get_verdictRisk)(libshared_kref_com_zhiniu_data_local_ChatRecord thiz);
+                const char* (*component1)(libshared_kref_com_zhiniu_data_local_ChatRecord thiz);
+                const char* (*component2)(libshared_kref_com_zhiniu_data_local_ChatRecord thiz);
+                const char* (*component3)(libshared_kref_com_zhiniu_data_local_ChatRecord thiz);
+                const char* (*component4)(libshared_kref_com_zhiniu_data_local_ChatRecord thiz);
+                const char* (*component5)(libshared_kref_com_zhiniu_data_local_ChatRecord thiz);
+                libshared_KBoolean (*component6)(libshared_kref_com_zhiniu_data_local_ChatRecord thiz);
+                const char* (*component7)(libshared_kref_com_zhiniu_data_local_ChatRecord thiz);
+                const char* (*component8)(libshared_kref_com_zhiniu_data_local_ChatRecord thiz);
+                libshared_kref_com_zhiniu_data_local_ChatRecord (*copy)(libshared_kref_com_zhiniu_data_local_ChatRecord thiz, const char* role, const char* text, const char* toolTitle, const char* toolDetail, const char* toolAction, libshared_KBoolean degraded, const char* verdictRisk, const char* verdictAction);
+                libshared_KBoolean (*equals)(libshared_kref_com_zhiniu_data_local_ChatRecord thiz, libshared_kref_kotlin_Any other);
+                libshared_KInt (*hashCode)(libshared_kref_com_zhiniu_data_local_ChatRecord thiz);
+                const char* (*toString)(libshared_kref_com_zhiniu_data_local_ChatRecord thiz);
+              } ChatRecord;
+              struct {
+                libshared_KType* (*_type)(void);
+                libshared_kref_com_zhiniu_data_local_ChatArchiveSession (*ChatArchiveSession)(const char* id, const char* title, const char* createdAt, libshared_kref_kotlin_collections_List records);
+                const char* (*get_createdAt)(libshared_kref_com_zhiniu_data_local_ChatArchiveSession thiz);
+                const char* (*get_id)(libshared_kref_com_zhiniu_data_local_ChatArchiveSession thiz);
+                libshared_kref_kotlin_collections_List (*get_records)(libshared_kref_com_zhiniu_data_local_ChatArchiveSession thiz);
+                const char* (*get_title)(libshared_kref_com_zhiniu_data_local_ChatArchiveSession thiz);
+                const char* (*component1)(libshared_kref_com_zhiniu_data_local_ChatArchiveSession thiz);
+                const char* (*component2)(libshared_kref_com_zhiniu_data_local_ChatArchiveSession thiz);
+                const char* (*component3)(libshared_kref_com_zhiniu_data_local_ChatArchiveSession thiz);
+                libshared_kref_kotlin_collections_List (*component4)(libshared_kref_com_zhiniu_data_local_ChatArchiveSession thiz);
+                libshared_kref_com_zhiniu_data_local_ChatArchiveSession (*copy)(libshared_kref_com_zhiniu_data_local_ChatArchiveSession thiz, const char* id, const char* title, const char* createdAt, libshared_kref_kotlin_collections_List records);
+                libshared_KBoolean (*equals)(libshared_kref_com_zhiniu_data_local_ChatArchiveSession thiz, libshared_kref_kotlin_Any other);
+                libshared_KInt (*hashCode)(libshared_kref_com_zhiniu_data_local_ChatArchiveSession thiz);
+                const char* (*toString)(libshared_kref_com_zhiniu_data_local_ChatArchiveSession thiz);
+              } ChatArchiveSession;
+              struct {
+                libshared_KType* (*_type)(void);
+                libshared_kref_com_zhiniu_data_local_ChatArchive (*_instance)();
+                libshared_kref_com_zhiniu_data_local_ChatRecord (*aiRecord)(libshared_kref_com_zhiniu_data_local_ChatArchive thiz, libshared_kref_kotlin_collections_List blocks);
+                const char* (*aiTextOf)(libshared_kref_com_zhiniu_data_local_ChatArchive thiz, libshared_kref_kotlin_collections_List blocks);
+                libshared_kref_kotlin_collections_List (*blocksOf)(libshared_kref_com_zhiniu_data_local_ChatArchive thiz, libshared_kref_com_zhiniu_data_local_ChatRecord record);
+                libshared_kref_kotlin_collections_List (*deserialize)(libshared_kref_com_zhiniu_data_local_ChatArchive thiz, const char* raw);
+                const char* (*serialize)(libshared_kref_com_zhiniu_data_local_ChatArchive thiz, libshared_kref_kotlin_collections_List sessions);
+              } ChatArchive;
+              struct {
+                libshared_KType* (*_type)(void);
+                libshared_kref_com_zhiniu_data_local_ViewHistory (*_instance)();
+                void (*clear)(libshared_kref_com_zhiniu_data_local_ViewHistory thiz);
+                void (*deserialize)(libshared_kref_com_zhiniu_data_local_ViewHistory thiz, const char* text);
+                libshared_kref_kotlin_collections_List (*items)(libshared_kref_com_zhiniu_data_local_ViewHistory thiz);
+                void (*record)(libshared_kref_com_zhiniu_data_local_ViewHistory thiz, const char* symbol, const char* name);
+                void (*remove)(libshared_kref_com_zhiniu_data_local_ViewHistory thiz, const char* symbol);
+                const char* (*serialize)(libshared_kref_com_zhiniu_data_local_ViewHistory thiz);
+                libshared_kref_kotlin_collections_List (*withPrices)(libshared_kref_com_zhiniu_data_local_ViewHistory thiz, libshared_kref_kotlin_Function1 quoteOf);
+              } ViewHistory;
+              struct {
+                libshared_KType* (*_type)(void);
+                libshared_kref_com_zhiniu_data_local_HistoryItem (*HistoryItem)(const char* symbol, const char* name, libshared_kref_kotlin_Double price);
+                const char* (*get_name)(libshared_kref_com_zhiniu_data_local_HistoryItem thiz);
+                libshared_kref_kotlin_Double (*get_price)(libshared_kref_com_zhiniu_data_local_HistoryItem thiz);
+                const char* (*get_symbol)(libshared_kref_com_zhiniu_data_local_HistoryItem thiz);
+                const char* (*component1)(libshared_kref_com_zhiniu_data_local_HistoryItem thiz);
+                const char* (*component2)(libshared_kref_com_zhiniu_data_local_HistoryItem thiz);
+                libshared_kref_kotlin_Double (*component3)(libshared_kref_com_zhiniu_data_local_HistoryItem thiz);
+                libshared_kref_com_zhiniu_data_local_HistoryItem (*copy)(libshared_kref_com_zhiniu_data_local_HistoryItem thiz, const char* symbol, const char* name, libshared_kref_kotlin_Double price);
+                libshared_KBoolean (*equals)(libshared_kref_com_zhiniu_data_local_HistoryItem thiz, libshared_kref_kotlin_Any other);
+                libshared_KInt (*hashCode)(libshared_kref_com_zhiniu_data_local_HistoryItem thiz);
+                const char* (*toString)(libshared_kref_com_zhiniu_data_local_HistoryItem thiz);
+              } HistoryItem;
+              struct {
+                libshared_KType* (*_type)(void);
                 libshared_kref_com_zhiniu_data_local_Watchlist (*_instance)();
                 void (*add)(libshared_kref_com_zhiniu_data_local_Watchlist thiz, const char* symbol);
                 libshared_KBoolean (*contains)(libshared_kref_com_zhiniu_data_local_Watchlist thiz, const char* symbol);
@@ -677,27 +772,44 @@ typedef struct {
               } AgentStage;
               struct {
                 libshared_KType* (*_type)(void);
-                libshared_kref_com_zhiniu_data_remote_AgentChatResult (*AgentChatResult)(const char* content, libshared_KBoolean isLlm, const char* provider, libshared_kref_kotlin_collections_List tools);
+                libshared_kref_com_zhiniu_data_remote_AgentVerdict (*AgentVerdict)(const char* risk, const char* action);
+                const char* (*get_action)(libshared_kref_com_zhiniu_data_remote_AgentVerdict thiz);
+                const char* (*get_risk)(libshared_kref_com_zhiniu_data_remote_AgentVerdict thiz);
+                const char* (*component1)(libshared_kref_com_zhiniu_data_remote_AgentVerdict thiz);
+                const char* (*component2)(libshared_kref_com_zhiniu_data_remote_AgentVerdict thiz);
+                libshared_kref_com_zhiniu_data_remote_AgentVerdict (*copy)(libshared_kref_com_zhiniu_data_remote_AgentVerdict thiz, const char* risk, const char* action);
+                libshared_KBoolean (*equals)(libshared_kref_com_zhiniu_data_remote_AgentVerdict thiz, libshared_kref_kotlin_Any other);
+                libshared_KInt (*hashCode)(libshared_kref_com_zhiniu_data_remote_AgentVerdict thiz);
+                const char* (*toString)(libshared_kref_com_zhiniu_data_remote_AgentVerdict thiz);
+              } AgentVerdict;
+              struct {
+                libshared_KType* (*_type)(void);
+                libshared_kref_com_zhiniu_data_remote_AgentChatResult (*AgentChatResult)(const char* content, libshared_KBoolean isLlm, const char* provider, libshared_kref_kotlin_collections_List tools, libshared_kref_com_zhiniu_data_remote_AgentVerdict verdict, libshared_kref_kotlin_collections_List charts);
+                libshared_kref_kotlin_collections_List (*get_charts)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
                 const char* (*get_content)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
                 libshared_KBoolean (*get_isLlm)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
                 const char* (*get_provider)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
                 libshared_kref_kotlin_collections_List (*get_tools)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
+                libshared_kref_com_zhiniu_data_remote_AgentVerdict (*get_verdict)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
                 const char* (*component1)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
                 libshared_KBoolean (*component2)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
                 const char* (*component3)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
                 libshared_kref_kotlin_collections_List (*component4)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
-                libshared_kref_com_zhiniu_data_remote_AgentChatResult (*copy)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz, const char* content, libshared_KBoolean isLlm, const char* provider, libshared_kref_kotlin_collections_List tools);
+                libshared_kref_com_zhiniu_data_remote_AgentVerdict (*component5)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
+                libshared_kref_kotlin_collections_List (*component6)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
+                libshared_kref_com_zhiniu_data_remote_AgentChatResult (*copy)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz, const char* content, libshared_KBoolean isLlm, const char* provider, libshared_kref_kotlin_collections_List tools, libshared_kref_com_zhiniu_data_remote_AgentVerdict verdict, libshared_kref_kotlin_collections_List charts);
                 libshared_KBoolean (*equals)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz, libshared_kref_kotlin_Any other);
                 libshared_KInt (*hashCode)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
                 const char* (*toString)(libshared_kref_com_zhiniu_data_remote_AgentChatResult thiz);
               } AgentChatResult;
               struct {
                 libshared_KType* (*_type)(void);
-                libshared_kref_com_zhiniu_data_remote_AgentToolDirective (*AgentToolDirective)(const char* name, const char* symbol, const char* stockName, const char* symbolB, const char* stockNameB, const char* alertOperator, libshared_KDouble alertPrice, const char* display);
+                libshared_kref_com_zhiniu_data_remote_AgentToolDirective (*AgentToolDirective)(const char* name, const char* symbol, const char* stockName, const char* symbolB, const char* stockNameB, const char* alertOperator, libshared_KDouble alertPrice, const char* mode, const char* display);
                 const char* (*get_alertOperator)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
                 libshared_KDouble (*get_alertPrice)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
                 const char* (*get_display)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
                 libshared_KBoolean (*get_isValid)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
+                const char* (*get_mode)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
                 const char* (*get_name)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
                 const char* (*get_stockName)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
                 const char* (*get_stockNameB)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
@@ -711,7 +823,8 @@ typedef struct {
                 const char* (*component6)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
                 libshared_KDouble (*component7)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
                 const char* (*component8)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
-                libshared_kref_com_zhiniu_data_remote_AgentToolDirective (*copy)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz, const char* name, const char* symbol, const char* stockName, const char* symbolB, const char* stockNameB, const char* alertOperator, libshared_KDouble alertPrice, const char* display);
+                const char* (*component9)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
+                libshared_kref_com_zhiniu_data_remote_AgentToolDirective (*copy)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz, const char* name, const char* symbol, const char* stockName, const char* symbolB, const char* stockNameB, const char* alertOperator, libshared_KDouble alertPrice, const char* mode, const char* display);
                 libshared_KBoolean (*equals)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz, libshared_kref_kotlin_Any other);
                 libshared_KInt (*hashCode)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
                 const char* (*toString)(libshared_kref_com_zhiniu_data_remote_AgentToolDirective thiz);
@@ -1568,6 +1681,18 @@ typedef struct {
                 } KLine;
                 struct {
                   libshared_KType* (*_type)(void);
+                  libshared_kref_com_zhiniu_domain_repository_AiBlock_Verdict (*Verdict)(const char* risk, const char* action);
+                  const char* (*get_action)(libshared_kref_com_zhiniu_domain_repository_AiBlock_Verdict thiz);
+                  const char* (*get_risk)(libshared_kref_com_zhiniu_domain_repository_AiBlock_Verdict thiz);
+                  const char* (*component1)(libshared_kref_com_zhiniu_domain_repository_AiBlock_Verdict thiz);
+                  const char* (*component2)(libshared_kref_com_zhiniu_domain_repository_AiBlock_Verdict thiz);
+                  libshared_kref_com_zhiniu_domain_repository_AiBlock_Verdict (*copy)(libshared_kref_com_zhiniu_domain_repository_AiBlock_Verdict thiz, const char* risk, const char* action);
+                  libshared_KBoolean (*equals)(libshared_kref_com_zhiniu_domain_repository_AiBlock_Verdict thiz, libshared_kref_kotlin_Any other);
+                  libshared_KInt (*hashCode)(libshared_kref_com_zhiniu_domain_repository_AiBlock_Verdict thiz);
+                  const char* (*toString)(libshared_kref_com_zhiniu_domain_repository_AiBlock_Verdict thiz);
+                } Verdict;
+                struct {
+                  libshared_KType* (*_type)(void);
                   libshared_kref_com_zhiniu_domain_repository_AiBlock_ToolResult (*ToolResult)(const char* title, const char* detail, const char* action, const char* actionLabel);
                   const char* (*get_action)(libshared_kref_com_zhiniu_domain_repository_AiBlock_ToolResult thiz);
                   const char* (*get_actionLabel)(libshared_kref_com_zhiniu_domain_repository_AiBlock_ToolResult thiz);
@@ -2072,6 +2197,7 @@ typedef struct {
                 libshared_KBoolean (*get_swapUpDon)(libshared_kref_com_zhiniu_pages_components_AppTheme thiz);
                 void (*set_swapUpDon)(libshared_kref_com_zhiniu_pages_components_AppTheme thiz, libshared_KBoolean set);
                 void (*applyMode)(libshared_kref_com_zhiniu_pages_components_AppTheme thiz, libshared_kref_com_zhiniu_pages_components_ThemeMode m);
+                void (*applyModePersisted)(libshared_kref_com_zhiniu_pages_components_AppTheme thiz, libshared_kref_com_zhiniu_pages_components_ThemeMode m);
                 libshared_KBoolean (*resolve)(libshared_kref_com_zhiniu_pages_components_AppTheme thiz, libshared_kref_com_zhiniu_pages_components_ThemeMode m);
                 void (*start)(libshared_kref_com_zhiniu_pages_components_AppTheme thiz);
               } AppTheme;

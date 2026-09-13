@@ -151,8 +151,9 @@ private fun ViewContainer<*, *>.CompactBreadthCard(breadth: MarketBreadth) {
         Text {
             attr {
                 fontSize(AppTypography.fs11); lines(1)
+                width(70f); textAlignRight()
                 color(colors.c(colors.textTertiary))
-                text("成交 " + fmtInt(breadth.amountYi) + " 亿")
+                text(fmtInt(breadth.amountYi) + "亿")
             }
         }
     }

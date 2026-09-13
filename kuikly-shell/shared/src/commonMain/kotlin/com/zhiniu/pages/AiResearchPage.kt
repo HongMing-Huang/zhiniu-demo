@@ -5,9 +5,12 @@
 package com.zhiniu.pages
 
 import com.tencent.kuikly.core.annotations.Page
+import com.tencent.kuikly.core.base.Animation
 import com.tencent.kuikly.core.base.Border
 import com.tencent.kuikly.core.base.attr.AccessibilityRole
 import com.tencent.kuikly.core.base.BorderStyle
+import com.tencent.kuikly.core.base.Color
+import com.tencent.kuikly.core.base.Translate
 import com.tencent.kuikly.core.base.ViewBuilder
 import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.base.ViewRef
@@ -22,6 +25,9 @@ import com.tencent.kuikly.core.views.InputView
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
 import com.zhiniu.data.mock.MarketStore
+import com.zhiniu.data.local.ChatArchive
+import com.zhiniu.data.local.ChatArchiveSession
+import com.zhiniu.data.local.ChatRecord
 import com.zhiniu.base.openComparePage
 import com.zhiniu.data.remote.GatewayMarketClient
 import com.zhiniu.data.remote.AgentResearchResult
@@ -32,6 +38,8 @@ import com.zhiniu.pages.components.ANIM_THEME
 import com.zhiniu.pages.components.AppRadius
 import com.zhiniu.pages.components.AppTheme
 import com.zhiniu.pages.components.AppTypography
+import com.zhiniu.pages.components.ThemeMode
+import com.zhiniu.pages.components.UPDOWN_SP_KEY
 import com.zhiniu.pages.components.Icon
 import com.zhiniu.pages.components.IconKind
 import com.zhiniu.pages.components.PAD
@@ -41,6 +49,7 @@ import com.zhiniu.pages.components.cssClass
 import com.zhiniu.pages.components.fmt2
 import com.zhiniu.pages.components.fmtMarketCap
 import com.zhiniu.pages.components.fmtPct
+import com.zhiniu.pages.components.fmtSymbol
 import com.zhiniu.pages.components.ai.AiBlockView
 import com.zhiniu.pages.components.AiMessageHeader
 import com.zhiniu.pages.components.common.AppInput
@@ -63,6 +72,8 @@ data class AiChatMessage(
 // 与 WatchlistPage 共用的持久化键（AI 从本页改自选/预警时同步落 SP）
 private const val WATCHLIST_SP_KEY = "zhiniu.watchlist.symbols.v1"
 private const val ALERTS_SP_KEY = "zhiniu.alert.items.v1"
+// 聊天归档键（会话 + 消息持久化；对标 KuiklyStock ChatStore——刷新/冷启动不再丢会话）
+private const val CHAT_ARCHIVE_SP_KEY = "zhiniu.chat.archive.v1"
 
 @Page("AiResearch", supportInLocal = true)
 internal class AiResearchPage : AppBasePage() {
@@ -73,24 +84,40 @@ internal class AiResearchPage : AppBasePage() {
     internal var roleView by observable("分析")
     internal val chatSessions by observableList<ChatSession>()
     internal val messages by observableList<AiChatMessage>()
+    /** 各会话的消息缓存（切会话时暂存当前、载入目标；落盘由 persistArchive 统一收口）。 */
+    private val sessionMsgs = mutableMapOf<String, List<AiChatMessage>>()
     internal var chatListRef: ViewRef<ListView<*, *>>? = null
+    /** 手机端会话历史底部面板（桌面用左栏，手机收进此处）。 */
+    internal var sessionSheetVisible by observable(false)
     private var seq = 0
     /** 最近一次研究结果：角色视图切换时按视角复述真实辩论内容，不再只发引导语。 */
     internal var lastResearch: AgentResearchResult? = null
 
-    private val seedSessions = listOf(
-        ChatSession("s1", "贵州茅台分析", "08-28 14:32"),
-        ChatSession("s2", "今日市场", "08-28 11:05"),
-        ChatSession("s3", "宁德时代", "08-27 16:10"),
-        ChatSession("s4", "五粮液", "08-27 09:12"),
-    )
+    // 种子会话从股票池动态生成（不再硬编码假标的与假时间戳）：前三个股票各一个会话 + 市场综述
+    private fun buildSeedSessions(): List<ChatSession> =
+        repo.stockQuotes().take(3).mapIndexed { i, stock ->
+            ChatSession("s${i + 1}", "${stock.name}分析", "")
+        } + listOf(ChatSession("s4", "今日市场", ""))
 
     override fun created() {
         super.created()
         if (chatSessions.isEmpty()) {
-            seedSessions.forEach { chatSessions.add(it) }
+            // 归档优先：有历史会话则恢复（含消息），否则用股票池生成种子会话
+            val archived = ChatArchive.deserialize(prefs.getString(CHAT_ARCHIVE_SP_KEY))
+            if (archived.isNotEmpty()) {
+                archived.forEach { session ->
+                    chatSessions.add(ChatSession(session.id, session.title, session.createdAt))
+                    sessionMsgs[session.id] = session.records.map { messageFromRecord(it) }
+                }
+            } else {
+                buildSeedSessions().forEach { chatSessions.add(it) }
+            }
         }
-        loadSession("s1")
+        // 默认进入最近创建的会话（归档按新建顺序头部插入；种子会话回退 s1）
+        if (chatSessions.isNotEmpty() && chatSessions.none { it.id == currentSessionId }) {
+            currentSessionId = chatSessions.first().id
+        }
+        loadSession(currentSessionId)
         // 图表选点 / 详情页 CTA 携问题跳入：等行情刷新回填会话后再自动提问
         //（直接在刷新前 send 会被 onSuccess 的 loadSession 重置掉）
         val pendingAsk = com.zhiniu.base.PendingAsk.question
@@ -100,6 +127,7 @@ internal class AiResearchPage : AppBasePage() {
                 .onSuccess { live ->
                     if (live.isNotEmpty()) {
                         MarketStore.applyLiveQuotes(live)
+                        refreshHotQuotes()
                         loadSession(currentSessionId)
                     }
                 }
@@ -128,6 +156,15 @@ internal class AiResearchPage : AppBasePage() {
                         action = "watchlist", actionLabel = "查看自选",
                     )
                 }
+                "research_stock" -> {
+                    // 模型识别出个股问题但缺数据 → 转入多 Agent 研究管线（真实行情/财报/资讯）
+                    blocks += AiBlock.ToolResult(
+                        title = "已转入个股研究",
+                        detail = "${tool.stockName.ifBlank { tool.symbol }}（${tool.symbol}）· 正在拉取行情/技术面/财务/资讯证据",
+                        action = "research:${tool.symbol}", actionLabel = "查看研究",
+                    )
+                    startResearch(tool.symbol, tool.stockName, "分析${tool.stockName.ifBlank { tool.symbol }}")
+                }
                 "open_compare" -> {
                     blocks += AiBlock.ToolResult(
                         title = "对比已就绪",
@@ -144,6 +181,27 @@ internal class AiResearchPage : AppBasePage() {
                         action = "alert", actionLabel = "查看预警",
                     )
                 }
+                "set_appearance" -> {
+                    val mode = when (tool.mode) {
+                        "light" -> ThemeMode.LIGHT
+                        "dark" -> ThemeMode.DARK
+                        else -> ThemeMode.SYSTEM
+                    }
+                    AppTheme.applyModePersisted(mode)
+                    blocks += AiBlock.ToolResult(
+                        title = "外观已切换",
+                        detail = "当前外观：${mode.label}（「我的」页可随时改回）",
+                    )
+                }
+                "set_color_mode" -> {
+                    val greenUp = tool.mode == "green_up"
+                    AppTheme.swapUpDon = greenUp
+                    prefs.setString(UPDOWN_SP_KEY, if (greenUp) "1" else "0")
+                    blocks += AiBlock.ToolResult(
+                        title = "涨跌配色已切换",
+                        detail = if (greenUp) "绿涨红跌（海外习惯）" else "红涨绿跌（A 股习惯）",
+                    )
+                }
             }
         }
         return blocks
@@ -157,6 +215,11 @@ internal class AiResearchPage : AppBasePage() {
                 val syms = action.removePrefix("compare:").split("|")
                 if (syms.size == 2) openComparePage(syms[0], syms[1])
             }
+            // research_stock 反馈卡：跳个股详情（研究结论已在会话流中展开）
+            action.startsWith("research:") -> {
+                val sym = action.removePrefix("research:")
+                if (sym.length == 8) openStock(sym)
+            }
         }
     }
 
@@ -166,7 +229,11 @@ internal class AiResearchPage : AppBasePage() {
         val alertIntent = text.contains("预警") || text.contains("提醒我") || text.contains("报警")
         val compareIntent = (text.contains("对比") || text.contains("比较")) &&
             (text.contains("和") || text.contains("与") || text.contains("vs") || text.contains("VS") || text.contains("×"))
-        return watchlistIntent || alertIntent || compareIntent
+        val appearanceIntent = listOf("深色", "浅色", "夜间", "暗黑", "亮色", "主题").any { it in text } &&
+            listOf("切", "换", "改", "调", "设").any { it in text }
+        val colorModeIntent = listOf("红涨绿跌", "绿涨红跌", "涨跌配色", "配色").any { it in text } &&
+            listOf("切", "换", "改", "调", "设").any { it in text }
+        return watchlistIntent || alertIntent || compareIntent || appearanceIntent || colorModeIntent
     }
 
     internal fun send(question: String) {
@@ -174,6 +241,7 @@ internal class AiResearchPage : AppBasePage() {
         if (text.isEmpty()) return
         messages.add(AiChatMessage("user", text = text))
         draft = ""
+        persistArchive()
         // 操作意图（加自选/设预警/双方对比）优先走带 ⟦TOOL⟧ 协议的通用问答——AI 直接操作 App；
         // 注意「对比宁德时代」这类单标的表述仍走研究管线（open_compare 需要两只标的）。
         if (isToolIntent(text)) {
@@ -188,7 +256,11 @@ internal class AiResearchPage : AppBasePage() {
             sendGeneralQuestion(text)
             return
         }
+        startResearch(target.symbol, target.name, text)
+    }
 
+    /** 多 Agent 研究管线（send 与 research_stock 工具指令共用入口）。 */
+    internal fun startResearch(symbol: String, name: String, question: String) {
         val token = "research-${++seq}"
         val messageIndex = messages.size
         messages.add(AiChatMessage("ai", streaming = true, progress = listOf("行情 Agent"), requestId = token))
@@ -196,7 +268,7 @@ internal class AiResearchPage : AppBasePage() {
             // 首选类型化 SSE：阶段帧实时驱动进度条（行情→技术面→财务→资讯→风险→多头→空头→研究经理→交易员→风控→归纳）
             val steps = mutableListOf<String>()
             val streamed = runCatching {
-                GatewayMarketClient.researchStream(target.symbol, text) { event ->
+                GatewayMarketClient.researchStream(symbol, question) { event ->
                     if (event.label.isNotBlank() && event.label !in steps) {
                         steps += event.label
                         updateResearchProgress(messageIndex, token, steps.toList())
@@ -204,13 +276,14 @@ internal class AiResearchPage : AppBasePage() {
                 }
             }.getOrNull()
             // 流不可用（旧网关 / 代理不支持流式）→ 回退一次性研究接口
-            val result = streamed ?: runCatching { GatewayMarketClient.research(target.symbol, text) }.getOrNull()
+            val result = streamed ?: runCatching { GatewayMarketClient.research(symbol, question) }.getOrNull()
             if (!isPending(messageIndex, token)) return@launch
             lastResearch = result ?: lastResearch
             val blocks = result?.let { researchBlocks(it) } ?: listOf(
                 AiBlock.Risk("研究网关暂不可用", "已保留本地快照回答；请稍后重试以获取带来源的实时证据。"),
-            ) + MarketStore.aiService.chatReply(currentSessionId, text)
+            ) + MarketStore.aiService.chatReply(currentSessionId, question)
             messages[messageIndex] = AiChatMessage("ai", blocks = blocks, streaming = false)
+            persistArchive()
         }
     }
 
@@ -223,9 +296,13 @@ internal class AiResearchPage : AppBasePage() {
         val token = "chat-${++seq}"
         val messageIndex = messages.size
         messages.add(AiChatMessage("ai", streaming = true, progress = listOf("模型网关"), requestId = token))
+        persistArchive()
         val contextSymbol = lastResearch?.symbol.orEmpty()
         lifecycleScope.launch {
-            val history = messages.takeLast(9).dropLast(1).map { (it.role to it.text) }
+            // 多轮上下文：AI 消息取块文本投影（此前 it.text 对 AI 恒为空，历史只剩用户侧）
+            val history = messages.takeLast(9).dropLast(1).map { msg ->
+                msg.role to if (msg.role == "user") msg.text else ChatArchive.aiTextOf(msg.blocks)
+            }.filter { it.second.isNotBlank() }
             var accumulated = ""
             val streamed = runCatching {
                 GatewayMarketClient.chatStream(text, history, contextSymbol) { delta ->
@@ -254,14 +331,33 @@ internal class AiResearchPage : AppBasePage() {
                     AiBlock.Risk("规则降级 · 未伪装模型", reply.content)
                 }
                 val body = if (reply.isLlm) markdownOf(reply.content) else emptyList()
+                // 结论徽章（【AI观点】结构化抽取）
+                val verdictBlocks = reply.verdict?.let { listOf(AiBlock.Verdict(it.risk, it.action)) } ?: emptyList()
+                // 走势卡（[KCHART:symbol]）：拉真实日 K 收盘渲染迷你图
+                val chartBlocks = if (reply.isLlm) fetchChartBlocks(reply.charts) else emptyList()
                 messages[messageIndex] = AiChatMessage(
-                    "ai", blocks = listOf(header) + body + toolBlocks, streaming = false,
+                    "ai",
+                    blocks = listOf(header) + body + verdictBlocks + toolBlocks + chartBlocks,
+                    streaming = false,
                 )
             } else {
                 // 离线兜底：本地 Mock（内容确定性，无网络依赖）
                 revealLocalReply(MarketStore.aiService.chatReply(currentSessionId, text), messageIndex, token)
             }
+            persistArchive()
         }
+    }
+
+    /** [KCHART:symbol] → 真实日 K 迷你图块（取近 60 日收盘；拉取失败静默跳过，不阻断回复）。 */
+    private suspend fun fetchChartBlocks(symbols: List<String>): List<AiBlock> {
+        val symbol = symbols.firstOrNull() ?: return emptyList()
+        val candles = runCatching { GatewayMarketClient.candles(symbol, 240, 60) }.getOrNull() ?: return emptyList()
+        val closes = candles.map { it.close }.filter { it > 0.0 }
+        if (closes.size < 2) return emptyList()
+        return listOf(
+            AiBlock.Text("#### ${fmtSymbol(symbol)} · 日 K（近 ${closes.size} 日收盘）"),
+            AiBlock.KLine(closes),
+        )
     }
 
     // AiBlock.Text 渲染端即 MarkdownView（标题/列表/表格/代码块全支持），通用问答直接喂原文
@@ -402,17 +498,28 @@ internal class AiResearchPage : AppBasePage() {
     }
 
     internal fun selectSession(id: String) {
-        currentSessionId = id
+        if (id != currentSessionId) {
+            // 切走前暂存当前会话消息，回来时原样恢复
+            sessionMsgs[currentSessionId] = messages.toList()
+            currentSessionId = id
+        }
         loadSession(id)
     }
 
     private fun loadSession(id: String) {
         messages.diffUpdate(emptyList())
-        val question = when (id) {
-            "s1" -> "分析贵州茅台，重点看趋势、量能和风险"
-            "s2" -> "今天市场强弱如何？"
-            "s3" -> "分析宁德时代当前技术结构"
-            "s4" -> "五粮液当前有哪些风险信号？"
+        // 已有会话消息（内存缓存或归档恢复）→ 原样载入，不再补种子问答
+        val saved = sessionMsgs[id]
+        if (!saved.isNullOrEmpty()) {
+            saved.forEach { messages.add(it) }
+            return
+        }
+        // 种子会话问题从标题派生（标题即股票池真实标的），不再按 id 硬编码映射
+        val session = chatSessions.firstOrNull { it.id == id }
+        val question = when {
+            session == null -> ""
+            session.title == "今日市场" -> "今天市场强弱如何？"
+            session.title.endsWith("分析") -> "分析${session.title.removeSuffix("分析")}，重点看趋势、量能和风险"
             else -> ""
         }
         if (question.isEmpty()) {
@@ -427,6 +534,41 @@ internal class AiResearchPage : AppBasePage() {
         val id = "s${++seq + 100}"
         chatSessions.add(0, ChatSession(id, "新会话", "刚刚"))
         selectSession(id)
+        persistArchive()
+    }
+
+    // ---------- 会话归档（SharedPreferences；结构化卡片压缩为正文 + 反馈卡 + 徽章） ----------
+
+    /** 当前全部会话 → 归档 JSON 落盘。消息事件（发送/回复落定/新建会话）时调用。 */
+    internal fun persistArchive() {
+        val sessions = chatSessions.map { session ->
+            ChatArchiveSession(
+                id = session.id,
+                title = session.title,
+                createdAt = session.createdAt,
+                records = recordsFor(session.id),
+            )
+        }
+        prefs.setString(CHAT_ARCHIVE_SP_KEY, ChatArchive.serialize(sessions))
+    }
+
+    /** 指定会话的消息记录：当前会话取 messages，其余取内存缓存。生成中的占位消息不归档。 */
+    private fun recordsFor(sessionId: String): List<ChatRecord> {
+        val msgs = if (sessionId == currentSessionId) messages.toList() else sessionMsgs[sessionId] ?: emptyList()
+        return msgs.asSequence()
+            .filter { !it.streaming }
+            .filter { it.role == "user" || it.blocks.isNotEmpty() }
+            .map { message ->
+                if (message.role == "user") ChatRecord(role = "user", text = message.text)
+                else ChatArchive.aiRecord(message.blocks)
+            }
+            .toList()
+    }
+
+    /** 归档记录 → 页面消息（user 恢复文本气泡；ai 恢复 Markdown + 徽章 + 反馈卡）。 */
+    private fun messageFromRecord(record: ChatRecord): AiChatMessage = when (record.role) {
+        "user" -> AiChatMessage("user", text = record.text)
+        else -> AiChatMessage("ai", blocks = ChatArchive.blocksOf(record))
     }
 
     /** 角色视图切换：有研究结果时按视角复述真实辩论内容；否则给出该角色的引导说明。 */
@@ -486,6 +628,7 @@ internal class AiResearchPage : AppBasePage() {
             else -> listOf(AiBlock.Text("已切换到「分析」：综合基本面、技术面与资讯证据给出个股分析。"))
         }
         messages.add(AiChatMessage("ai", blocks = blocks))
+        persistArchive()
     }
 
     override fun body(): ViewBuilder = {
@@ -505,6 +648,100 @@ internal class AiResearchPage : AppBasePage() {
             chatColumn(this@AiResearchPage)
         }
         renderBottomTab(this@AiResearchPage, "AI研究")
+        sessionHistorySheet(this@AiResearchPage)
+    }
+}
+
+/** 手机端会话历史底部面板：遮罩 + 圆角列表，选择即切换并收起。 */
+private fun ViewContainer<*, *>.sessionHistorySheet(host: AiResearchPage) {
+    val colors = AppTheme.colors
+    if (!host.isCompact()) return
+    // 遮罩（点击关闭）
+    View {
+        attr {
+            absolutePositionAllZero()
+            backgroundColor(Color(0x000000L, 0.4f))
+            touchEnable(host.sessionSheetVisible)
+            opacity(if (host.sessionSheetVisible) 1f else 0f)
+            animate(Animation.easeOut(0.16f), value = host.sessionSheetVisible)
+            zIndex(20)
+        }
+        event { click { host.sessionSheetVisible = false } }
+    }
+    // 底部面板（手机：距底 = 底部 Tab 高度 + 安全区；列表上限 5.5 行高度）
+    View {
+        attr {
+            absolutePosition(bottom = 64f + host.safeBottomInset(), left = 0f, right = 0f)
+            height(320f)
+            flexDirectionColumn()
+            backgroundColor(colors.c(colors.surface))
+            borderRadius(topLeft = 16f, topRight = 16f, bottomLeft = 0f, bottomRight = 0f)
+            touchEnable(host.sessionSheetVisible)
+            opacity(if (host.sessionSheetVisible) 1f else 0f)
+            transform(translate = Translate(0f, 0f, offsetY = if (host.sessionSheetVisible) 0f else 24f))
+            animate(Animation.easeOut(0.2f), value = host.sessionSheetVisible)
+            zIndex(21)
+        }
+        View {
+            attr {
+                height(52f); flexDirectionRow(); alignItemsCenter()
+                padding(left = 16f, right = 12f)
+                borderBottom(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+            }
+            Text {
+                attr {
+                    fontSize(AppTypography.fs15); fontWeightSemiBold()
+                    color(colors.c(colors.textPrimary)); text("会话记录")
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+            }
+            View { attr { flex(1f) } }
+            Icon(IconKind.CLOSE, 16f)
+            event { click { host.sessionSheetVisible = false } }
+        }
+        List {
+            attr { flex(1f) }
+            vfor({ host.chatSessions }) { session ->
+                View {
+                    attr {
+                        height(48f); flexDirectionRow(); alignItemsCenter()
+                        padding(left = 16f, right = 16f)
+                        backgroundColor(colors.c(if (session.id == host.currentSessionId) colors.surfaceHover else colors.surface))
+                        cssClass("zn-row zn-click")
+                        animate(ANIM_THEME, value = AppTheme.isDark)
+                    }
+                    View {
+                        attr {
+                            width(3f); height(20f); borderRadius(2f)
+                            backgroundColor(colors.ca(colors.aiAccent, if (session.id == host.currentSessionId) 100 else 0))
+                        }
+                    }
+                    View { attr { width(12f) } }
+                    Icon(IconKind.CHAT, 14f)
+                    View { attr { width(8f) } }
+                    Text {
+                        attr {
+                            fontSize(AppTypography.fs14)
+                            color(colors.c(if (session.id == host.currentSessionId) colors.textPrimary else colors.textSecondary))
+                            text(session.title)
+                        }
+                    }
+                    View { attr { flex(1f) } }
+                    if (session.createdAt.isNotBlank()) {
+                        Text {
+                            attr {
+                                fontSize(AppTypography.fs11)
+                                color(colors.c(colors.textTertiary)); text(session.createdAt)
+                            }
+                        }
+                    }
+                    event { click {
+                        host.selectSession(session.id)
+                        host.sessionSheetVisible = false
+                    } }
+                }
+            }
+        }
     }
 }
 
@@ -560,11 +797,13 @@ private fun ViewContainer<*, *>.sessionColumn(host: AiResearchPage) {
                         }
                     }
                     View { attr { flex(1f) } }
-                    Text {
-                        attr {
-                            fontSize(AppTypography.fs11)
-                            color(colors.c(colors.textTertiary))
-                            text(session.createdAt)
+                    if (session.createdAt.isNotBlank()) {
+                        Text {
+                            attr {
+                                fontSize(AppTypography.fs11)
+                                color(colors.c(colors.textTertiary))
+                                text(session.createdAt)
+                            }
                         }
                     }
                 }
@@ -597,11 +836,27 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
             }
             View { attr { flex(1f) } }
             if (host.isCompact()) {
-                // 手机：圆形图标按钮新建会话（对标移动端 IM 顶栏操作）
-                RoundIconButton(
-                    IconKind.CHAT, size = 15f, box = 30f,
-                    accessibilityLabel = "新建会话",
-                ) { host.newSession() }
+                // 手机：历史会话（底部面板）+ 新建，两个圆形图标按钮（对标移动端 IM 顶栏操作）
+                // 各自独立 View 包裹：Kuikly KSP 事件桥按作用域生成签名，同层两个
+                // 事件 lambda 会触发 IrSimpleFunctionSymbol 重复绑定（编译器内部错误）
+                View {
+                    attr { flexDirectionRow(); alignItemsCenter() }
+                    View {
+                        attr { flexDirectionRow(); alignItemsCenter() }
+                        RoundIconButton(
+                            IconKind.DATA, size = 15f, box = 30f,
+                            accessibilityLabel = "历史会话",
+                        ) { host.sessionSheetVisible = true }
+                    }
+                    View { attr { width(8f) } }
+                    View {
+                        attr { flexDirectionRow(); alignItemsCenter() }
+                        RoundIconButton(
+                            IconKind.CHAT, size = 15f, box = 30f,
+                            accessibilityLabel = "新建会话",
+                        ) { host.newSession() }
+                    }
+                }
             } else {
                 Text {
                     attr {

@@ -104,11 +104,15 @@ internal class MarketPage : AppBasePage() {
                         marketSource = "实时行情"
                         marketLoading = false
                         refreshRows()
+                        refreshHotQuotes()
                     } else {
                         marketSource = "本地快照 · 可重试"
                     }
                 }
-                .onFailure { marketSource = "本地快照 · 可重试" }
+                .onFailure {
+                    println("zn-net: quotes fail url=${GatewayMarketClient.baseUrl} err=$it")
+                    marketSource = "本地快照 · 可重试"
+                }
         }
         if (selectedMarket == TAB_POPULAR) loadPopularity()
         if (selectedMarket == TAB_SECTORS && sectorRows.isEmpty()) loadSectors()

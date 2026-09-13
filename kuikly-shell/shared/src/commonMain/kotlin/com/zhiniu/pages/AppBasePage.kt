@@ -114,6 +114,11 @@ internal abstract class AppBasePage : BasePager() {
         if (searchHot.isEmpty()) repo.stockQuotes().take(5).forEach { searchHot.add(it) }
     }
 
+    /** 实时行情到达后刷新热门列表价格（避免搜索热门展示过期 mock 价）。 */
+    internal fun refreshHotQuotes() {
+        searchHot.diffUpdate(repo.stockQuotes().take(5))
+    }
+
     internal fun navMarket() = openMarketPage()
     internal fun navAiResearch() = openAiResearchPage()
     internal fun navWatchlist() = openWatchlistPage()
@@ -123,13 +128,21 @@ internal abstract class AppBasePage : BasePager() {
 
     override fun created() {
         super.created(); AppTheme.start(); initSearch()
+        // 外观持久化钩子：任意页面切换外观（我的页三段式/快捷切换、AI 指令 set_appearance）统一落盘
+        AppTheme.persistHook = { mode ->
+            acquireModule<com.tencent.kuikly.core.module.SharedPreferencesModule>(
+                com.tencent.kuikly.core.module.SharedPreferencesModule.MODULE_NAME,
+            ).setString(com.zhiniu.pages.components.THEME_MODE_SP_KEY, mode.name)
+        }
         // 真机/局域网联调：?gateway=http://192.168.x.x:8000 覆盖默认本机网关（非法值忽略）
         pageData.params.optString("gateway", "").takeIf { it.isNotBlank() }?.let { GatewayMarketClient.baseUrl = it }
         lifecycleScope.launch {
-            runCatching { GatewayMarketClient.health() }.onSuccess { status ->
-                gatewayOnline = status.online
-                agentReady = status.agentReady
-            }
+            runCatching { GatewayMarketClient.health() }
+                .onSuccess { status ->
+                    gatewayOnline = status.online
+                    agentReady = status.agentReady
+                }
+                .onFailure { println("zn-net: health fail url=${GatewayMarketClient.baseUrl} err=$it") }
         }
     }
 }

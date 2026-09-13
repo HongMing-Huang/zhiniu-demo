@@ -182,13 +182,35 @@ fun ViewContainer<*, *>.StockRow(
             }
         }
         // 最新价
-        NumCell(fmt2(q.price), if (compact) 78f else 120f, { colors.textPrimary }, semibold = true)
-        // 涨跌额
-        if (!compact && StockColumns.CHANGE in columns) NumCell(fmtChangeSigned(q.change), 110f, { if (q.isUp) colors.up else colors.down })
-        // 涨跌幅（compact：欧易式色块；桌面：文字）
+        // 最新价（compact：价格 + 下方「涨跌额 涨跌幅」同色小字，课题 Task1 要求涨跌额；东财移动端样式）
         if (compact) {
-            ChangeBadge(q.changePercent, compact = true)
+            View {
+                attr { width(128f); flexDirectionColumn(); alignItemsFlexEnd() }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs15); fontWeightSemiBold()
+                        fontFamily(NUM_FONT); lines(1); cssClass("zn-nowrap")
+                        color(colors.c(colors.textPrimary))
+                        text(fmt2(q.price))
+                        animate(ANIM_THEME, value = AppTheme.isDark)
+                    }
+                }
+                Text {
+                    attr {
+                        marginTop(2f)
+                        fontSize(AppTypography.fs11); fontWeightMedium()
+                        fontFamily(NUM_FONT); lines(1); cssClass("zn-nowrap")
+                        color(colors.c(if (q.isUp) colors.up else colors.down))
+                        text(fmtChangeSigned(q.change) + "  " + fmtPct(q.changePercent))
+                        animate(ANIM_THEME, value = AppTheme.isDark)
+                    }
+                }
+            }
         } else {
+            NumCell(fmt2(q.price), 120f, { colors.textPrimary }, semibold = true)
+            // 涨跌额（桌面列）
+            if (StockColumns.CHANGE in columns) NumCell(fmtChangeSigned(q.change), 110f, { if (q.isUp) colors.up else colors.down })
+            // 涨跌幅（桌面：文字 + 浅色底）
             NumCell(fmtPct(q.changePercent), 110f, { if (q.isUp) colors.up else colors.down }, semibold = true, chipBg = { if (q.isUp) colors.riseBackground else colors.fallBackground })
         }
         // 总市值 / 成交量（课题基础字段）

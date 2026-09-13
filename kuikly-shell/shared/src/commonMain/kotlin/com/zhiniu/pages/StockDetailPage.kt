@@ -272,6 +272,15 @@ internal class StockDetailPage : AppBasePage() {
     override fun created() {
         super.created()
         watchlisted = selectedSymbol()?.let { Watchlist.contains(it) } ?: false
+        // 浏览历史：进页即记录（名称未知时先记代码，行情回来后由我的页补价格显示）
+        selectedSymbol()?.let { sym ->
+            com.zhiniu.data.local.ViewHistory.record(sym, repo.quoteOf(sym)?.name ?: sym)
+            runCatching {
+                acquireModule<com.tencent.kuikly.core.module.SharedPreferencesModule>(
+                    com.tencent.kuikly.core.module.SharedPreferencesModule.MODULE_NAME,
+                ).setString("zhiniu.history.items.v1", com.zhiniu.data.local.ViewHistory.serialize())
+            }
+        }
         selectedSymbol()?.let { symbol ->
             lifecycleScope.launch {
                 runCatching { GatewayMarketClient.quotes(listOf(symbol)).firstOrNull() }

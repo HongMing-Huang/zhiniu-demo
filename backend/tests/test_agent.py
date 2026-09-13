@@ -17,6 +17,14 @@ from app.agent import (
     stream_compare,
     stream_research,
 )
+from app.agent import (  # 结论徽章 / 走势卡 / 新增外观与配色指令
+    _extract_charts,
+    _extract_verdict,
+    _looks_like_tool_intent,
+    _norm_appearance,
+    _norm_color_mode,
+)
+import app.agent as agent
 
 
 class TestNumCoercion(unittest.TestCase):
@@ -362,8 +370,11 @@ class TestStreamChat(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(types[-1], "chat_finished")
         self.assertEqual(frames[-1]["mode"], "llm")
         self.assertEqual(frames[-1]["content"], "RSI 是动量指标。")
+        # delta 分块边界是防 marker 截断的实现细节（缓冲保留 marker 最长长度-1 字符），
+        # 只断言拼接语义：逐段 delta 连接 == 终帧正文。
         deltas = [f["content"] for f in frames if f["type"] == "delta"]
-        self.assertEqual(deltas, ["RSI 是", "动量指标。"])
+        self.assertTrue(deltas)
+        self.assertEqual("".join(deltas), "RSI 是动量指标。")
 
     async def test_stream_mock_llm_suppressed_into_rule_fallback(self):
         async def fake_gateway_chat(**_kw):
@@ -579,3 +590,119 @@ class TestStreamChatTools(unittest.IsolatedAsyncioTestCase):
             frames = await self._collect(question="解释 RSI")
         self.assertEqual([f["type"] for f in frames if f["type"] != "delta"], ["chat_started", "chat_finished"])
         self.assertEqual(frames[-1]["tools"], [])
+
+
+class TestVerdictAndCharts(unittest.TestCase):
+    """结论徽章（【AI观点】）与 [KCHART:] 走势卡指令抽取。"""
+
+    def test_extract_verdict_parses_and_strips(self):
+        body, verdict = _extract_verdict("RSI 偏高超买。\n【AI观点】风险：高｜操作建议：卖出")
+        self.assertEqual(body, "RSI 偏高超买。")
+        self.assertEqual(verdict, {"risk": "高", "action": "卖出"})
+
+    def test_extract_verdict_tolerates_reordered_labels(self):
+        _, verdict = _extract_verdict("【AI观点】高风险｜持有")
+        self.assertEqual(verdict, {"risk": "高", "action": "持有"})
+        _, verdict = _extract_verdict("【AI观点】操作建议：买入｜风险：低")
+        self.assertEqual(verdict, {"risk": "低", "action": "买入"})
+
+    def test_extract_verdict_absent_for_plain_reply(self):
+        body, verdict = _extract_verdict("RSI 是相对强弱指标，取值 0-100。")
+        self.assertIn("RSI", body)
+        self.assertIsNone(verdict)
+
+    def test_extract_verdict_marker_without_valid_pair_strips_line(self):
+        body, verdict = _extract_verdict("回答。\n【AI观点】仅供参考")
+        self.assertEqual(body, "回答。")
+        self.assertIsNone(verdict)
+
+    def test_extract_charts_parses_and_strips(self):
+        body, charts = _extract_charts("贵州茅台近期走弱。[KCHART:sh600519]")
+        self.assertEqual(body, "贵州茅台近期走弱。")
+        self.assertEqual(charts, ["sh600519"])
+
+    def test_extract_charts_dedups_and_caps_at_two(self):
+        _, charts = _extract_charts(
+            "[KCHART:sz000001] 与 [KCHART:SZ000001:day] 与 [KCHART:sh600519] 与 [KCHART:sz300750]"
+        )
+        self.assertEqual(charts, ["sz000001", "sh600519"])
+
+    def test_extract_charts_absent(self):
+        body, charts = _extract_charts("普通回答，无走势卡。")
+        self.assertEqual(charts, [])
+        self.assertIn("普通回答", body)
+
+
+class TestAppearanceColorTools(unittest.IsolatedAsyncioTestCase):
+    async def test_norm_appearance_aliases(self):
+        for raw, expected in (("深色", "dark"), ("dark", "dark"), ("夜间模式", "dark"),
+                              ("浅色", "light"), ("跟随系统", "system"), ("auto", "system")):
+            self.assertEqual(_norm_appearance(raw), expected, raw)
+        self.assertIsNone(_norm_appearance("五彩斑斓"))
+
+    async def test_norm_color_mode_aliases(self):
+        for raw, expected in (("红涨绿跌", "red_up"), ("A股", "red_up"), ("red_up", "red_up"),
+                              ("绿涨红跌", "green_up"), ("欧美", "green_up")):
+            self.assertEqual(_norm_color_mode(raw), expected, raw)
+        self.assertIsNone(_norm_color_mode("彩虹"))
+
+    async def test_set_appearance_directive(self):
+        tool, note = await _validate_tool_directive({"name": "set_theme", "args": {"mode": "深色"}}, "")
+        self.assertIsNotNone(tool)
+        self.assertEqual(tool["name"], "set_appearance")
+        self.assertEqual(tool["args"]["mode"], "dark")
+
+    async def test_set_appearance_invalid_value_rejected(self):
+        tool, note = await _validate_tool_directive({"name": "set_appearance", "args": {"mode": "五彩斑斓"}}, "")
+        self.assertIsNone(tool)
+        self.assertIn("未切换", note)
+
+    async def test_set_color_mode_directive(self):
+        tool, note = await _validate_tool_directive({"name": "set_color_mode", "args": {"mode": "欧美"}}, "")
+        self.assertIsNotNone(tool)
+        self.assertEqual(tool["args"]["mode"], "green_up")
+
+    async def test_tool_intent_covers_theme_and_color(self):
+        self.assertTrue(_looks_like_tool_intent("帮我换成深色模式"))
+        self.assertTrue(_looks_like_tool_intent("配色换成绿涨红跌"))
+        self.assertFalse(_looks_like_tool_intent("深色的含义是什么"))
+
+
+class TestChatVerdictChartE2E(unittest.IsolatedAsyncioTestCase):
+    async def test_run_chat_returns_verdict_and_charts(self):
+        content = (
+            "宁德时代短期承压，建议观望。\n"
+            "[KCHART:sz300750]\n"
+            "【AI观点】风险：中｜操作建议：观望"
+        )
+
+        async def fake_gateway_chat(**_kw):
+            yield {"id": "chat-v", "provider": "gemai", "model": "m",
+                   "choices": [{"message": {"content": content}}]}
+
+        with mock.patch("app.agent.gateway.chat_completions", new=fake_gateway_chat):
+            result = await run_chat(question="分析宁德时代")
+        self.assertNotIn("AI观点", result["content"])
+        self.assertNotIn("KCHART", result["content"])
+        self.assertEqual(result["verdict"], {"risk": "中", "action": "观望"})
+        self.assertEqual(result["charts"], ["sz300750"])
+
+    async def test_stream_suppresses_kchart_and_emits_in_final(self):
+        async def fake_gateway_chat(**_kw):
+            yield {"id": "c9", "provider": "gemai", "model": "m", "choices": [{"delta": {"content": "贵州茅台走强。"}}]}
+            yield {"id": "c9", "provider": "gemai", "model": "m", "choices": [{"delta": {"content": "\n[KCH"}}]}
+            yield {"id": "c9", "provider": "gemai", "model": "m", "choices": [{"delta": {"content": "ART:sh600519]"}}]}
+            yield {"id": "c9", "provider": "gemai", "model": "m",
+                   "choices": [{"delta": {"content": "【AI观点】风险：低｜操作建议：买入"}}]}
+
+        frames = []
+        with mock.patch("app.agent.gateway.chat_completions", new=fake_gateway_chat):
+            async for frame in stream_chat(question="分析贵州茅台"):
+                frames.append(frame)
+        deltas = "".join(f["content"] for f in frames if f["type"] == "delta")
+        self.assertNotIn("KCHART", deltas)
+        self.assertNotIn("【AI观点】", deltas)
+        final = frames[-1]
+        self.assertEqual(final["verdict"], {"risk": "低", "action": "买入"})
+        self.assertEqual(final["charts"], ["sh600519"])
+        self.assertNotIn("KCHART", final["content"])

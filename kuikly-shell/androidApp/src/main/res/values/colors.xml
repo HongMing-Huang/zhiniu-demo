@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#F5F4F0</color>
+    <!-- 启动底色：与 App 浅色主题 pageBg 一致（#F7F8FA） -->
+    <color name="zn_splash_bg">#FFF7F8FA</color>
 </resources>

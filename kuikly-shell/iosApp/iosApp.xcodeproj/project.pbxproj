@@ -13,6 +13,7 @@
 		4DB47752F2515EA410F74CBE /* libPods-iosApp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 01EAD169E138EC672F72417A /* libPods-iosApp.a */; };
 		5C620D72318EF50EB25C159C /* KRFontHandler.m in Sources */ = {isa = PBXBuildFile; fileRef = EB7EF1ACC8973CFA91978E16 /* KRFontHandler.m */; };
 		638E2D8F2EBABC9815D833B1 /* KuiklyRenderViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 746C2753711C299DCE6E4207 /* KuiklyRenderViewController.m */; };
+		7A1C2D3E4F5A6B7C8D9E0F01 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7A1C2D3E4F5A6B7C8D9E0F02 /* Assets.xcassets */; };
 		F7EDDDBAD7768290C319F32C /* KRBridgeModule.m in Sources */ = {isa = PBXBuildFile; fileRef = A8C1D4B091949447FE069FFB /* KRBridgeModule.m */; };
 /* End PBXBuildFile section */
 
@@ -23,6 +24,7 @@
 		20C40E886A1C73E286641BE2 /* KRFontHandler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KRFontHandler.h; sourceTree = "<group>"; };
 		20E015EDDBB20E253894CFC7 /* KuiklyRenderComponentExpandHandler.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KuiklyRenderComponentExpandHandler.m; sourceTree = "<group>"; };
 		2FAF84858486B3E4FDEC1B17 /* Pods-iosApp.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-iosApp.debug.xcconfig"; path = "Target Support Files/Pods-iosApp/Pods-iosApp.debug.xcconfig"; sourceTree = "<group>"; };
+		7A1C2D3E4F5A6B7C8D9E0F02 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		52F85C5E8924D5AC62502CE1 /* KuiklyRenderViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KuiklyRenderViewController.h; sourceTree = "<group>"; };
 		746C2753711C299DCE6E4207 /* KuiklyRenderViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KuiklyRenderViewController.m; sourceTree = "<group>"; };
 		86038AE1032E284E79B32AD6 /* iosApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = iosApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -101,6 +103,7 @@
 			isa = PBXGroup;
 			children = (
 				0185475DE4A36AF9546E5984 /* AppDelegate.swift */,
+				7A1C2D3E4F5A6B7C8D9E0F02 /* Assets.xcassets */,
 				C59114F647E69202552CE362 /* Info.plist */,
 				52F85C5E8924D5AC62502CE1 /* KuiklyRenderViewController.h */,
 				746C2753711C299DCE6E4207 /* KuiklyRenderViewController.m */,
@@ -128,6 +131,7 @@
 				F6B0D75893D0E129F7DE9248 /* [CP] Check Pods Manifest.lock */,
 				297B59D9CE634556D6007C40 /* Sources */,
 				8A34249C53339AAE04A804DC /* Frameworks */,
+				7A1C2D3E4F5A6B7C8D9E0F03 /* Resources */,
 				A83E6277EE3FEE3CAE849BB0 /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
@@ -168,6 +172,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		7A1C2D3E4F5A6B7C8D9E0F03 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7A1C2D3E4F5A6B7C8D9E0F01 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
 		A83E6277EE3FEE3CAE849BB0 /* [CP] Copy Pods Resources */ = {

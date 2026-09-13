@@ -26,7 +26,12 @@
         <dict/>
     </dict>
     <key>UILaunchScreen</key>
-    <dict/>
+    <dict>
+        <key>UIColorName</key>
+        <string>SplashBackground</string>
+        <key>UIImageName</key>
+        <string>BrandMark</string>
+    </dict>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsArbitraryLoads</key>

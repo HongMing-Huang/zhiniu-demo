@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 知牛 · 启动画面背景：微灰底 + 居中品牌 Logo（与 App 浅色页面底一致） -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/zn_splash_bg" />
+    <item
+        android:width="96dp"
+        android:height="96dp"
+        android:gravity="center"
+        android:drawable="@drawable/zn_splash_logo" />
+</layer-list>

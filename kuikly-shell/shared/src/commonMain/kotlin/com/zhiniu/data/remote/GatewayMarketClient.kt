@@ -37,16 +37,26 @@ data class MarketNewsItem(
 data class AgentStage(val label: String, val source: String, val status: String)
 
 /** 通用问答结果（/agent/chat）：isLlm=false 为后端显式规则降级；tools 为模型请求的 App 操作指令（已服务端校验）。 */
+/** 结论徽章（服务端从回复末行【AI观点】结构化抽取，正文已剥除该行）。 */
+data class AgentVerdict(
+    val risk: String,
+    val action: String,
+)
+
 data class AgentChatResult(
     val content: String,
     val isLlm: Boolean,
     val provider: String,
     val tools: List<AgentToolDirective> = emptyList(),
+    val verdict: AgentVerdict? = null,
+    /** 走势卡指令解析出的标的（协议 [KCHART:symbol]），客户端拉真实日 K 渲染。 */
+    val charts: List<String> = emptyList(),
 )
 
 /**
  * AI 工具指令（服务端已解析校验：名称→代码经东财搜索真实解析、白名单/枚举/数值校验）。
- * 客户端只负责执行：add_watchlist / open_compare / set_price_alert。
+ * 客户端只负责执行：add_watchlist / open_compare / set_price_alert / research_stock /
+ * set_appearance / set_color_mode。
  */
 data class AgentToolDirective(
     val name: String,
@@ -56,12 +66,16 @@ data class AgentToolDirective(
     val stockNameB: String = "",
     val alertOperator: String = "",   // above | below
     val alertPrice: Double = 0.0,
+    val mode: String = "",            // set_appearance: light|dark|system; set_color_mode: red_up|green_up
     val display: String = "",
 ) {
     val isValid: Boolean get() = when (name) {
         "add_watchlist" -> symbol.length == 8
         "open_compare" -> symbol.length == 8 && symbolB.length == 8 && symbol != symbolB
         "set_price_alert" -> symbol.length == 8 && alertPrice > 0.0 && alertOperator in setOf("above", "below")
+        "research_stock" -> symbol.length == 8
+        "set_appearance" -> mode in setOf("light", "dark", "system")
+        "set_color_mode" -> mode in setOf("red_up", "green_up")
         else -> false
     }
 }
@@ -382,6 +396,8 @@ object GatewayMarketClient {
             isLlm = root.string("mode") == "llm",
             provider = root.string("provider"),
             tools = tools,
+            verdict = parseVerdict(root),
+            charts = parseCharts(root),
         )
     }
 
@@ -412,10 +428,42 @@ object GatewayMarketClient {
                 alertPrice = args.double("price"),
                 display = obj.string("display"),
             )
+            "research_stock" -> AgentToolDirective(
+                name = name,
+                symbol = args.string("symbol"),
+                stockName = args.string("name"),
+                display = obj.string("display"),
+            )
+            "set_appearance" -> AgentToolDirective(
+                name = name,
+                mode = args.string("mode"),
+                display = obj.string("display"),
+            )
+            "set_color_mode" -> AgentToolDirective(
+                name = name,
+                mode = args.string("mode"),
+                display = obj.string("display"),
+            )
             else -> null
         }
         return directive?.takeIf { it.isValid }
     }
+
+    /** chat_finished / /agent/chat 响应中的结论徽章（【AI观点】）。 */
+    internal fun parseVerdict(obj: JsonObject): AgentVerdict? {
+        val v = obj["verdict"]?.let { runCatching { it.jsonObject }.getOrNull() } ?: return null
+        val risk = v.string("risk")
+        val action = v.string("action")
+        if (risk.isBlank() || action.isBlank()) return null
+        return AgentVerdict(risk = risk, action = action)
+    }
+
+    /** chat_finished / /agent/chat 响应中的走势卡标的列表（去重、上限 2）。 */
+    internal fun parseCharts(obj: JsonObject): List<String> =
+        obj["charts"]?.jsonArray?.mapNotNull { el ->
+            (el as? kotlinx.serialization.json.JsonPrimitive)?.content
+                ?.takeIf { Regex("^[a-z]{2}\\d{6}$").matches(it) }
+        }?.distinct()?.take(2) ?: emptyList()
 
     /**
      * 流式通用问答（/agent/chat/stream）：onDelta 逐段回调（打字机效果），
@@ -442,6 +490,8 @@ object GatewayMarketClient {
         var finalMode = ""
         var finalContent = ""
         var finalProvider = ""
+        var finalVerdict: AgentVerdict? = null
+        val finalCharts = mutableListOf<String>()
         val tools = mutableListOf<AgentToolDirective>()
         var pendingEvent: String? = null
         runCatching {
@@ -460,6 +510,8 @@ object GatewayMarketClient {
                         finalMode = obj.string("mode")
                         finalContent = obj.string("content")
                         finalProvider = obj.string("provider")
+                        finalVerdict = parseVerdict(obj)
+                        finalCharts.addAll(parseCharts(obj))
                         obj["tools"]?.jsonArray?.forEach { el ->
                             runCatching { el.jsonObject }.getOrNull()?.let { parseToolDirective(it)?.let(tools::add) }
                         }
@@ -470,8 +522,11 @@ object GatewayMarketClient {
         }
         if (finalContent.isBlank()) return null
         // tool 帧与 chat_finished.tools 可能各携带一次同一指令，按 name+标的 去重
-        val deduped = tools.distinctBy { it.name + "|" + it.symbol + "|" + it.symbolB + "|" + it.alertPrice }
-        return AgentChatResult(finalContent, finalMode == "llm", finalProvider, deduped)
+        val deduped = tools.distinctBy { it.name + "|" + it.symbol + "|" + it.symbolB + "|" + it.alertPrice + "|" + it.mode }
+        return AgentChatResult(
+            content = finalContent, isLlm = finalMode == "llm", provider = finalProvider,
+            tools = deduped, verdict = finalVerdict, charts = finalCharts.toList(),
+        )
     }
 
     /**

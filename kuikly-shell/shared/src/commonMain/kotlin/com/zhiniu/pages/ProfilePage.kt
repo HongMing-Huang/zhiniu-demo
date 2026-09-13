@@ -13,6 +13,7 @@ import com.tencent.kuikly.core.base.attr.AccessibilityRole
 import com.tencent.kuikly.core.base.attr.ImageUri
 import com.tencent.kuikly.core.directives.vif
 import com.tencent.kuikly.core.reactive.handler.observable
+import com.tencent.kuikly.core.reactive.handler.observableList
 import com.tencent.kuikly.core.views.Image
 import com.tencent.kuikly.core.views.List
 import com.tencent.kuikly.core.views.Text
@@ -27,12 +28,14 @@ import com.zhiniu.pages.components.AppTypography
 import com.zhiniu.pages.components.Icon
 import com.zhiniu.pages.components.IconKind
 import com.zhiniu.pages.components.ThemeMode
+import com.zhiniu.pages.components.THEME_MODE_SP_KEY
+import com.zhiniu.pages.components.UPDOWN_SP_KEY
 import com.zhiniu.pages.components.c
 import com.zhiniu.pages.components.ca
 import com.zhiniu.pages.components.cssClass
 
 private val APP_VERSION = "v1.0.0"
-private const val UPDOWN_SP_KEY = "zhiniu.prefs.swap-updown.v1"
+private const val HISTORY_SP_KEY = "zhiniu.history.items.v1"
 
 @Page("Profile", supportInLocal = true)
 internal class ProfilePage : AppBasePage() {
@@ -41,16 +44,27 @@ internal class ProfilePage : AppBasePage() {
     internal var alertCount by observable(0)
     internal var aboutExpanded by observable(false)
     internal var disclaimerExpanded by observable(false)
+    internal val historyItems by observableList<com.zhiniu.data.local.HistoryItem>()
 
     override fun created() {
         super.created()
         watchCount = Watchlist.symbols().size
         alertCount = AlertStore.alerts().size
-        // 恢复涨跌配色偏好（SP 唯一事实源 → AppTheme 全局生效）
         val sp = acquireModule<com.tencent.kuikly.core.module.SharedPreferencesModule>(
             com.tencent.kuikly.core.module.SharedPreferencesModule.MODULE_NAME,
         )
+        // 恢复涨跌配色偏好（SP 唯一事实源 → AppTheme 全局生效）
         AppTheme.swapUpDon = sp.getString(UPDOWN_SP_KEY) == "1"
+        // 恢复外观偏好（浅色/深色/跟随系统；此前仅内存态，重启丢失）
+        when (sp.getString(THEME_MODE_SP_KEY)) {
+            ThemeMode.LIGHT.name -> AppTheme.applyMode(ThemeMode.LIGHT)
+            ThemeMode.DARK.name -> AppTheme.applyMode(ThemeMode.DARK)
+            ThemeMode.SYSTEM.name -> AppTheme.applyMode(ThemeMode.SYSTEM)
+        }
+        // 持久化钩子已在 AppBasePage.created 注册（与 AI 指令 set_appearance 共用）
+        // 浏览历史恢复 + 用本地快照补价格（拿不到价格的只显示名称）
+        com.zhiniu.data.local.ViewHistory.deserialize(sp.getString(HISTORY_SP_KEY))
+        historyItems.diffUpdate(com.zhiniu.data.local.ViewHistory.withPrices { repo.quoteOf(it) })
     }
 
     internal fun toggleSwapUpDon() {
@@ -59,6 +73,15 @@ internal class ProfilePage : AppBasePage() {
             com.tencent.kuikly.core.module.SharedPreferencesModule.MODULE_NAME,
         )
         sp.setString(UPDOWN_SP_KEY, if (AppTheme.swapUpDon) "1" else "0")
+    }
+
+    internal fun clearHistory() {
+        com.zhiniu.data.local.ViewHistory.clear()
+        historyItems.diffUpdate(emptyList())
+        val sp = acquireModule<com.tencent.kuikly.core.module.SharedPreferencesModule>(
+            com.tencent.kuikly.core.module.SharedPreferencesModule.MODULE_NAME,
+        )
+        sp.setString(HISTORY_SP_KEY, "")
     }
 
     override fun body(): ViewBuilder = {
@@ -148,6 +171,71 @@ private fun ViewContainer<*, *>.profileContent(host: ProfilePage) {
             View { attr { width(10f) } }
             StatCell("AI 研究", "多视角", "", colors) {
                 host.navAiResearch()
+            }
+        }
+
+        // ---- 浏览历史（横向胶囊流，点击直达详情；空态不占位） ----
+        vif({ host.historyItems.isNotEmpty() }) {
+            View { attr { height(20f) } }
+            View {
+                attr { flexDirectionRow(); alignItemsCenter(); marginBottom(8f) }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs12); fontWeightMedium()
+                        color(colors.c(colors.textSecondary)); text("浏览历史")
+                    }
+                }
+                View { attr { flex(1f) } }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs11)
+                        color(colors.c(colors.textTertiary)); text("清空")
+                        accessibility("清空浏览历史")
+                        accessibilityRole(com.tencent.kuikly.core.base.attr.AccessibilityRole.BUTTON)
+                        accessibilityInfo(clickable = true, longClickable = false)
+                        cssClass("zn-click")
+                    }
+                    event { click { host.clearHistory() } }
+                }
+            }
+            View {
+                attr { flexDirectionRow(); flexWrapWrap() }
+                host.historyItems.forEach { item ->
+                    View {
+                        attr {
+                            height(30f); paddingLeft(10f); paddingRight(10f)
+                            marginBottom(6f); marginRight(8f)
+                            flexDirectionRow(); alignItemsCenter()
+                            borderRadius(15f)
+                            backgroundColor(colors.c(colors.surface))
+                            border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+                            cssClass("zn-click")
+                            accessibility("查看 ${item.name}")
+                            accessibilityRole(com.tencent.kuikly.core.base.attr.AccessibilityRole.BUTTON)
+                            accessibilityInfo(clickable = true, longClickable = false)
+                            highlightBackgroundColor(colors.ca(colors.textSecondary, 6))
+                            animate(ANIM_THEME, value = AppTheme.isDark)
+                        }
+                        event { click { host.openStock(item.symbol) } }
+                        Text {
+                            attr {
+                                fontSize(AppTypography.fs12); lines(1)
+                                color(colors.c(colors.textPrimary)); text(item.name)
+                            }
+                        }
+                        item.price?.let { p ->
+                            View { attr { width(5f) } }
+                            Text {
+                                attr {
+                                    fontSize(AppTypography.fs11)
+                                    fontFamily(com.zhiniu.pages.components.NUM_FONT)
+                                    color(colors.c(colors.textTertiary))
+                                    text(com.zhiniu.pages.components.fmt2(p))
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -391,7 +479,7 @@ private fun ViewContainer<*, *>.ThemeQuickToggle() {
             highlightBackgroundColor(colors.ca(colors.textSecondary, 10))
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
-        event { click { AppTheme.applyMode(next) } }
+        event { click { AppTheme.applyModePersisted(next) } }
         Icon(if (AppTheme.isDark) IconKind.THEME else IconKind.THEME, 17f)
     }
 }
@@ -598,7 +686,7 @@ private fun ViewContainer<*, *>.ThemeSegment(mode: ThemeMode) {
             cssClass("zn-click")
             highlightBackgroundColor(colors.ca(colors.textSecondary, 7))
         }
-        event { click { AppTheme.applyMode(mode) } }
+        event { click { AppTheme.applyModePersisted(mode) } }
         Text {
             attr {
                 fontSize(AppTypography.fs12)

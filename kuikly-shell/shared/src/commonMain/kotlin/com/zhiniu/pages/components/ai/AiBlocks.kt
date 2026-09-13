@@ -44,8 +44,64 @@ fun ViewContainer<*, *>.AiBlockView(
         is AiBlock.FollowUps -> AiFollowUps(block.questions, onAsk)
         is AiBlock.TradeAdvice -> AiTradeAdviceCard(block)
         is AiBlock.RiskLevel -> AiRiskLevelChip(block)
+        is AiBlock.Verdict -> AiVerdictBadge(block)
         is AiBlock.KLine -> AiKLineCard(block)
         is AiBlock.ToolResult -> AiToolResultCard(block) { onToolAction(it) }
+    }
+}
+
+/** 结论徽章（【AI观点】）：操作建议 + 风险档两枚胶囊，操作方向着色（对标 KuiklyStock AiVerdict）。 */
+private fun ViewContainer<*, *>.AiVerdictBadge(block: AiBlock.Verdict) {
+    val colors = AppTheme.colors
+    val actionColor = when (block.action) {
+        "买入" -> colors.up
+        "卖出" -> colors.down
+        else -> colors.textSecondary
+    }
+    val riskColor = when (block.risk) {
+        "低" -> colors.up
+        "高" -> colors.down
+        else -> colors.textSecondary
+    }
+    View {
+        attr { flexDirectionRow(); alignItemsCenter(); marginTop(8f) }
+        Text {
+            attr {
+                fontSize(AppTypography.fs12)
+                color(colors.c(colors.textTertiary)); marginRight(8f)
+                text("AI 观点"); animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+        }
+        View {
+            attr {
+                height(20f); padding(left = 8f, right = 8f); allCenter()
+                borderRadius(4f); backgroundColor(colors.ca(actionColor, 14))
+                border(Border(1f, BorderStyle.SOLID, colors.c(actionColor)))
+            }
+            Text {
+                attr {
+                    fontSize(AppTypography.fs11); fontWeightSemiBold()
+                    color(colors.c(actionColor)); text(block.action)
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+            }
+        }
+        View { attr { width(6f) } }
+        View {
+            attr {
+                height(20f); padding(left = 8f, right = 8f); allCenter()
+                borderRadius(4f); backgroundColor(colors.ca(riskColor, 14))
+                border(Border(1f, BorderStyle.SOLID, colors.c(riskColor)))
+            }
+            Text {
+                attr {
+                    fontSize(AppTypography.fs11); fontWeightSemiBold()
+                    color(colors.c(riskColor)); text("${block.risk}风险")
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+            }
+        }
+        View { attr { flex(1f) } }
     }
 }
 

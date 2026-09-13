@@ -1,3 +1,11 @@
 <resources>
-    <style name="AppTheme" parent="android:Theme.Material.NoActionBar"/>
+    <!-- 常规主题 -->
+    <style name="AppTheme" parent="android:Theme.Material.NoActionBar" />
+
+    <!-- 知牛启动主题：微灰底 + 居中 Logo，承接 KuiklyRenderActivity 冷启动 -->
+    <style name="ZhiNiu.Launch" parent="AppTheme">
+        <item name="android:windowBackground">@drawable/zn_splash_bg</item>
+        <item name="android:statusBarColor">@color/zn_splash_bg</item>
+        <item name="android:navigationBarColor">@color/zn_splash_bg</item>
+    </style>
 </resources>

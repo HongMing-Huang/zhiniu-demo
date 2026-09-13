@@ -44,10 +44,19 @@ _CHAT_TOOLS_PROMPT = (
     "- add_watchlist：加入自选，args={\"symbol\":\"sz300750\"}（代码必须来自上下文快照；不确定代码时用 {\"name\":\"宁德时代\"} 交由服务端搜索解析）\n"
     "- open_compare：拉起双股对比页，args={\"symbol_a\":\"sh600519\",\"symbol_b\":\"sz300750\"}\n"
     "- set_price_alert：价格预警，args={\"symbol\":\"sz300750\",\"operator\":\"above\"|\"below\",\"price\":320.5}（price 必须是具体数字；operator above=突破上方价、below=跌破下方价）\n"
-    "仅当用户明确表达操作意图时输出一条指令，并用一句话在正文说明已为其执行；不明确时不要输出指令。"
+    "- research_stock：转入个股多 Agent 研究（行情/技术面/财务/资讯/多空/风控），args={\"symbol\":\"sz300750\"}（不确定代码时用 {\"name\":\"隆基绿能\"} 由服务端搜索解析）。当用户就某只具体股票寻求分析/行情/趋势/买卖参考，而上下文快照中没有该股数据时，必须输出此指令让 App 取真实数据，而不是凭记忆作答。\n"
+    "- set_appearance：切换 App 外观，args={\"mode\":\"light\"|\"dark\"|\"system\"}（light=浅色、dark=深色/夜间、system=跟随系统；用户说「换成深色/夜间模式」时输出）\n"
+    "- set_color_mode：切换涨跌配色，args={\"mode\":\"red_up\"|\"green_up\"}（red_up=红涨绿跌·A 股习惯；green_up=绿涨红跌·海外习惯；用户说「换成绿涨红跌/欧美配色」时输出）\n"
+    "仅当用户明确表达操作意图时输出一条指令，并用一句话在正文说明已为其执行；不明确时不要输出指令。\n"
+    "7. 结论徽章（可选）：当且仅当本次回答给出了明确的风险/操作倾向时，在回答最末尾另起一行、严格按格式输出：\n"
+    "【AI观点】风险：低｜操作建议：观望\n"
+    "（风险只能取 低/中/高；操作建议只能取 买入/持有/卖出/观望；科普、闲聊、纯概念解释类回答不要输出这一行。）\n"
+    "8. 走势卡片（可选）：需要展示某只股票近期走势时，在回答最末尾另起一行输出 [KCHART:sh600519]（代码必须来自本轮工具结果或上下文快照，最多 1 个；App 会渲染真实日 K 卡；闲聊不要输出）。"
 )
 
 _TOOL_MARKERS = ("⟦TOOL⟧", "【TOOL】", "[TOOL]", "「TOOL」")
+# 流式阶段一并抑制的正文标记：工具指令 + [KCHART:] 走势卡（协议约定置于回复末尾）
+_STREAM_MARKERS = _TOOL_MARKERS + ("[KCHART:", "【KCHART】")
 _TOOL_NAME_ALIASES = {
     "add_watchlist": "add_watchlist", "addwatchlist": "add_watchlist", "add_to_watchlist": "add_watchlist",
     "watch": "add_watchlist", "add_favorite": "add_watchlist", "add_favourite": "add_watchlist",
@@ -55,6 +64,14 @@ _TOOL_NAME_ALIASES = {
     "open_stock_compare": "open_compare", "stock_compare": "open_compare",
     "set_price_alert": "set_price_alert", "price_alert": "set_price_alert", "set_alert": "set_price_alert",
     "alert": "set_price_alert", "add_alert": "set_price_alert", "set_price_warning": "set_price_alert",
+    "research_stock": "research_stock", "research": "research_stock", "analyze_stock": "research_stock",
+    "analyse_stock": "research_stock", "stock_research": "research_stock", "deep_research": "research_stock",
+    "set_appearance": "set_appearance", "set_theme": "set_appearance", "theme_mode": "set_appearance",
+    "set_theme_mode": "set_appearance", "set_mode": "set_appearance", "appearance": "set_appearance",
+    "set_dark_mode": "set_appearance", "dark_mode": "set_appearance", "switch_theme": "set_appearance",
+    "set_color_mode": "set_color_mode", "setcolormode": "set_color_mode", "color_mode": "set_color_mode",
+    "set_updown": "set_color_mode", "updown_color": "set_color_mode", "up_down_mode": "set_color_mode",
+    "change_color_mode": "set_color_mode", "switch_color_mode": "set_color_mode",
 }
 _SYMBOL_RE = re.compile(r"^(sh|sz|bj)\d{6}$", re.IGNORECASE)
 
@@ -138,6 +155,15 @@ async def _validate_tool_directive(
             {"name": "add_watchlist", "args": {"symbol": symbol, "name": stock_name}, "display": f"加入自选 {stock_name or symbol}"},
             "",
         )
+    if canonical == "research_stock":
+        resolved = await _resolve_symbol_arg(args, ("symbol", "code", "stock", "name"), context_symbol)
+        if resolved is None:
+            return None, "（未能解析研究标的，本次未转入研究；可在行情页搜索该股后进入详情）"
+        symbol, stock_name = resolved
+        return (
+            {"name": "research_stock", "args": {"symbol": symbol, "name": stock_name}, "display": f"转入个股研究 {stock_name or symbol}"},
+            "",
+        )
     if canonical == "open_compare":
         first = await _resolve_symbol_arg(args, ("symbol_a", "symbolA", "a", "symbol"), "")
         second = await _resolve_symbol_arg(args, ("symbol_b", "symbolB", "b"), "")
@@ -174,6 +200,23 @@ async def _validate_tool_directive(
             },
             "",
         )
+    if canonical == "set_appearance":
+        mode = _norm_appearance(args.get("mode") or args.get("theme") or args.get("value"))
+        if mode is None:
+            return None, "（外观取值不明确（浅色/深色/跟随系统），本次未切换）"
+        return (
+            {"name": "set_appearance", "args": {"mode": mode}, "display": f"外观切换为{_APPEARANCE_LABELS[mode]}"},
+            "",
+        )
+    if canonical == "set_color_mode":
+        mode = _norm_color_mode(args.get("mode") or args.get("colorMode") or args.get("value"))
+        if mode is None:
+            return None, "（涨跌配色取值不明确（红涨绿跌/绿涨红跌），本次未切换）"
+        label = "红涨绿跌（A 股）" if mode == "red_up" else "绿涨红跌（海外）"
+        return (
+            {"name": "set_color_mode", "args": {"mode": mode}, "display": f"涨跌配色切换为{label}"},
+            "",
+        )
     return None, ""
 
 
@@ -206,7 +249,13 @@ def _looks_like_tool_intent(question: str) -> bool:
     compare_intent = any(w in question for w in ("对比", "比较")) and any(
         w in question.lower() for w in ("和", "与", "vs", "×")
     )
-    return watchlist_intent or alert_intent or compare_intent
+    appearance_intent = any(w in question for w in ("深色", "浅色", "夜间", "暗黑", "亮色", "主题")) and any(
+        w in question for w in ("切", "换", "改", "调", "设")
+    )
+    colormode_intent = any(w in question for w in ("红涨绿跌", "绿涨红跌", "涨跌配色", "配色")) and any(
+        w in question for w in ("切", "换", "改", "调", "设")
+    )
+    return watchlist_intent or alert_intent or compare_intent or appearance_intent or colormode_intent
 
 
 async def _chat_once(messages: list[dict]) -> tuple[str, str, str]:
@@ -453,6 +502,8 @@ async def run_chat(question: str, history: list[dict] | None = None, symbol: str
         content = ((response.get("choices") or [{}])[0].get("message") or {}).get("content", "").strip()
         if content:
             clean_text, tools = await _process_chat_tools(content, symbol)
+            clean_text, charts = _extract_charts(clean_text)
+            clean_text, verdict = _extract_verdict(clean_text)
             # 无指令强重试（对标 KuiklyStock）：用户明确要操作、模型只说不发指令 → 补一轮只要指令
             if not tools and _looks_like_tool_intent(question):
                 retry_messages = messages + [
@@ -469,6 +520,8 @@ async def run_chat(question: str, history: list[dict] | None = None, symbol: str
                 "model": response.get("model", ""),
                 "content": clean_text[:1200],
                 "tools": tools,
+                "verdict": verdict,
+                "charts": charts,
             }
     return {
         "mode": "deterministic_fallback",
@@ -476,6 +529,8 @@ async def run_chat(question: str, history: list[dict] | None = None, symbol: str
         "model": "none",
         "content": _CHAT_FALLBACK_TEXT,
         "tools": [],
+        "verdict": None,
+        "charts": [],
     }
 
 
@@ -501,10 +556,10 @@ async def stream_chat(
     provider = ""
     model = ""
     is_mock = False
-    marker_len = max(len(m) for m in _TOOL_MARKERS)
+    marker_len = max(len(m) for m in _STREAM_MARKERS)
 
     def _marker_index(text: str) -> int:
-        found = [text.find(m) for m in _TOOL_MARKERS if text.find(m) >= 0]
+        found = [text.find(m) for m in _STREAM_MARKERS if text.find(m) >= 0]
         return min(found) if found else -1
 
     try:
@@ -552,6 +607,8 @@ async def stream_chat(
     content = "".join(parts)
     if not is_mock and provider and (content.strip() or rest.strip()):
         clean_text, tools = await _process_chat_tools(content + ("\n" + rest if rest else ""), symbol)
+        clean_text, charts = _extract_charts(clean_text)
+        clean_text, verdict = _extract_verdict(clean_text)
         # 无指令强重试：操作意图明确但模型只说不发指令 → 补一轮只要指令（不影响已流出的正文）
         if not tools and _looks_like_tool_intent(question):
             retry_messages = messages + [
@@ -570,13 +627,15 @@ async def stream_chat(
             yield {"type": "tool", "name": tool["name"], "args": tool["args"], "display": tool["display"], "final": False}
         yield {
             "type": "chat_finished", "mode": "llm", "provider": provider,
-            "model": model, "content": clean_text, "tools": tools, "final": True,
+            "model": model, "content": clean_text, "tools": tools,
+            "verdict": verdict, "charts": charts, "final": True,
         }
         return
     yield {
         "type": "chat_finished", "mode": "deterministic_fallback",
         "provider": "rule-engine", "model": "none",
-        "content": _CHAT_FALLBACK_TEXT, "tools": [], "final": True,
+        "content": _CHAT_FALLBACK_TEXT, "tools": [],
+        "verdict": None, "charts": [], "final": True,
     }
 
 
@@ -587,6 +646,76 @@ def _num_or_none(v: Any) -> float | None:
         return float(v)
     except (TypeError, ValueError):
         return None
+
+
+_APPEARANCE_LABELS = {"light": "浅色", "dark": "深色", "system": "跟随系统"}
+
+
+def _norm_appearance(v: Any) -> str | None:
+    """外观归一化：容忍 深色/夜间/暗黑/dark/night 等（对标 KuiklyStock setThemeColor 的别名兜底）。"""
+    s = str(v or "").strip().lower()
+    if not s:
+        return None
+    if any(w in s for w in ("深", "夜", "暗", "dark", "night")):
+        return "dark"
+    if any(w in s for w in ("浅", "亮", "白", "light")):
+        return "light"
+    if any(w in s for w in ("系统", "自动", "system", "auto")):
+        return "system"
+    return None
+
+
+def _norm_color_mode(v: Any) -> str | None:
+    """涨跌配色归一化：red_up=红涨绿跌（A 股），green_up=绿涨红跌（海外）。"""
+    s = str(v or "").strip().lower()
+    if not s:
+        return None
+    if any(w in s for w in ("绿涨", "红跌", "欧美", "海外", "green_up", "greenup", "us")):
+        return "green_up"
+    if any(w in s for w in ("红涨", "绿跌", "a股", "a 股", "中国", "red_up", "redup", "cn")):
+        return "red_up"
+    if s in ("0", "1"):
+        return "red_up" if s == "0" else "green_up"
+    return None
+
+
+def _extract_verdict(text: str) -> tuple[str, dict | None]:
+    """抽取【AI观点】结论行：返回 (剥除后的正文, {risk, action}|None)。
+
+    宽松解析（对标 KuiklyStock AiVerdict）：容忍省略标签/语序颠倒，如
+    「【AI观点】高风险｜持有」「【AI观点】操作建议：卖出｜风险：低」。
+    """
+    lines = text.splitlines()
+    for i in range(len(lines) - 1, -1, -1):
+        stripped = lines[i].strip()
+        if "【AI观点】" not in stripped:
+            continue
+        risk = next((label for key, label in
+                     (("高风险", "高"), ("中风险", "中"), ("低风险", "低"), ("高", "高"), ("中", "中"), ("低", "低"))
+                     if key in stripped), "")
+        action = next((a for a in ("买入", "持有", "卖出", "观望") if a in stripped), "")
+        body = "\n".join(lines[:i] + lines[i + 1:]).strip()
+        if risk and action:
+            return body, {"risk": risk, "action": action}
+        return body, None
+    return text, None
+
+
+_KCHART_RE = re.compile(r"\[KCHART:([A-Za-z]{2}\d{6})(?::[a-z]+)?\]")
+
+
+def _extract_charts(text: str) -> tuple[str, list[str]]:
+    """抽取 [KCHART:symbol] 走势卡指令：返回 (剥除后的正文, [symbol])；最多 2 个、去重。"""
+    symbols: list[str] = []
+    for match in _KCHART_RE.finditer(text):
+        sym = match.group(1).lower()
+        if sym not in symbols:
+            symbols.append(sym)
+    if not symbols:
+        return text, []
+    body = _KCHART_RE.sub("", text)
+    body = "\n".join(line for line in body.splitlines() if line.strip()).strip()
+    return body, symbols[:2]
 
 
 def _validate_zone(zone: Any, support: float | None, pressure: float | None) -> list[float] | None:
