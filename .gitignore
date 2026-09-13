@@ -58,3 +58,5 @@ DerivedData/
 .pytest_cache/
 .workbuddy/
 .playwright/
+# === 本地研究笔记（不入库）===
+docs/sairen-benchmark.md
