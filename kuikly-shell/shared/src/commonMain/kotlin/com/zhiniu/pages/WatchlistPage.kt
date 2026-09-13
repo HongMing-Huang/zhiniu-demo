@@ -14,6 +14,7 @@ import com.tencent.kuikly.core.directives.vif
 import com.tencent.kuikly.core.module.SharedPreferencesModule
 import com.tencent.kuikly.core.reactive.handler.observable
 import com.tencent.kuikly.core.reactive.handler.observableList
+import com.tencent.kuikly.core.views.List
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
 import com.zhiniu.base.openAiResearchPage
@@ -124,7 +125,17 @@ internal class WatchlistPage : AppBasePage() {
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
         renderCommonOverlays(this@WatchlistPage, "自选")
-        watchContent(this@WatchlistPage)
+        // 内容放 List：与市场页同结构。普通 Column 里 vfor 行在 iOS 渲染层
+        // 会行高塌陷+横向溢出（实测截图行重叠、价格列被裁切）
+        List {
+            attr {
+                flex(1f)
+                backgroundColor(AppTheme.colors.c(AppTheme.colors.pageBg))
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+            watchContent(this@WatchlistPage)
+            View { attr { height(32f) } }
+        }
         renderBottomTab(this@WatchlistPage, "自选")
     }
 }
@@ -134,14 +145,19 @@ private fun ViewContainer<*, *>.watchContent(host: WatchlistPage) {
     val colors = AppTheme.colors
     View {
         attr {
-            flex(1f); flexDirectionColumn()
+            flexDirectionColumn()
             paddingLeft(if (host.isCompact()) 16f else 32f)
             paddingRight(if (host.isCompact()) 16f else 32f)
             backgroundColor(colors.c(colors.pageBg))
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
         View {
-            attr { width(host.contentWidth()); flexDirectionColumn() }
+            // 手机：撑满 padding 内区域（contentWidth=全屏宽，再叠 padding 会右溢出屏幕）
+            // 桌面：显式 1360 上限居中
+            attr {
+                if (host.isCompact()) flexDirectionColumn()
+                else { width(host.contentWidth()); flexDirectionColumn() }
+            }
             View { attr { height(24f) } }
             Text {
                 attr {
@@ -155,7 +171,7 @@ private fun ViewContainer<*, *>.watchContent(host: WatchlistPage) {
                 attr {
                     fontSize(AppTypography.fs12)
                     color(colors.c(colors.textSecondary))
-                    text(host.sourceLabel + " · 左滑删除或进入详情管理")
+                    text(host.sourceLabel + " · 点击行进入详情管理自选")
                     animate(ANIM_THEME, value = AppTheme.isDark)
                 }
             }

@@ -15,6 +15,7 @@ import com.tencent.kuikly.core.base.ViewBuilder
 import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.base.ViewRef
 import com.tencent.kuikly.core.directives.vfor
+import com.tencent.kuikly.core.directives.vforIndex
 import com.tencent.kuikly.core.directives.vif
 import com.tencent.kuikly.core.reactive.handler.observable
 import com.tencent.kuikly.core.reactive.handler.observableList
@@ -57,6 +58,7 @@ import com.zhiniu.pages.components.common.RoundIconButton
 import com.zhiniu.pages.components.common.Divider
 import com.zhiniu.pages.components.common.SecondaryButton
 import com.zhiniu.pages.components.common.SectionHeader
+import com.tencent.kuikly.core.coroutines.Job
 import com.tencent.kuikly.core.coroutines.launch
 
 /** 聊天消息（user 文本 / ai 结构化块 + 流式）。 */
@@ -67,6 +69,7 @@ data class AiChatMessage(
     val streaming: Boolean = false,
     val progress: List<String> = emptyList(),
     val requestId: String = "",
+    val cancelled: Boolean = false,   // 用户主动停止生成（保留已到内容，可原位重试）
 )
 
 // 与 WatchlistPage 共用的持久化键（AI 从本页改自选/预警时同步落 SP）
@@ -92,6 +95,13 @@ internal class AiResearchPage : AppBasePage() {
     private var seq = 0
     /** 最近一次研究结果：角色视图切换时按视角复述真实辩论内容，不再只发引导语。 */
     internal var lastResearch: AgentResearchResult? = null
+
+    // ---------- 生成中状态（取消/重试，对标 Study0915 会话工单状态机） ----------
+    /** 是否有回复正在生成（驱动「停止生成」按钮）。 */
+    internal var isGenerating by observable(false)
+    private var activeJob: com.tencent.kuikly.core.coroutines.Job? = null
+    private var activeMessageIndex = -1
+    private var activeToken = ""
 
     // 种子会话从股票池动态生成（不再硬编码假标的与假时间戳）：前三个股票各一个会话 + 市场综述
     private fun buildSeedSessions(): List<ChatSession> =
@@ -242,29 +252,59 @@ internal class AiResearchPage : AppBasePage() {
         messages.add(AiChatMessage("user", text = text))
         draft = ""
         persistArchive()
+        answer(text, atIndex = null)
+    }
+
+    /** 路由到研究管线或通用问答；atIndex 非空 = 原位重试（替换该条 AI 消息，不追加）。 */
+    private fun answer(question: String, atIndex: Int?) {
         // 操作意图（加自选/设预警/双方对比）优先走带 ⟦TOOL⟧ 协议的通用问答——AI 直接操作 App；
         // 注意「对比宁德时代」这类单标的表述仍走研究管线（open_compare 需要两只标的）。
-        if (isToolIntent(text)) {
-            sendGeneralQuestion(text)
+        if (isToolIntent(question)) {
+            sendGeneralQuestion(question, atIndex)
             return
         }
         val target = repo.stockQuotes().firstOrNull {
-            text.contains(it.name) || text.contains(it.code) ||
-                (it.pinyin.isNotBlank() && text.contains(it.pinyin, ignoreCase = true))
+            question.contains(it.name) || question.contains(it.code) ||
+                (it.pinyin.isNotBlank() && question.contains(it.pinyin, ignoreCase = true))
         }
         if (target == null) {
-            sendGeneralQuestion(text)
+            sendGeneralQuestion(question, atIndex)
             return
         }
-        startResearch(target.symbol, target.name, text)
+        startResearch(target.symbol, target.name, question, atIndex)
     }
 
-    /** 多 Agent 研究管线（send 与 research_stock 工具指令共用入口）。 */
-    internal fun startResearch(symbol: String, name: String, question: String) {
+    /** 用户停止生成：取消在途请求，保留已到内容并标记可重试（对标 Study0915 cancel）。 */
+    internal fun stopGenerating() {
+        activeJob?.cancel()
+        activeJob = null
+        val idx = activeMessageIndex
+        val token = activeToken
+        if (idx in messages.indices && messages[idx].requestId == token) {
+            val msg = messages[idx]
+            val blocks = if (msg.blocks.isEmpty()) listOf(AiBlock.Text("（已停止生成）")) else msg.blocks
+            messages[idx] = msg.copy(streaming = false, cancelled = true, requestId = "", blocks = blocks)
+        }
+        isGenerating = false
+        persistArchive()
+    }
+
+    /** 原位重试：取该 AI 消息之前最近的一条用户提问，替换此条重新生成（对标 Study0915 retry）。 */
+    internal fun retryMessage(index: Int) {
+        if (index <= 0 || index >= messages.size) return
+        val question = messages.take(index).lastOrNull { it.role == "user" }?.text?.trim().orEmpty()
+        if (question.isEmpty()) return
+        answer(question, atIndex = index)
+    }
+
+    /** 多 Agent 研究管线（send / retry / research_stock 工具指令共用入口）。 */
+    internal fun startResearch(symbol: String, name: String, question: String, atIndex: Int? = null) {
         val token = "research-${++seq}"
-        val messageIndex = messages.size
-        messages.add(AiChatMessage("ai", streaming = true, progress = listOf("行情 Agent"), requestId = token))
-        lifecycleScope.launch {
+        val messageIndex = beginPlaceholder(atIndex, token, listOf("行情 Agent"))
+        activeMessageIndex = messageIndex
+        activeToken = token
+        isGenerating = true
+        activeJob = lifecycleScope.launch {
             // 首选类型化 SSE：阶段帧实时驱动进度条（行情→技术面→财务→资讯→风险→多头→空头→研究经理→交易员→风控→归纳）
             val steps = mutableListOf<String>()
             val streamed = runCatching {
@@ -275,9 +315,11 @@ internal class AiResearchPage : AppBasePage() {
                     }
                 }
             }.getOrNull()
+            if (coroutineContext[Job]?.isActive != true) return@launch
             // 流不可用（旧网关 / 代理不支持流式）→ 回退一次性研究接口
             val result = streamed ?: runCatching { GatewayMarketClient.research(symbol, question) }.getOrNull()
-            if (!isPending(messageIndex, token)) return@launch
+            if (coroutineContext[Job]?.isActive != true || !isPending(messageIndex, token)) return@launch
+            if (activeToken == token) isGenerating = false
             lastResearch = result ?: lastResearch
             val blocks = result?.let { researchBlocks(it) } ?: listOf(
                 AiBlock.Risk("研究网关暂不可用", "已保留本地快照回答；请稍后重试以获取带来源的实时证据。"),
@@ -292,13 +334,14 @@ internal class AiResearchPage : AppBasePage() {
      * （打字机逐段上屏）；流式不可用回退一次性 /agent/chat；网关整体不可用回退本地 Mock。
      * 上下文标的取最近一次研究，回答中的价格数字锚定该快照。
      */
-    private fun sendGeneralQuestion(text: String) {
+    private fun sendGeneralQuestion(text: String, atIndex: Int? = null) {
         val token = "chat-${++seq}"
-        val messageIndex = messages.size
-        messages.add(AiChatMessage("ai", streaming = true, progress = listOf("模型网关"), requestId = token))
-        persistArchive()
+        val messageIndex = beginPlaceholder(atIndex, token, listOf("模型网关"))
+        activeMessageIndex = messageIndex
+        activeToken = token
+        isGenerating = true
         val contextSymbol = lastResearch?.symbol.orEmpty()
-        lifecycleScope.launch {
+        activeJob = lifecycleScope.launch {
             // 多轮上下文：AI 消息取块文本投影（此前 it.text 对 AI 恒为空，历史只剩用户侧）
             val history = messages.takeLast(9).dropLast(1).map { msg ->
                 msg.role to if (msg.role == "user") msg.text else ChatArchive.aiTextOf(msg.blocks)
@@ -318,11 +361,13 @@ internal class AiResearchPage : AppBasePage() {
                     }
                 }
             }.getOrNull()
+            if (coroutineContext[Job]?.isActive != true) return@launch
             // 流式不可用（旧网关/iOS 流断言）→ 一次性问答接口
             val reply = streamed ?: runCatching {
                 GatewayMarketClient.agentChat(text, history, contextSymbol)
             }.getOrNull()
-            if (!isPending(messageIndex, token)) return@launch
+            if (coroutineContext[Job]?.isActive != true || !isPending(messageIndex, token)) return@launch
+            if (activeToken == token) isGenerating = false
             if (reply != null) {
                 val toolBlocks = if (reply.isLlm) executeToolDirectives(reply.tools) else emptyList()
                 val header = if (reply.isLlm) {
@@ -365,6 +410,16 @@ internal class AiResearchPage : AppBasePage() {
 
     private fun isPending(index: Int, token: String): Boolean =
         index < messages.size && messages[index].requestId == token
+
+    /** 放置生成占位消息：atIndex 非空且指向 AI 消息 = 原位重试（替换），否则追加。返回占位下标。 */
+    private fun beginPlaceholder(atIndex: Int?, token: String, progress: List<String>): Int {
+        if (atIndex != null && atIndex in messages.indices && messages[atIndex].role == "ai") {
+            messages[atIndex] = AiChatMessage("ai", streaming = true, progress = progress, requestId = token)
+            return atIndex
+        }
+        messages.add(AiChatMessage("ai", streaming = true, progress = progress, requestId = token))
+        return messages.size - 1
+    }
 
     private fun updateResearchProgress(index: Int, token: String, steps: List<String>) {
         if (!isPending(index, token)) return
@@ -930,7 +985,7 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
                     }
                 }
             }
-            vfor({ host.messages }) { msg ->
+            vforIndex({ host.messages }) { msg, msgIndex, _ ->
                 View {
                     attr { padding(top = 14f, left = host.chatSidePad(), right = host.chatSidePad()) }
                     if (msg.role == "user") {
@@ -981,6 +1036,22 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
                                     )
                                 }
                             }
+                            // 停止生成的回复：保留已到内容 + 原位重新生成入口（对标 Study0915 retry）
+                            vif({ !msg.streaming && msg.cancelled }) {
+                                View {
+                                    attr { flexDirectionRow(); alignItemsCenter(); marginTop(8f) }
+                                    Text {
+                                        attr {
+                                            fontSize(AppTypography.fs12)
+                                            color(colors.c(colors.textTertiary)); marginRight(10f)
+                                            text("已停止生成"); animate(ANIM_THEME, value = AppTheme.isDark)
+                                        }
+                                    }
+                                    SecondaryButton("重新生成", height = 28f, icon = IconKind.REFRESH) {
+                                        host.retryMessage(msgIndex)
+                                    }
+                                }
+                            }
                             View { attr { height(14f) } }
                         }
                     }
@@ -996,6 +1067,16 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
                 padding(top = 12f, bottom = 12f, left = host.chatSidePad(), right = host.chatSidePad())
                 flexDirectionRow(); alignItemsCenter()
                 animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+            // 停止生成（生成中可见）：取消在途请求，保留已到内容并给出重试入口
+            vif({ host.isGenerating }) {
+                View {
+                    attr { marginRight(10f) }
+                    RoundIconButton(
+                        IconKind.CLOSE, size = 14f, box = 38f,
+                        accessibilityLabel = "停止生成",
+                    ) { host.stopGenerating() }
+                }
             }
             AppInput(
                 placeholder = "继续提问，如：分析贵州茅台 / 解释 RSI",

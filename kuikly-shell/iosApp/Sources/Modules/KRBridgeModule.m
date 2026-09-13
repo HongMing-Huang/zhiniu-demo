@@ -2,6 +2,7 @@
 #import "KuiklyRenderViewController.h"
 #import "KuiklyContextParam.h"
 #import "KuiklyRenderView.h"
+#import "KuiklyRenderThreadManager.h"
 #import <SDWebImage/SDWebImageManager.h>
 #import <SDWebImage/SDWebImageDownloader.h>
 #import <SDWebImage/SDImageCache.h>
@@ -84,6 +85,54 @@
             callback(result);
         }
     });
+}
+
+#pragma mark - HTTP Gateway（知牛网络桥）
+
+/* 知牛 shared 层的网络传输桥：NSURLSession 标准 API（completion 队列与 Kotlin 侧无耦合）。
+ * args: url / method(GET|POST) / body(POST JSON 文本，可空)
+ * callback: { result: 响应文本, error: 错误描述, statusCode: 状态码 }
+ * KRBridgeModule（Kuikly module callback）会把回调编组回 Context 线程，Kotlin 侧安全。 */
+- (void)httpRequest:(NSDictionary *)args {
+    NSDictionary *params = [self parseParams:args];
+    KuiklyRenderCallback callback = args[KR_CALLBACK_KEY];
+    NSString *urlStr = params[@"url"];
+    NSString *method = params[@"method"] ?: @"GET";
+    NSString *body = params[@"body"];
+
+    NSURL *url = [NSURL URLWithString:urlStr];
+    if (!url || !callback) {
+        if (callback) {
+            callback(@{@"result": @"", @"error": @"invalid url or callback", @"statusCode": @(-1)});
+        }
+        return;
+    }
+    NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url];
+    req.HTTPMethod = method;
+    req.timeoutInterval = 60.0;
+    if (body.length > 0 && [method caseInsensitiveCompare:@"POST"] == NSOrderedSame) {
+        [req setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+        req.HTTPBody = [body dataUsingEncoding:NSUTF8StringEncoding];
+    }
+    NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:req
+                                                                completionHandler:^(NSData *data, NSURLResponse *resp, NSError *error) {
+        NSString *text = data ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] : @"";
+        NSInteger status = 0;
+        if ([resp isKindOfClass:[NSHTTPURLResponse class]]) {
+            status = ((NSHTTPURLResponse *)resp).statusCode;
+        }
+        NSDictionary *result = @{
+            @"result": text ?: @"",
+            @"error": error.localizedDescription ?: @"",
+            @"statusCode": @(status)
+        };
+        // 回调必须编组回 Context 线程（NSURLSession completion 在自有队列触发，
+        // Kuikly 的 Kotlin 回调恢复依赖 Context 线程时序）
+        [KuiklyRenderThreadManager performOnContextQueueWithBlock:^{
+            if (callback) { callback(result); }
+        }];
+    }];
+    [task resume];
 }
 
 #pragma mark - Helpers

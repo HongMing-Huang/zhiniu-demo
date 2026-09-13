@@ -13,6 +13,7 @@ import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.directives.vif
 import com.tencent.kuikly.core.reactive.handler.observable
 import com.tencent.kuikly.core.reactive.handler.observableList
+import com.tencent.kuikly.core.views.List
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
 import com.tencent.kuikly.core.coroutines.launch
@@ -105,7 +106,16 @@ internal class ComparePage : AppBasePage() {
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
         renderCommonOverlays(this@ComparePage, "市场", showBack = true)
-        compareContent(this@ComparePage)
+        // 内容放 List：小屏（AI 归纳块较高）可滚动，且与市场/自选页同结构
+        List {
+            attr {
+                flex(1f)
+                backgroundColor(AppTheme.colors.c(AppTheme.colors.pageBg))
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+            compareContent(this@ComparePage)
+            View { attr { height(32f) } }
+        }
         renderBottomTab(this@ComparePage, "市场")
     }
 }
@@ -115,7 +125,7 @@ private fun ViewContainer<*, *>.compareContent(host: ComparePage) {
     val colors = AppTheme.colors
     View {
         attr {
-            flex(1f); flexDirectionColumn()
+            flexDirectionColumn()
             paddingLeft(if (host.isCompact()) 16f else 32f)
             paddingRight(if (host.isCompact()) 16f else 32f)
             paddingBottom(24f)
@@ -123,7 +133,12 @@ private fun ViewContainer<*, *>.compareContent(host: ComparePage) {
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
         View {
-            attr { width(host.contentWidth()); flexDirectionColumn() }
+            // 手机：撑满 padding 内区域（contentWidth=全屏宽，再叠 padding 会右溢出屏幕）
+            // 桌面：显式 1360 上限居中
+            attr {
+                if (host.isCompact()) flexDirectionColumn()
+                else { width(host.contentWidth()); flexDirectionColumn() }
+            }
             View { attr { height(24f) } }
             Text {
                 attr {

@@ -1766,8 +1766,9 @@ typedef struct {
           struct {
             struct {
               libshared_KType* (*_type)(void);
-              libshared_kref_com_zhiniu_pages_AiChatMessage (*AiChatMessage)(const char* role, const char* text, libshared_kref_kotlin_collections_List blocks, libshared_KBoolean streaming, libshared_kref_kotlin_collections_List progress, const char* requestId);
+              libshared_kref_com_zhiniu_pages_AiChatMessage (*AiChatMessage)(const char* role, const char* text, libshared_kref_kotlin_collections_List blocks, libshared_KBoolean streaming, libshared_kref_kotlin_collections_List progress, const char* requestId, libshared_KBoolean cancelled);
               libshared_kref_kotlin_collections_List (*get_blocks)(libshared_kref_com_zhiniu_pages_AiChatMessage thiz);
+              libshared_KBoolean (*get_cancelled)(libshared_kref_com_zhiniu_pages_AiChatMessage thiz);
               libshared_kref_kotlin_collections_List (*get_progress)(libshared_kref_com_zhiniu_pages_AiChatMessage thiz);
               const char* (*get_requestId)(libshared_kref_com_zhiniu_pages_AiChatMessage thiz);
               const char* (*get_role)(libshared_kref_com_zhiniu_pages_AiChatMessage thiz);
@@ -1779,7 +1780,8 @@ typedef struct {
               libshared_KBoolean (*component4)(libshared_kref_com_zhiniu_pages_AiChatMessage thiz);
               libshared_kref_kotlin_collections_List (*component5)(libshared_kref_com_zhiniu_pages_AiChatMessage thiz);
               const char* (*component6)(libshared_kref_com_zhiniu_pages_AiChatMessage thiz);
-              libshared_kref_com_zhiniu_pages_AiChatMessage (*copy)(libshared_kref_com_zhiniu_pages_AiChatMessage thiz, const char* role, const char* text, libshared_kref_kotlin_collections_List blocks, libshared_KBoolean streaming, libshared_kref_kotlin_collections_List progress, const char* requestId);
+              libshared_KBoolean (*component7)(libshared_kref_com_zhiniu_pages_AiChatMessage thiz);
+              libshared_kref_com_zhiniu_pages_AiChatMessage (*copy)(libshared_kref_com_zhiniu_pages_AiChatMessage thiz, const char* role, const char* text, libshared_kref_kotlin_collections_List blocks, libshared_KBoolean streaming, libshared_kref_kotlin_collections_List progress, const char* requestId, libshared_KBoolean cancelled);
               libshared_KBoolean (*equals)(libshared_kref_com_zhiniu_pages_AiChatMessage thiz, libshared_kref_kotlin_Any other);
               libshared_KInt (*hashCode)(libshared_kref_com_zhiniu_pages_AiChatMessage thiz);
               const char* (*toString)(libshared_kref_com_zhiniu_pages_AiChatMessage thiz);

@@ -6,6 +6,7 @@ import com.tencent.kuikly.core.module.Module
 import com.tencent.kuikly.core.nvi.serialization.json.JSONArray
 import com.tencent.kuikly.core.nvi.serialization.json.JSONObject
 import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 
 internal class BridgeModule : Module() {
@@ -68,6 +69,40 @@ internal class BridgeModule : Module() {
         return syncCallNativeMethod(DATE_FORMATTER, params, null)
     }
 
+    /**
+     * HTTP 请求（iOS 壳桥实现：NSURLSession；回调由 Kuikly 编组回 Context 线程）。
+     * @return 响应文本；非 2xx 或传输错误抛异常（调用方按既有降级逻辑处理）。
+     */
+    fun httpRequest(url: String, method: String, body: String?, callbackFn: CallbackFn) {
+        val methodArgs = JSONObject()
+        methodArgs.put("url", url)
+        methodArgs.put("method", method)
+        body?.also { methodArgs.put("body", it) }
+        callNativeMethod(HTTP_REQUEST, methodArgs, callbackFn)
+    }
+
+    /** 回调风格（供平台 actual 在 suspendCoroutine 内使用）；Result = 成功响应文本 / 失败异常。 */
+    fun httpRequestAwaitVia(url: String, method: String, body: String?, callbackFn: (Result<String>) -> Unit) {
+        httpRequest(url, method, body) { data ->
+            val result = data?.optString("result").orEmpty()
+            val error = data?.optString("error").orEmpty()
+            val statusCode = data?.optInt("statusCode") ?: 0
+            if (error.isNotEmpty() || statusCode !in 200..299) {
+                callbackFn(Result.failure(RuntimeException("bridge http $statusCode: $error")))
+            } else {
+                callbackFn(Result.success(result))
+            }
+        }
+    }
+
+    suspend fun httpRequestAwait(url: String, method: String, body: String?): String {
+        return suspendCoroutine { continuation ->
+            httpRequestAwaitVia(url, method, body) { result ->
+                result.fold(continuation::resume, continuation::resumeWithException)
+            }
+        }
+    }
+
     private fun callNativeMethod(methodName: String, data: JSONObject?, callbackFn: CallbackFn?) {
         toNative(false, methodName, data?.toString(), callbackFn, false)
     }
@@ -84,5 +119,6 @@ internal class BridgeModule : Module() {
         const val SSO_REQUEST = "ssoRequest"
         const val CURRENT_TIMESTAMP = "currentTimestamp"
         const val DATE_FORMATTER = "dateFormatter"
+        const val HTTP_REQUEST = "httpRequest"
     }
 }
