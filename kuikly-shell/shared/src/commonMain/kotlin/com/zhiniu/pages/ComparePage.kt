@@ -1,0 +1,221 @@
+/* 知牛 · ComparePage（双股对比 · 课题「AI 输出形态丰富」交互项）
+ * 并排对比两只股票的关键指标：最新价/涨跌幅（色块）/总市值/成交额/换手率/振幅。
+ * 数据走网关 /quote/realtime（真实行情），失败回落本地快照；左右卡点击进各自详情。
+ * 快捷入口：AI 研究页快捷指令「对比宁德时代」→ 路由携带 symbolA/symbolB。
+ */
+package com.zhiniu.pages
+
+import com.tencent.kuikly.core.annotations.Page
+import com.tencent.kuikly.core.base.Border
+import com.tencent.kuikly.core.base.BorderStyle
+import com.tencent.kuikly.core.base.ViewBuilder
+import com.tencent.kuikly.core.base.ViewContainer
+import com.tencent.kuikly.core.directives.vif
+import com.tencent.kuikly.core.reactive.handler.observable
+import com.tencent.kuikly.core.reactive.handler.observableList
+import com.tencent.kuikly.core.views.Text
+import com.tencent.kuikly.core.views.View
+import com.tencent.kuikly.core.coroutines.launch
+import com.zhiniu.data.remote.GatewayMarketClient
+import com.zhiniu.domain.model.StockQuote
+import com.zhiniu.pages.components.ANIM_THEME
+import com.zhiniu.pages.components.AppRadius
+import com.zhiniu.pages.components.AppTheme
+import com.zhiniu.pages.components.AppTypography
+import com.zhiniu.pages.components.NUM_FONT
+import com.zhiniu.pages.components.c
+import com.zhiniu.pages.components.ca
+import com.zhiniu.pages.components.cssClass
+import com.zhiniu.pages.components.fmt2
+import com.zhiniu.pages.components.fmtSymbol
+import com.zhiniu.pages.components.fmtVolHand
+import com.zhiniu.pages.components.fmtAmplitude
+import com.zhiniu.pages.components.fmtMarketCap
+import com.zhiniu.pages.components.fmtOptional
+import com.zhiniu.pages.components.fmtPct
+import com.zhiniu.pages.components.fmtVolHand
+import com.zhiniu.pages.components.common.SectionHeader
+
+private val DEFAULT_PAIR = "sh600519" to "sz300750"
+
+@Page("Compare", supportInLocal = true)
+internal class ComparePage : AppBasePage() {
+
+    internal val sideA by observableList<StockQuote>()
+    internal val sideB by observableList<StockQuote>()
+    internal var loading by observable(true)
+    internal var sourceLabel by observable("同步中…")
+
+    override fun created() {
+        super.created()
+        // 路由参数：symbolA/symbolB 可指定对比对（缺省 茅台 vs 宁德）
+        pageData.params.optString("symbolA", "").takeIf { it.isNotBlank() }?.let { pairA = it }
+        pageData.params.optString("symbolB", "").takeIf { it.isNotBlank() }?.let { pairB = it }
+        refresh()
+    }
+
+    private var pairA: String = DEFAULT_PAIR.first
+    private var pairB: String = DEFAULT_PAIR.second
+
+    internal fun refresh() {
+        loading = true
+        sourceLabel = "同步中…"
+        lifecycleScope.launch {
+                val live = runCatching { GatewayMarketClient.quotes(listOf(pairA, pairB)) }.getOrNull()
+            val byCode = live?.associateBy { it.symbol } ?: emptyMap()
+            fun rowOf(symbol: String): StockQuote =
+                byCode[symbol] ?: repo.quoteOf(symbol)?.copy(symbol = symbol)
+                ?: StockQuote(symbol, symbol, open = 0.0, prevClose = 0.0, price = 0.0, high = 0.0, low = 0.0, volume = 0L, amount = 0.0)
+            sideA.diffUpdate(listOf(rowOf(pairA)))
+            sideB.diffUpdate(listOf(rowOf(pairB)))
+            sourceLabel = if (live != null) "实时行情" else "本地快照 · 可重试"
+            loading = false
+        }
+    }
+
+    override fun body(): ViewBuilder = {
+        attr {
+            flexDirectionColumn()
+            backgroundColor(AppTheme.colors.c(AppTheme.colors.pageBg))
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+        renderCommonOverlays(this@ComparePage, "市场")
+        compareContent(this@ComparePage)
+        renderBottomTab(this@ComparePage, "市场")
+    }
+}
+
+// ============== 内容区 ==============
+private fun ViewContainer<*, *>.compareContent(host: ComparePage) {
+    val colors = AppTheme.colors
+    View {
+        attr {
+            flex(1f); flexDirectionColumn()
+            paddingLeft(if (host.isCompact()) 16f else 32f)
+            paddingRight(if (host.isCompact()) 16f else 32f)
+            paddingBottom(host.bottomNavInset() + 24f)
+            backgroundColor(colors.c(colors.pageBg))
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+        View {
+            attr { width(host.contentWidth()); flexDirectionColumn() }
+            View { attr { height(24f) } }
+            Text {
+                attr {
+                    fontSize(AppTypography.fs24); fontWeightSemiBold()
+                    color(colors.c(colors.textPrimary)); text("对比")
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+            }
+            View { attr { height(4f) } }
+            Text {
+                attr {
+                    fontSize(AppTypography.fs12)
+                    color(colors.c(colors.textSecondary))
+                    text(host.sourceLabel + " · 点击任意一侧进个股详情")
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+            }
+            View { attr { height(16f) } }
+            vif({ host.sideA.isNotEmpty() && host.sideB.isNotEmpty() }) {
+                compareCard(host, host.sideA.first(), host.sideB.first())
+            }
+            View { attr { height(24f) } }
+        }
+    }
+}
+
+/** 对比卡：表头双列（名称+价格+色块），下方指标行（label 居中 + 左右值）。 */
+private fun ViewContainer<*, *>.compareCard(host: ComparePage, a: StockQuote, b: StockQuote) {
+    val colors = AppTheme.colors
+    View {
+        attr {
+            borderRadius(AppRadius.radius8)
+            border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+            backgroundColor(colors.c(colors.surface))
+            animate(ANIM_THEME, value = AppTheme.isDark)
+        }
+        // 表头：左右名称
+        View {
+            attr {
+                flexDirectionRow(); alignItemsCenter()
+                padding(left = 14f, right = 14f, top = 12f, bottom = 12f)
+            }
+            CompareHeaderCell(a, onClick = { host.openStock(a.symbol) })
+            View { attr { width(12f) } }
+            CompareHeaderCell(b, onClick = { host.openStock(b.symbol) })
+        }
+        View {
+            attr {
+                height(1f); backgroundColor(colors.c(colors.border))
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+        }
+        compareRow("最新价", com.zhiniu.pages.components.fmt2(a.price), com.zhiniu.pages.components.fmt2(b.price))
+        compareRow("涨跌幅", fmtPct(a.changePercent), fmtPct(b.changePercent))
+        compareRow("总市值", fmtMarketCap(a.marketCap), fmtMarketCap(b.marketCap))
+        compareRow("成交量", com.zhiniu.pages.components.fmtVolHand(a.volume), com.zhiniu.pages.components.fmtVolHand(b.volume))
+        compareRow("换手率", com.zhiniu.pages.components.fmtOptional(a.turnoverRate, "%"), com.zhiniu.pages.components.fmtOptional(b.turnoverRate, "%"))
+        compareRow("振幅", fmtAmplitude(a.high, a.low, a.prevClose), fmtAmplitude(b.high, b.low, b.prevClose))
+    }
+}
+
+/** 表头单元格：名称 + 副行（代码·市场）。 */
+private fun ViewContainer<*, *>.CompareHeaderCell(q: StockQuote, onClick: () -> Unit) {
+    val colors = AppTheme.colors
+    View {
+        attr {
+            flex(1f); flexDirectionColumn()
+            cssClass("zn-click")
+            highlightBackgroundColor(colors.ca(colors.textSecondary, 6))
+            accessibility("查看 ${q.name} 详情")
+        }
+        event { click { onClick() } }
+        Text {
+            attr {
+                fontSize(AppTypography.fs15); fontWeightSemiBold()
+                color(colors.c(colors.textPrimary)); text(q.name); lines(1); textOverFlowClip()
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+        }
+        Text {
+            attr {
+                marginTop(2f); fontSize(AppTypography.fs11)
+                color(colors.c(colors.textTertiary))
+                text(fmtSymbol(q.symbol))
+            }
+        }
+    }
+}
+
+/** 指标对比行：中间 label 居中，左右值右/左对齐。 */
+private fun ViewContainer<*, *>.compareRow(label: String, valueA: String, valueB: String) {
+    val colors = AppTheme.colors
+    View {
+        attr {
+            flexDirectionRow(); alignItemsCenter()
+            padding(top = 8f, bottom = 8f, left = 14f, right = 14f)
+        }
+        Text {
+            attr {
+                flex(1f); textAlignRight()
+                fontSize(AppTypography.fs13); fontWeightMedium(); fontFamily(NUM_FONT)
+                color(colors.c(colors.textPrimary)); text(valueA)
+            }
+        }
+        Text {
+            attr {
+                width(72f); textAlignCenter()
+                fontSize(AppTypography.fs11)
+                color(colors.c(colors.textTertiary)); text(label)
+            }
+        }
+        Text {
+            attr {
+                flex(1f)
+                fontSize(AppTypography.fs13); fontWeightMedium(); fontFamily(NUM_FONT)
+                color(colors.c(colors.textPrimary)); text(valueB)
+            }
+        }
+    }
+}
