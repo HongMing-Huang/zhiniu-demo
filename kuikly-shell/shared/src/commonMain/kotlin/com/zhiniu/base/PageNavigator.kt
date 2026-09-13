@@ -28,3 +28,8 @@ internal fun Pager.openWatchlistPage() = openZhiniuPage("Watchlist")
 internal fun Pager.closeCurrentPage() {
     acquireModule<RouterModule>(RouterModule.MODULE_NAME).closePage()
 }
+
+/** 跨页一次性传参：图表选点/详情 CTA → AI 研究自动提问（SPA 同 bundle 内可靠；URL 直达不支持）。 */
+object PendingAsk {
+    var question: String? = null
+}

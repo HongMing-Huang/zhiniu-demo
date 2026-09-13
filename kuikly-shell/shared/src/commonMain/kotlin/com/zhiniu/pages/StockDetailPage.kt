@@ -131,7 +131,10 @@ internal class StockDetailPage : AppBasePage() {
 
     internal fun askSelectedBar() {
         val q = selectedBarQuestion()
-        if (q.isNotBlank()) openAiResearchPage(q)
+        if (q.isNotBlank()) {
+            com.zhiniu.base.PendingAsk.question = q
+            openAiResearchPage()
+        }
     }
 
     /** 选点追问问题（跳转 AI 研究自动发送）。 */

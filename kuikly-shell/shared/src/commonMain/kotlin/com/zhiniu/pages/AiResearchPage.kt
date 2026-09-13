@@ -85,8 +85,11 @@ internal class AiResearchPage : AppBasePage() {
             seedSessions.forEach { chatSessions.add(it) }
         }
         loadSession("s1")
-        // 图表选点 / 详情页 CTA 携问题跳入：自动开始研究
-        pageData.params.optString("question", "").takeIf { it.isNotBlank() }?.let { send(it) }
+        // 图表选点 / 详情页 CTA 携问题跳入：自动开始研究（进程内单例传参，URL 直达不支持自定义参数）
+        com.zhiniu.base.PendingAsk.question?.let { pending ->
+            com.zhiniu.base.PendingAsk.question = null
+            send(pending)
+        }
         lifecycleScope.launch {
             runCatching { GatewayMarketClient.quotes(repo.stockQuotes().map { it.symbol }) }
                 .onSuccess { live ->
@@ -394,7 +397,7 @@ internal class AiResearchPage : AppBasePage() {
 
     override fun body(): ViewBuilder = {
         attr {
-            flexDirectionColumn()
+            flex(1f); flexDirectionColumn()
             backgroundColor(AppTheme.colors.c(AppTheme.colors.pageBg))
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
