@@ -32,7 +32,7 @@ fun ViewContainer<*, *>.AppHeader(
     topInset: Float = 0f,
     onNavMarket: () -> Unit,
     onNavAiResearch: () -> Unit,
-    onNavTodo: () -> Unit,
+    onNavWatchlist: () -> Unit,
     onSearch: () -> Unit,
     onTheme: () -> Unit,
 ) {
@@ -83,7 +83,7 @@ fun ViewContainer<*, *>.AppHeader(
             if (!compact) {
                 HeaderNav("市场", activeNav == "市场", onClick = onNavMarket)
                 HeaderNav("AI研究", activeNav == "AI研究", onClick = onNavAiResearch)
-                HeaderNav("待办", activeNav == "待办", onClick = onNavTodo)
+                HeaderNav("自选", activeNav == "自选", onClick = onNavWatchlist)
             }
             View { attr { flex(1f) } }
             // 全局搜索（点击打开 Overlay）：手机用图标按钮（占位文字窄屏被裁），桌面用宽搜索框

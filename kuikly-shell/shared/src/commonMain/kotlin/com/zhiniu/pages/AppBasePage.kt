@@ -11,7 +11,7 @@ import com.zhiniu.base.closeCurrentPage
 import com.zhiniu.base.openAiResearchPage
 import com.zhiniu.base.openMarketPage
 import com.zhiniu.base.openStockDetail
-import com.zhiniu.base.openTodoPage
+import com.zhiniu.base.openWatchlistPage
 import com.zhiniu.data.mock.MarketStore
 import com.zhiniu.data.remote.GatewayMarketClient
 import com.zhiniu.domain.model.StockQuote
@@ -93,7 +93,7 @@ internal abstract class AppBasePage : BasePager() {
 
     internal fun navMarket() = openMarketPage()
     internal fun navAiResearch() = openAiResearchPage()
-    internal fun navTodo() = openTodoPage()
+    internal fun navWatchlist() = openWatchlistPage()
     internal fun openStock(symbol: String) = openStockDetail(symbol)
     internal fun goBack() = closeCurrentPage()
 
@@ -117,8 +117,8 @@ internal fun ViewContainer<*, *>.renderBottomTab(host: AppBasePage, activeNav: S
         activeNav = activeNav,
         bottomInset = host.safeBottomInset(),
         onNavMarket = { host.navMarket() },
+        onNavWatchlist = { host.navWatchlist() },
         onNavAiResearch = { host.navAiResearch() },
-        onNavTodo = { host.navTodo() },
     )
 }
 
@@ -130,7 +130,7 @@ internal fun ViewContainer<*, *>.renderCommonOverlays(host: AppBasePage, activeN
         topInset = host.safeTopInset(),
         onNavMarket = { host.navMarket() },
         onNavAiResearch = { host.navAiResearch() },
-        onNavTodo = { host.navTodo() },
+        onNavWatchlist = { host.navWatchlist() },
         onSearch = { host.isSearchVisible = true },
         onTheme = { host.isThemePopoverVisible = !host.isThemePopoverVisible },
     )

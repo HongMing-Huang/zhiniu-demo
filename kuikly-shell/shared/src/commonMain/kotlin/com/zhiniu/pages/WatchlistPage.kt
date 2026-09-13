@@ -6,6 +6,9 @@ package com.zhiniu.pages
 
 import com.tencent.kuikly.core.annotations.Page
 import com.tencent.kuikly.core.base.ViewBuilder
+import com.tencent.kuikly.core.base.ViewContainer
+import com.tencent.kuikly.core.base.attr.AccessibilityRole
+import com.tencent.kuikly.core.directives.velse
 import com.tencent.kuikly.core.directives.vif
 import com.tencent.kuikly.core.module.SharedPreferencesModule
 import com.tencent.kuikly.core.reactive.handler.observable
@@ -14,6 +17,7 @@ import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
 import com.zhiniu.base.openAiResearchPage
 import com.zhiniu.base.openMarketPage
+import com.zhiniu.data.remote.GatewayMarketClient
 import com.zhiniu.domain.model.StockQuote
 import com.zhiniu.pages.components.ANIM_THEME
 import com.zhiniu.pages.components.AppTheme
@@ -90,7 +94,7 @@ internal class WatchlistPage : AppBasePage() {
 }
 
 // ============== 内容区 ==============
-private fun ViewBuilder.watchContent(host: WatchlistPage) {
+private fun ViewContainer<*, *>.watchContent(host: WatchlistPage) {
     val colors = AppTheme.colors
     View {
         attr {
