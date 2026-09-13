@@ -175,12 +175,14 @@ def _parse_sina(code: str, raw: str) -> Optional[dict]:
 
     volume_share = _num(f[8])  # 股
     amount_yuan = _num(f[9])   # 元
+    price_num, prev_num = _num(f[3]), _num(f[2])
     return {
         "symbol": code,
         "name": f[0],
         "open": _num(f[1]),
-        "prevClose": _num(f[2]),
-        "price": _num(f[3]),
+        "prevClose": prev_num,
+        "price": price_num,
+        "changePct": round((price_num - prev_num) / prev_num * 100, 2) if prev_num > 0 else None,
         "high": _num(f[4]),
         "low": _num(f[5]),
         "buy1": _num(f[6]),
@@ -327,7 +329,15 @@ async def quote_kline(symbol: str, scale: int = 240, datalen: int = 120) -> dict
                 "isStale": True,
             }
 
-    if result is not None:
+    # 只有「真实源、非空、非 stale 兜底」的结果才进缓存。离线快照/空结果/stale 旧数据一旦入缓存
+    # （日线 TTL 6h）会长期顶掉真实数据或反复续期，且日线过期 stale 兜底也会退化为快照——
+    # 实测一次瞬时失败即可让日 K 连续数小时停在假数据上。
+    if (
+        result is not None
+        and result.get("provider") not in (None, "offline-snapshot")
+        and result.get("data")
+        and not result.get("isStale")
+    ):
         _kline_cache[cache_key] = (now, result)
     return result or {"symbol": symbol, "name": "", "data": [], "scale": scale}
 
@@ -345,7 +355,7 @@ async def _eastmoney_json(url: str) -> dict:
 
 
 _ALLOWED_API_HOSTS = {
-    "push2.eastmoney.com",
+    "push2delay.eastmoney.com",
     "datacenter-web.eastmoney.com",       # 东财行情快照/板块/选股
     "emappdata.eastmoney.com",   # 东财人气榜
     "searchapi.eastmoney.com",   # 东财全市场搜索建议
@@ -436,7 +446,7 @@ async def _quote_extras(symbols: list) -> Dict[str, dict]:
             need_codes.append(symbol)
     if secids:
         url = (
-            "https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&invt=2"
+            "https://push2delay.eastmoney.com/api/qt/ulist.np/get?fltt=2&invt=2"
             "&fields=f12,f8,f10,f20&secids=" + ",".join(secids)
         )
         try:
@@ -522,7 +532,7 @@ async def quote_fundamentals(symbol: str) -> dict:
 
     code = symbol[2:]
     snapshot_url = (
-        "https://push2.eastmoney.com/api/qt/stock/get?"
+        "https://push2delay.eastmoney.com/api/qt/stock/get?"
         + urlencode({
             "secid": secid,
             "fields": "f58,f116,f117,f127,f128,f129,f152,f162,f167,f168,f171",
@@ -541,7 +551,7 @@ async def quote_fundamentals(symbol: str) -> dict:
         })
     )
     flow_url = (
-        "https://push2.eastmoney.com/api/qt/stock/fflow/kline/get?"
+        "https://push2delay.eastmoney.com/api/qt/stock/fflow/kline/get?"
         + urlencode({
             "lmt": 1, "klt": 1, "secid": secid,
             "fields1": "f1,f2,f3,f7",
@@ -713,7 +723,7 @@ async def quote_sectors() -> dict:
         return cached[1]
     try:
         url = (
-            "https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1"
+            "https://push2delay.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1"
             "&fltt=2&invt=2&fid=f3&fs=m:90+t:2"
             "&fields=f3,f12,f14,f104,f105,f128,f136,f140"
         )
@@ -748,7 +758,7 @@ async def quote_screener(industry: str = "", min_pct: float = 0.0, limit: int = 
     else:
         try:
             url = (
-                "https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1"
+                "https://push2delay.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1"
                 "&fltt=2&invt=2&fid=f6&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23"
                 "&fields=f12,f14,f2,f3,f5,f6,f8,f9,f20,f100"
             )

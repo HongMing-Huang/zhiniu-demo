@@ -55,6 +55,8 @@ class TestQuoteExtensions(unittest.TestCase):
         self.assertEqual(quote["volume"], 12.0)
         self.assertEqual(quote["bids"], [[10.0, 100.0]] * 5)
         self.assertEqual(quote["asks"], [[11.0, 100.0]] * 5)
+        # 涨跌幅由现价/昨收现算（AI 快照注入、诊股证据、双股对比共同依赖）
+        self.assertEqual(quote["changePct"], 22.22)
 
     def test_eastmoney_snapshot_parses_fundamental_units(self):
         result = _parse_eastmoney_snapshot(
@@ -236,11 +238,11 @@ class TestQuoteExtensions(unittest.TestCase):
 
     def test_guard_external_url_blocks_non_allowlist(self):
         self.assertEqual(
-            _guard_external_url("https://push2.eastmoney.com/api/qt/clist/get"),
-            "https://push2.eastmoney.com/api/qt/clist/get",
+            _guard_external_url("https://push2delay.eastmoney.com/api/qt/clist/get"),
+            "https://push2delay.eastmoney.com/api/qt/clist/get",
         )
         with self.assertRaises(ValueError):
-            _guard_external_url("http://push2.eastmoney.com/api")  # 非 HTTPS
+            _guard_external_url("http://push2delay.eastmoney.com/api")  # 非 HTTPS
         with self.assertRaises(ValueError):
             _guard_external_url("https://169.254.169.254/latest/meta-data")  # 云元数据
         with self.assertRaises(ValueError):
@@ -304,6 +306,61 @@ class TestQuoteSearch(unittest.TestCase):
         result = _run(quote_search("  ", 10))
         self.assertEqual(result["items"], [])
         self.assertEqual(result["source"], "invalid")
+
+
+class TestKlineCacheIntegrity(unittest.IsolatedAsyncioTestCase):
+    """回归：离线快照/空结果不得进入 kline 缓存（此前一次瞬时失败 → 日线 6h 假 K）。"""
+
+    def setUp(self):
+        quote_module._kline_cache.clear()
+
+    tearDown = setUp
+
+    _SINA_BARS = (
+        '[{"day":"2026-09-10","open":"10.0","high":"11.0","low":"9.5","close":"10.5","volume":"1000"},'
+        '{"day":"2026-09-11","open":"10.5","high":"11.5","low":"10.0","close":"11.0","volume":"1200"}]'
+    )
+
+    async def test_failed_fetch_mock_not_cached(self):
+        # 源失败 → 返回离线快照（sh600519 有快照夹具），但不得写入缓存
+        with mock.patch.object(quote_module, "_http_get", side_effect=OSError("offline")):
+            result = await quote_module.quote_kline("sh600519", 240, 5)
+        self.assertEqual(result["provider"], "offline-snapshot")
+        self.assertNotIn("sh600519|240|5", quote_module._kline_cache)
+
+    async def test_next_request_retries_live_after_failure(self):
+        # 失败后的下一次请求必须重试真实源（不被 mock 缓存顶掉）
+        with mock.patch.object(quote_module, "_http_get", side_effect=OSError("offline")):
+            await quote_module.quote_kline("sz000002", 240, 5)
+        with mock.patch.object(
+            quote_module, "_http_get", return_value=self._SINA_BARS
+        ):
+            result = await quote_module.quote_kline("sz000002", 240, 5)
+        self.assertEqual(result["provider"], "sina-kline")
+        self.assertFalse(result["isStale"])
+        self.assertEqual(result["data"][-1]["close"], "11.0")
+
+    async def test_expired_real_entry_serves_stale_and_is_not_rearmed(self):
+        # 过期真实数据：源失败时作 stale 兜底返回，但不得写回缓存刷新时间戳
+        real = {
+            "symbol": "sz000003", "name": "x", "data": [{"day": "2026-09-11", "close": "9.9"}],
+            "scale": 240, "source": "新浪财经", "provider": "sina-kline", "isStale": False,
+        }
+        import time as _time
+        quote_module._kline_cache["sz000003|240|5"] = (_time.time() - 7 * 3600, real)
+        with mock.patch.object(quote_module, "_http_get", side_effect=OSError("offline")):
+            result = await quote_module.quote_kline("sz000003", 240, 5)
+        self.assertTrue(result["isStale"])
+        stored_ts, stored = quote_module._kline_cache["sz000003|240|5"]
+        self.assertLess(stored_ts, _time.time() - 6 * 3600)  # 时间戳未被刷新
+        self.assertFalse(stored["isStale"])  # 缓存里仍是无 stale 标记的原始真实数据
+
+    async def test_empty_source_result_not_cached(self):
+        # 新浪返回空列表且无快照可用 → 空结果不进缓存
+        with mock.patch.object(quote_module, "_http_get", return_value="[]"):
+            result = await quote_module.quote_kline("sz000004", 240, 5)
+        self.assertEqual(result.get("data"), [])
+        self.assertNotIn("sz000004|240|5", quote_module._kline_cache)
 
 
 if __name__ == "__main__":

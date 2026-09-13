@@ -460,6 +460,9 @@ def _chat_messages(question: str, history: list[dict] | None, symbol: str, quote
         name = quote.get("name", "")
         price = quote.get("price")
         change = quote.get("changePct")
+        if change is None and price and quote.get("prevClose"):
+            # 快照未带涨跌幅（如离线快照）→ 由现价/昨收现算，避免模型拿到空值
+            change = round((price - quote["prevClose"]) / quote["prevClose"] * 100, 2)
         system += (
             f"\n当前上下文标的：{name}（{symbol}），最新价 {price}，涨跌幅 {change}%。"
             "回答中引用该标的数字时只能使用此快照。"
