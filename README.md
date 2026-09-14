@@ -12,11 +12,33 @@
 
 ![页面预览](docs/img/pages_preview.png)
 
-| 行情 · Dark | AI 研究归纳 |
-|:---:|:---:|
-| ![行情深色](docs/img/market-dark.png) | ![AI 研究](docs/img/ai-markdown.png) |
+| 行情（Android） | AI 研究（iOS） | 个股详情（iOS） |
+|:---:|:---:|:---:|
+| ![行情](docs/img/mobile-asset/android-1-market.png) | ![AI 研究](docs/img/mobile-asset/ios-3-ai.png) | ![详情](docs/img/mobile-asset/ios-4-detail.png) |
 
 </div>
+
+---
+
+## 快速体验（免编译）
+
+| 方式 | 链接 / 命令 | 说明 |
+|:--|:--|:--|
+| **Android 直接安装** | [zhiniu-debug.apk](zhiniu-debug.apk)（约 8 MB） | 下载即装；默认连 `10.0.2.2:8000`（模拟器）/ 本机网关，见 [运行说明](docs/getting-started.md) |
+| **H5 秒开** | 起后端 + `python3 -m http.server 8082`（web-host 目录） | 浏览器打开即为 390 移动布局 |
+| **iOS / 鸿蒙** | 见 [docs/getting-started.md](docs/getting-started.md) | iOS 需 Xcode Run；鸿蒙需 DevEco 构建 HAP |
+| **演示视频** | 分镜脚本 [docs/demo-script.md](docs/demo-script.md) | 录制中，随后入库 |
+
+> 行情来自公开免费接口（新浪/东财），AI 结论由大模型生成，两者都可能出错；本作品仅用于课程学习与产品原型演示，**不构成任何投资建议**，也不提供真实证券交易。
+
+## 任务对照（Task 1 & Task 2）
+
+| 任务 | 实际路径 | 验收要点 |
+|:--|:--|:--|
+| **Task 1 · 行情原型** | 市场列表（自选/筛选/排序/人气榜/板块）→ 搜索 → 个股详情（日K/分时缩放/十字线/MA/MACD/RSI/五档/资金/财务/新闻）→ 加自选 → 价格预警 | 真实新浪+东财数据；断网自动回退快照并标记 stale |
+| **Task 2 · AI 问答** | AI 研究页提问 → 多 Agent 管线（四阶段进度）→ Markdown+证据卡混排 → 结论徽章/K线卡 → 点击卡片回详情 → 追问/对比/停止/重试 → 会话归档 | 真 LLM 流式逐字上屏；LLM 不可用明示「规则降级」；AI 可执行 6 类工具指令直接操作 App |
+
+逐项自查详见 [docs/deliverables.md](docs/deliverables.md)。
 
 ---
 

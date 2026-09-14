@@ -84,15 +84,23 @@
 | 真实 AI 接入 | ✅ | FastAPI LLM 网关（OpenAI 兼容协议，多厂商可选）+ 真实新浪/东财数据 |
 | 体验优化 | ✅ | 深/浅色 180ms 切换、骨架屏、Hover/按压微交互、响应式四断点、安全区避让、无障碍语义、等宽数字对齐 |
 
-## 6. 剩余待办（按优先级，已在 GitHub Issues 建立跟踪）
+## 6. 同课题仓库对标（2026-09-14 复查）
+
+| 仓库 | 活跃度 | 亮点表达 | 我们已吸收 / 待借鉴 |
+|:--|:--|:--|:--|
+| [Study0915/Kuikly](https://github.com/Study0915/Kuikly) | 09-13 更新 | README 顶部三联截图 + webm 录屏直链 + 「两题完成什么」任务对照表 + 运行说明/测试报告分文档 | ✅ 三联移动截图 + 任务对照表已进 README；分文档化测试报告待做 |
+| [zeriehan/KuiklyStock](https://github.com/zeriehan/KuiklyStock) | 09-13 更新 | **debug APK 直接入库**（免编译安装）、B 站演示视频、免责声明块、单 Pager 四 Tab 架构（Tab 零动画） | ✅ APK 入库 + 免责声明已吸收；**单 Pager 架构**列为 Tab 动画彻底解的后续重构项；长按行菜单（加自选/问AI）待借鉴 |
+| [1250422131/SaiRen](https://github.com/1250422131/SaiRen) | 09-13 更新 | APK 外链下载、平台预览拼图、五端覆盖（含微信小程序） | ✅ 移动端素材目录（docs/img/mobile-asset/）已建立；小程序端不在课题范围 |
+
+## 7. 剩余待办（按优先级，已在 GitHub Issues 建立跟踪）
 
 | # | 待办 | Issue |
 |:--|:--|:--|
 | 1 | 🔶 录制原型演示视频（交付物硬性项）：按 `docs/demo-script.md` 分镜录制 | [#1](https://github.com/HongMing-Huang/zhiniu-demo/issues/1) |
 | 2 | 🔶 品牌 Logo 素材替换（Header / README / favicon，当前文字占位） | [#2](https://github.com/HongMing-Huang/zhiniu-demo/issues/2) |
-| 3 | 🔶 iOS 原生构建验收（pod install + Xcode；勿重跑 xcodegen） | [#3](https://github.com/HongMing-Huang/zhiniu-demo/issues/3) |
-| 4 | 🔶 鸿蒙网络层 expect/actual 桥接 + 真机验收 | [#4](https://github.com/HongMing-Huang/zhiniu-demo/issues/4) |
-| 5 | ⬜ 重跑 Mimosa 完整安全扫描（提交钩子 scanner_enobufs 未出结论） | [#5](https://github.com/HongMing-Huang/zhiniu-demo/issues/5) |
+| 3 | ✅ 鸿蒙端装机验证（Pura 90 CLI 拉起 + OKX UI + 逐 Tab 点击，2026-09-14） | [#4](https://github.com/HongMing-Huang/zhiniu-demo/issues/4) |
+| 4 | ⬜ 重跑 Mimosa 完整安全扫描（提交钩子 scanner_enobufs 未出结论） | [#5](https://github.com/HongMing-Huang/zhiniu-demo/issues/5) |
+| 5 | 🔶 Android APK 已入库（zhiniu-debug.apk），发版前换 release 签名包 | 新增 |
 
 ---
 
