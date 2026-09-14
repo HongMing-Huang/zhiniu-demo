@@ -169,7 +169,7 @@ internal fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.
                 attr { flex(1f); flexDirectionColumn() }
                 Text {
                     attr {
-                        fontSize(AppTypography.fs18); fontWeightSemiBold()
+                        fontSize(AppTypography.fs20); fontWeightSemiBold()
                         color(colors.c(colors.textPrimary))
                         text(q.name)
                         animate(ANIM_THEME, value = AppTheme.isDark)
@@ -215,12 +215,12 @@ internal fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.
             }
         }
         View { attr { height(10f) } }
-        // 大价格块：价格 + 涨跌额/幅 同行；更新时间独立小字一行（避免挤压重叠）
+        // 大价格块（OKX 式特大价格锚）：价格 + 涨跌额/幅 同行；更新时间独立小字一行
         View {
-            attr { flexDirectionRow(); alignItemsCenter() }
+            attr { flexDirectionRow(); alignItemsFlexEnd() }
             Text {
                 attr {
-                    fontSize(AppTypography.fs28); fontWeightSemiBold()
+                    fontSize(AppTypography.fs34); fontWeightBold()
                     fontFamily(NUM_FONT)
                     color(colors.c(if (q.isUp) colors.up else colors.down))
                     text(com.zhiniu.pages.components.fmt2(q.price))
@@ -229,7 +229,7 @@ internal fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.
             }
             Text {
                 attr {
-                    marginLeft(10f); marginTop(8f)
+                    marginLeft(10f); marginBottom(6f)
                     fontSize(AppTypography.fs13); fontWeightMedium()
                     fontFamily(NUM_FONT)
                     color(colors.c(if (q.isUp) colors.up else colors.down))

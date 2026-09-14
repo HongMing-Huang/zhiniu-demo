@@ -135,6 +135,47 @@
     [task resume];
 }
 
+/* 知牛同步版 HTTP：syncCallNative 直返结果 JSON（在 Context 线程阻塞执行）。
+ * 用于短请求（localhost 行情/搜索，百毫秒级）；LLM 长请求仍走异步 httpRequest。 */
+- (NSString *)httpRequestSync:(NSDictionary *)args {
+    NSDictionary *params = [self parseParams:args];
+    NSString *urlStr = params[@"url"];
+    NSString *method = params[@"method"] ?: @"GET";
+    NSString *body = params[@"body"];
+    NSURL *url = [NSURL URLWithString:urlStr];
+    if (!url) {
+        return @"{\"error\":\"invalid url\",\"statusCode\":-1}";
+    }
+    NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url];
+    req.HTTPMethod = method;
+    req.timeoutInterval = 20.0;
+    if (body.length > 0 && [method caseInsensitiveCompare:@"POST"] == NSOrderedSame) {
+        [req setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+        req.HTTPBody = [body dataUsingEncoding:NSUTF8StringEncoding];
+    }
+    __block NSData *data = nil;
+    __block NSString *errText = @"";
+    __block NSInteger status = 0;
+    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+    NSURLSessionDataTask *syncTask = [[NSURLSession sharedSession] dataTaskWithRequest:req
+                                                                    completionHandler:^(NSData *d, NSURLResponse *resp, NSError *error) {
+        data = d;
+        status = ([resp isKindOfClass:[NSHTTPURLResponse class]]) ? ((NSHTTPURLResponse *)resp).statusCode : 0;
+        errText = error.localizedDescription ?: @"";
+        dispatch_semaphore_signal(sem);
+    }];
+    [syncTask resume];
+    dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, 25LL * NSEC_PER_SEC));
+    NSString *text = data ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] : @"";
+    NSDictionary *result = @{
+        @"result": text ?: @"",
+        @"error": errText ?: (text ? @"" : @"timeout or empty response"),
+        @"statusCode": @(status)
+    };
+    NSData *json = [NSJSONSerialization dataWithJSONObject:result options:0 error:nil];
+    return json ? [[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding] : @"{\"error\":\"serialize fail\",\"statusCode\":-1}";
+}
+
 #pragma mark - Helpers
 
 - (NSDictionary *)parseParams:(NSDictionary *)args {

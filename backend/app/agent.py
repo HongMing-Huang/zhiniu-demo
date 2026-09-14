@@ -137,6 +137,23 @@ async def _resolve_symbol_arg(arg: dict, keys: tuple[str, ...], context_symbol: 
     return None
 
 
+async def _display_name(symbol: str, current: str) -> str:
+    """指令展示名兜底：模型直接给代码时 name 常缺省/等于代码，补一次真实行情名称，
+    避免反馈卡与对比页显示 sh600519 这类裸代码。"""
+    if current and current != symbol:
+        return current
+    try:
+        from .quote import quote_realtime
+
+        result, _ = await quote_realtime([symbol])
+        name = str((result.get(symbol) or {}).get("name") or "").strip()
+        if name:
+            return name
+    except Exception:  # noqa: BLE001 - 拿不到名称时保留原值，不阻塞指令
+        pass
+    return current or symbol
+
+
 async def _validate_tool_directive(
     raw: dict, context_symbol: str
 ) -> tuple[dict | None, str]:
@@ -151,8 +168,9 @@ async def _validate_tool_directive(
         if resolved is None:
             return None, "（未能解析标的代码，本次未执行加自选；可在个股详情页手动添加）"
         symbol, stock_name = resolved
+        stock_name = await _display_name(symbol, stock_name)
         return (
-            {"name": "add_watchlist", "args": {"symbol": symbol, "name": stock_name}, "display": f"加入自选 {stock_name or symbol}"},
+            {"name": "add_watchlist", "args": {"symbol": symbol, "name": stock_name}, "display": f"加入自选 {stock_name}"},
             "",
         )
     if canonical == "research_stock":
@@ -160,8 +178,9 @@ async def _validate_tool_directive(
         if resolved is None:
             return None, "（未能解析研究标的，本次未转入研究；可在行情页搜索该股后进入详情）"
         symbol, stock_name = resolved
+        stock_name = await _display_name(symbol, stock_name)
         return (
-            {"name": "research_stock", "args": {"symbol": symbol, "name": stock_name}, "display": f"转入个股研究 {stock_name or symbol}"},
+            {"name": "research_stock", "args": {"symbol": symbol, "name": stock_name}, "display": f"转入个股研究 {stock_name}"},
             "",
         )
     if canonical == "open_compare":
@@ -169,11 +188,13 @@ async def _validate_tool_directive(
         second = await _resolve_symbol_arg(args, ("symbol_b", "symbolB", "b"), "")
         if first is None or second is None or first[0] == second[0]:
             return None, "（对比标的不完整或重复，本次未打开对比页；可指明两只股票后重试）"
+        name_a = await _display_name(first[0], first[1])
+        name_b = await _display_name(second[0], second[1])
         return (
             {
                 "name": "open_compare",
-                "args": {"symbolA": first[0], "symbolB": second[0], "nameA": first[1], "nameB": second[1]},
-                "display": f"打开对比 {first[1] or first[0]} × {second[1] or second[0]}",
+                "args": {"symbolA": first[0], "symbolB": second[0], "nameA": name_a, "nameB": name_b},
+                "display": f"打开对比 {name_a} × {name_b}",
             },
             "",
         )

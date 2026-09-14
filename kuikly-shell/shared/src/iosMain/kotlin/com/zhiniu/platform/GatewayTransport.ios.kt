@@ -12,11 +12,21 @@ import com.zhiniu.base.BridgeModule
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 internal class BridgeGatewayTransport : GatewayTransport {
 
-    override suspend fun get(url: String): String = request(url, "GET", null)
+    // GET（行情/搜索/榜单等短请求）：同步桥直返（Context 阻塞百毫秒级，可接受）
+    override suspend fun get(url: String): String {
+        val module = PagerManager.getCurrentPager().acquireModule<BridgeModule>(BridgeModule.MODULE_NAME)
+        val obj = module.httpRequestSync(url, "GET", null)
+        val error = obj["error"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        if (error.isNotEmpty()) throw RuntimeException("bridge http: $error")
+        return obj["result"]?.jsonPrimitive?.contentOrNull.orEmpty()
+    }
 
+    // POST（LLM 长请求）：异步桥（避免长时间阻塞 UI；失败由页面侧 mock 降级承接）
     override suspend fun postJson(url: String, json: String): String = request(url, "POST", json)
 
     // iOS 无 Ktor 流式：页面侧已有「流不可用 → 回退一次性接口」降级

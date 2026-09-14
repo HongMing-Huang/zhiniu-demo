@@ -2119,6 +2119,7 @@ typedef struct {
                 libshared_KFloat (*get_fs24)(libshared_kref_com_zhiniu_pages_components_AppTypography thiz);
                 libshared_KFloat (*get_fs28)(libshared_kref_com_zhiniu_pages_components_AppTypography thiz);
                 libshared_KFloat (*get_fs32)(libshared_kref_com_zhiniu_pages_components_AppTypography thiz);
+                libshared_KFloat (*get_fs34)(libshared_kref_com_zhiniu_pages_components_AppTypography thiz);
               } AppTypography;
               struct {
                 libshared_KType* (*_type)(void);

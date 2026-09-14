@@ -97,11 +97,13 @@ internal class MarketPage : AppBasePage() {
         lifecycleScope.launch {
             runCatching { GatewayMarketClient.quotes(repo.stockQuotes().map { it.symbol }) }
                 .onSuccess { live ->
+                    println("zn-net: quotes ok n=${live.size}")
                     if (live.isNotEmpty()) {
                         com.zhiniu.data.mock.MarketStore.applyLiveQuotes(live)
                         val local = repo.stockQuotes().associateBy { it.symbol }
                         marketUniverse.diffUpdate(live.map { q -> q.copy(pinyin = local[q.symbol]?.pinyin.orEmpty()) })
                         marketSource = "实时行情"
+                        println("zn-net: marketSource set")
                         marketLoading = false
                         refreshRows()
                         refreshHotQuotes()
@@ -123,7 +125,11 @@ internal class MarketPage : AppBasePage() {
     internal fun loadLiveIndices() {
         lifecycleScope.launch {
             runCatching { GatewayMarketClient.indices() }
-                .onSuccess { if (!it.isNullOrEmpty()) liveIndices.diffUpdate(it) }
+                .onSuccess {
+                    println("zn-net: indices ok n=${it?.size}")
+                    if (!it.isNullOrEmpty()) liveIndices.diffUpdate(it)
+                }
+                .onFailure { println("zn-net: indices fail err=$it") }
         }
     }
 
@@ -214,20 +220,76 @@ internal class MarketPage : AppBasePage() {
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
         renderCommonOverlays(this@MarketPage, "市场")
+        // 头部区（标题/指数卡/Tab/工具条）放普通容器：Kuikly List 内的非 vfor 子项
+        // 在 H5/Android 不响应 observable 重渲染（卡在首帧 mock），普通容器无此问题
+        View {
+            attr {
+                flexDirectionColumn()
+                backgroundColor(AppTheme.colors.c(AppTheme.colors.pageBg))
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+            marketHeader(this@MarketPage)
+        }
         List {
             attr {
                 flex(1f)
                 backgroundColor(AppTheme.colors.c(AppTheme.colors.pageBg))
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
-            marketContent(this@MarketPage)
+            marketRows(this@MarketPage)
             View { attr { height(32f) } }
         }
         renderBottomTab(this@MarketPage, "市场")
     }
 }
 
-private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
+private fun ViewContainer<*, *>.marketRows(host: MarketPage) {
+    val colors = AppTheme.colors
+    // ---- 行情表 / 榜单表 / 板块表（List 行区） ----
+    vif({ host.isRankTab() }) {
+        RankTable(rows = { host.rankRows }, compact = host.isCompact()) { host.openStock(it.symbol) }
+        vif({ host.rankLoading }) {
+            MarketSkeleton(rows = 6)
+        }
+        vif({ !host.rankLoading && host.rankRows.isEmpty() }) {
+            EmptyState(
+                title = "榜单暂不可用",
+                desc = "请启动本地网关后点击「刷新」重试",
+            )
+        }
+    }
+    velseif({ host.isSectorTab() }) {
+        SectorTable(rows = { host.sectorRows }, compact = host.isCompact()) { row ->
+            // 板块行点击 → 领涨股详情（有真实 symbol 才跳转）
+            if (row.leadSymbol.isNotBlank()) host.openStock(row.leadSymbol)
+        }
+        vif({ host.sectorLoading }) {
+            MarketSkeleton(rows = 6)
+        }
+        vif({ !host.sectorLoading && host.sectorRows.isEmpty() }) {
+            EmptyState(
+                title = "板块数据暂不可用",
+                desc = "请启动本地网关后点击「刷新」重试",
+            )
+        }
+    }
+    velseif({ host.marketLoading }) {
+        MarketSkeleton()
+    }
+    velse {
+        // 列结构在构建期决定：epoch 奇偶切换让表格随字段选择重建
+        vif({ host.tableEpoch % 2 == 0 }) { stockTable(host) }
+        velse { stockTable(host) }
+        vif({ host.marketQuotes.isEmpty() }) {
+            EmptyState(
+                title = "没有符合条件的股票",
+                desc = "切换上方 Tab 或调整筛选条件",
+            )
+        }
+    }
+}
+
+private fun ViewContainer<*, *>.marketHeader(host: MarketPage) {
     val colors = AppTheme.colors
     val pad: Float = if (host.isCompact()) 16f else PAD
         val aw: Float = host.viewportWidth()
@@ -287,7 +349,9 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
         // ---- Market Pulse（92px） ----
         View { attr { height(if (host.isCompact()) 16f else 28f) } }
         MarketPulse(
-            indices = if (host.liveIndices.isNotEmpty()) { host.liveIndices.toList() } else host.repo.indices(),
+            // 手机只展示前 3 张指数卡（6 张会溢出截断）；桌面可全量
+            indices = (if (host.liveIndices.isNotEmpty()) host.liveIndices.toList() else host.repo.indices())
+                .let { if (host.isCompact()) it.take(3) else it },
             breadth = host.repo.breadth(),
             narrow = host.isNarrow(),
             compact = host.isCompact(),
@@ -402,48 +466,6 @@ private fun ViewContainer<*, *>.marketContent(host: MarketPage) {
                 height(1f)
                 backgroundColor(colors.c(colors.border))
                 animate(ANIM_THEME, value = AppTheme.isDark)
-            }
-        }
-        // ---- 行情表 / 榜单表 / 板块表 ----
-        vif({ host.isRankTab() }) {
-            RankTable(rows = { host.rankRows }, compact = host.isCompact()) { host.openStock(it.symbol) }
-            vif({ host.rankLoading }) {
-                MarketSkeleton(rows = 6)
-            }
-            vif({ !host.rankLoading && host.rankRows.isEmpty() }) {
-                EmptyState(
-                    title = "榜单暂不可用",
-                    desc = "请启动本地网关后点击「刷新」重试",
-                )
-            }
-        }
-        velseif({ host.isSectorTab() }) {
-            SectorTable(rows = { host.sectorRows }, compact = host.isCompact()) { row ->
-                // 板块行点击 → 领涨股详情（有真实 symbol 才跳转）
-                if (row.leadSymbol.isNotBlank()) host.openStock(row.leadSymbol)
-            }
-            vif({ host.sectorLoading }) {
-                MarketSkeleton(rows = 6)
-            }
-            vif({ !host.sectorLoading && host.sectorRows.isEmpty() }) {
-                EmptyState(
-                    title = "板块数据暂不可用",
-                    desc = "请启动本地网关后点击「刷新」重试",
-                )
-            }
-        }
-        velseif({ host.marketLoading }) {
-            MarketSkeleton()
-        }
-        velse {
-            // 列结构在构建期决定：epoch 奇偶切换让表格随字段选择重建
-            vif({ host.tableEpoch % 2 == 0 }) { stockTable(host) }
-            velse { stockTable(host) }
-            vif({ host.marketQuotes.isEmpty() }) {
-                EmptyState(
-                    title = "没有符合条件的股票",
-                    desc = "切换上方 Tab 或调整筛选条件",
-                )
             }
         }
     }

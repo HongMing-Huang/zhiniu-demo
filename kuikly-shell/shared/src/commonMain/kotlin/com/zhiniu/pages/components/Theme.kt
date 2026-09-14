@@ -26,6 +26,7 @@ internal const val UPDOWN_SP_KEY = "zhiniu.prefs.swap-updown.v1"
 
 // ---------- 排版 / 间距 / 圆角 / 尺寸 ----------
 object AppTypography {
+    const val fs34 = 34f
     const val fs32 = 32f
     const val fs28 = 28f
     const val fs24 = 24f

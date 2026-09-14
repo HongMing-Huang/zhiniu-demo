@@ -8,6 +8,9 @@ import com.tencent.kuikly.core.nvi.serialization.json.JSONObject
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 
 internal class BridgeModule : Module() {
 
@@ -81,6 +84,19 @@ internal class BridgeModule : Module() {
         callNativeMethod(HTTP_REQUEST, methodArgs, callbackFn)
     }
 
+    /**
+     * HTTP 同步请求（iOS：syncCallNative 直返，Context 线程阻塞至响应/超时）。
+     * 仅用于短请求（localhost 行情/搜索）；返回解析后的包装 JSON，error 非空 = 失败。
+     */
+    fun httpRequestSync(url: String, method: String, body: String?): JsonObject {
+        val methodArgs = JSONObject()
+        methodArgs.put("url", url)
+        methodArgs.put("method", method)
+        body?.also { methodArgs.put("body", it) }
+        val raw = syncCallNativeMethod(HTTP_REQUEST_SYNC, methodArgs, null)
+        return runCatching { Json.parseToJsonElement(raw).jsonObject }.getOrElse { JsonObject(emptyMap()) }
+    }
+
     /** 回调风格（供平台 actual 在 suspendCoroutine 内使用）；Result = 成功响应文本 / 失败异常。 */
     fun httpRequestAwaitVia(url: String, method: String, body: String?, callbackFn: (Result<String>) -> Unit) {
         httpRequest(url, method, body) { data ->
@@ -120,5 +136,6 @@ internal class BridgeModule : Module() {
         const val CURRENT_TIMESTAMP = "currentTimestamp"
         const val DATE_FORMATTER = "dateFormatter"
         const val HTTP_REQUEST = "httpRequest"
+        const val HTTP_REQUEST_SYNC = "httpRequestSync"
     }
 }

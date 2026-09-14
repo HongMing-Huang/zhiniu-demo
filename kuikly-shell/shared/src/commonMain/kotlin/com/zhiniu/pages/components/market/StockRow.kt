@@ -59,7 +59,7 @@ fun ViewContainer<*, *>.StockTable(
     }
 }
 
-/** 表头：42px / fs12 / textTertiary；点击表头排序由调用方通过外部 SortToolbar 控制。 */
+/** 表头：42px / fs12 / textTertiary；compact 行加 16f 水平留白（List 行区原样通栏）。 */
 fun ViewContainer<*, *>.StockTableHeader(
     narrow: Boolean,
     compact: Boolean = false,
@@ -67,7 +67,10 @@ fun ViewContainer<*, *>.StockTableHeader(
 ) {
     val colors = AppTheme.colors
     View {
-        attr { flexDirectionRow(); alignItemsCenter(); height(42f) }
+        attr {
+            flexDirectionRow(); alignItemsCenter(); height(42f)
+            if (compact) { paddingLeft(16f); paddingRight(16f) }
+        }
         View { attr { flex(2.4f) }; ThLabel("股票", alignLeft = true) }
         View { attr { width(if (compact) 78f else 120f) }; ThLabel("最新价", alignLeft = false) }
         if (!compact && StockColumns.CHANGE in columns) View { attr { width(110f) }; ThLabel("涨跌额", alignLeft = false) }
@@ -148,7 +151,9 @@ fun ViewContainer<*, *>.StockRow(
     View {
         attr {
             flexDirectionRow(); alignItemsCenter()
-            height(64f)
+            height(if (compact) 68f else 64f)
+            // compact 行内 16f 水平留白（OKX 参照；行级 padding 不破坏 List 虚拟化）
+            if (compact) { paddingLeft(16f); paddingRight(16f) }
             backgroundColor(colors.c(colors.surface))
             highlightBackgroundColor(colors.c(colors.surfaceHover))
             accessibility("${q.name} ${fmtSymbol(q.symbol)}，最新价 ${fmt2(q.price)}，涨跌幅 ${fmtPct(q.changePercent)}")
@@ -163,7 +168,8 @@ fun ViewContainer<*, *>.StockRow(
             attr { flex(2.4f) }
             Text {
                 attr {
-                    fontSize(AppTypography.fs14); fontWeightSemiBold()
+                    // OKX 参照：主名称加大加粗，是行内第一视觉层级
+                    fontSize(if (compact) AppTypography.fs16 else AppTypography.fs14); fontWeightSemiBold()
                     color(colors.c(colors.textPrimary))
                     text(q.name)
                     animate(ANIM_THEME, value = AppTheme.isDark)
@@ -181,14 +187,13 @@ fun ViewContainer<*, *>.StockRow(
                 }
             }
         }
-        // 最新价
-        // 最新价（compact：价格 + 下方「涨跌额 涨跌幅」同色小字，课题 Task1 要求涨跌额；东财移动端样式）
+        // 最新价（compact：OKX 式大号价格锚 + 下方「涨跌额 涨跌幅」同色小字，课题 Task1 要求涨跌额）
         if (compact) {
             View {
-                attr { width(128f); flexDirectionColumn(); alignItemsFlexEnd() }
+                attr { width(136f); flexDirectionColumn(); alignItemsFlexEnd() }
                 Text {
                     attr {
-                        fontSize(AppTypography.fs15); fontWeightSemiBold()
+                        fontSize(AppTypography.fs20); fontWeightSemiBold()
                         fontFamily(NUM_FONT); lines(1); cssClass("zn-nowrap")
                         color(colors.c(colors.textPrimary))
                         text(fmt2(q.price))
@@ -197,8 +202,8 @@ fun ViewContainer<*, *>.StockRow(
                 }
                 Text {
                     attr {
-                        marginTop(2f)
-                        fontSize(AppTypography.fs11); fontWeightMedium()
+                        marginTop(3f)
+                        fontSize(AppTypography.fs12); fontWeightMedium()
                         fontFamily(NUM_FONT); lines(1); cssClass("zn-nowrap")
                         color(colors.c(if (q.isUp) colors.up else colors.down))
                         text(fmtChangeSigned(q.change) + "  " + fmtPct(q.changePercent))
@@ -236,7 +241,11 @@ fun ViewContainer<*, *>.StockRow(
         // 行底分割线（满足 vfor 单一孩子约束）
         View {
             attr {
-                absolutePosition(top = 63f, left = 0f, right = 0f)
+                if (compact) {
+                    absolutePosition(top = 67f, left = 16f, right = 16f)
+                } else {
+                    absolutePosition(top = 63f, left = 0f, right = 0f)
+                }
                 height(1f)
                 backgroundColor(colors.c(colors.border))
                 animate(ANIM_THEME, value = AppTheme.isDark)
@@ -264,7 +273,10 @@ fun ViewContainer<*, *>.SectorTable(
 ) {
     val colors = AppTheme.colors
     View {
-        attr { flexDirectionRow(); alignItemsCenter(); height(42f) }
+        attr {
+            flexDirectionRow(); alignItemsCenter(); height(42f)
+            if (compact) { paddingLeft(16f); paddingRight(16f) }
+        }
         View { attr { width(36f) }; ThLabel("#", alignLeft = true) }
         View { attr { flex(1f) }; ThLabel("行业板块", alignLeft = true) }
         View { attr { width(if (compact) 64f else 90f) }; ThLabel("涨跌幅", alignLeft = false) }
@@ -282,6 +294,7 @@ fun ViewContainer<*, *>.SectorTable(
             attr {
                 flexDirectionRow(); alignItemsCenter()
                 height(56f)
+                if (compact) { paddingLeft(16f); paddingRight(16f) }
                 backgroundColor(colors.c(colors.surface))
                 highlightBackgroundColor(colors.c(colors.surfaceHover))
                 accessibility("第 ${row.rank} 名板块 ${row.name}，涨跌幅 ${fmtPct(row.changePercent)}，领涨股 ${row.leadStock}")
@@ -357,7 +370,10 @@ fun ViewContainer<*, *>.RankTable(
 ) {
     val colors = AppTheme.colors
     View {
-        attr { flexDirectionRow(); alignItemsCenter(); height(42f) }
+        attr {
+            flexDirectionRow(); alignItemsCenter(); height(42f)
+            if (compact) { paddingLeft(16f); paddingRight(16f) }
+        }
         View { attr { width(36f) }; ThLabel("#", alignLeft = true) }
         View { attr { flex(1f) }; ThLabel("股票", alignLeft = true) }
         View { attr { width(if (compact) 78f else 120f) }; ThLabel("最新价", alignLeft = false) }
@@ -375,6 +391,7 @@ fun ViewContainer<*, *>.RankTable(
             attr {
                 flexDirectionRow(); alignItemsCenter()
                 height(56f)
+                if (compact) { paddingLeft(16f); paddingRight(16f) }
                 backgroundColor(colors.c(colors.surface))
                 highlightBackgroundColor(colors.c(colors.surfaceHover))
                 accessibility("第 ${row.rank} 名 ${row.name}，最新价 ${fmt2(row.price)}，涨跌幅 ${fmtPct(row.changePercent)}")
