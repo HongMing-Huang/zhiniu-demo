@@ -48,6 +48,16 @@
 
 - **状态**：✅ 已修复（2026-09-14，`4cf3cb6`）——`persistHook` 收口 AppBasePage；ChatArchive 归档（会话+消息）。
 
+### 8. 前端行情数据硬编码在 Kotlin 源码里
+
+- **现象**：12 只股票池 / 3 个指数 / 市场宽度 / 默认自选 / 默认对比对 / 详情页行业文案全部以字面量散落在 `MockMarketRepository`、`Watchlist`、`ComparePage`、`ProfilePage`、`StockDetailSections`；与 `mock_quotes.json` 双源维护。
+- **状态**：✅ 已修复（2026-09-14）——数据抽到 `shared/src/commonMain/data/mock_market.json` 单一事实源，Gradle 任务 `generateMockMarketData` 编译期生成 Kotlin（Android/iOS/ohos/JS 四端构建脚本均已接线），业务代码只读解析结果；详情页行业改用真实 `fundamentals.industry`。离线兜底能力不变（无网时股票池/指数/宽度照常渲染）。
+
+### 9. 数据源单点：realtime 只依赖新浪、日K 只依赖新浪
+
+- **现象**：新浪不可达时 realtime/日K 直接落离线快照（假数据兜底）。
+- **状态**：✅ 已修复（2026-09-14）——realtime 新浪失败自动降级腾讯 gtimg（`_parse_tencent_quote` 同构解析）；日K 新浪失败自动降级东财 push2delay kline。三源链 = 主源 → 备源 → 离线快照（标注 stale），备用源为真实数据可正常入缓存。
+
 ---
 
 ## 二、已知非阻塞（不阻塞演示与交付，按影响排序）
