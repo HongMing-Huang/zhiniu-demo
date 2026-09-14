@@ -37,6 +37,8 @@ import com.zhiniu.pages.components.fmtOptional
 import com.zhiniu.pages.components.fmtPct
 import com.zhiniu.pages.components.fmtVolHand
 import com.zhiniu.pages.components.common.SectionHeader
+import com.zhiniu.pages.components.common.SecondaryButton
+import com.zhiniu.pages.components.common.StockSearchOverlay
 
 private val DEFAULT_PAIR: Pair<String, String> get() = com.zhiniu.data.mock.MockMarketDefaults.comparePair
 
@@ -52,6 +54,52 @@ internal class ComparePage : AppBasePage() {
     internal var aiResult by observable<AgentCompareResult?>(null)
     internal var aiLoading by observable(false)
     internal var aiStage by observable("")
+
+    // ---------- 换股交互：⇄ 交换 / 换 A / 换 B（搜索浮层选股替换该侧） ----------
+    internal var cmpSearchVisible by observable(false)
+    internal var cmpSearchSide by observable("A")            // 本次搜索替换哪一侧
+    internal var cmpSearchQuery by observable("")
+    internal val cmpSearchResults by observableList<StockQuote>()
+    private var cmpSearchSeq = 0
+
+    /** 交换左右两侧（立即刷新行情与 AI 对比）。 */
+    internal fun swapPair() {
+        val t = pairA; pairA = pairB; pairB = t
+        refresh()
+    }
+
+    /** 打开换股搜索浮层（side = "A" / "B"）。 */
+    internal fun openSideSearch(side: String) {
+        cmpSearchSide = side
+        cmpSearchQuery = ""
+        cmpSearchResults.diffUpdate(repo.stockQuotes())
+        cmpSearchVisible = true
+    }
+
+    internal fun refreshCmpSearch() {
+        val kw = cmpSearchQuery.trim()
+        cmpSearchResults.diffUpdate(repo.search(kw))
+        if (kw.length < 2) return
+        val seq = ++cmpSearchSeq
+        lifecycleScope.launch {
+            // 全市场搜索（东财 suggest）异步补全；序号防抖避免乱序覆盖
+            val sug = runCatching { GatewayMarketClient.search(kw) }.getOrNull() ?: return@launch
+            if (seq != cmpSearchSeq || sug.isEmpty()) return@launch
+            val known = cmpSearchResults.map { it.symbol }.toSet()
+            val rows = sug.filter { it.symbol !in known }.take(10 - known.size)
+                .mapNotNull { s -> runCatching { GatewayMarketClient.quotes(listOf(s.symbol)) }.getOrNull()?.firstOrNull() }
+                .filterNotNull()
+            if (rows.isNotEmpty() && seq == cmpSearchSeq) cmpSearchResults.diffUpdate(cmpSearchResults.toList() + rows)
+        }
+    }
+
+    /** 选中搜索结果：替换对应侧并整页刷新（行情 + AI 对比）。 */
+    internal fun applySidePick(symbol: String) {
+        if (symbol.length != 8) return
+        if (cmpSearchSide == "B") pairB = symbol else pairA = symbol
+        cmpSearchVisible = false
+        refresh()
+    }
 
     override fun created() {
         super.created()
@@ -117,6 +165,20 @@ internal class ComparePage : AppBasePage() {
             View { attr { height(32f) } }
         }
         renderBottomTab(this@ComparePage, "市场")
+        StockSearchOverlay(
+            visible = { this@ComparePage.cmpSearchVisible },
+            query = { this@ComparePage.cmpSearchQuery },
+            recent = { this@ComparePage.cmpSearchResults },
+            hot = { this@ComparePage.cmpSearchResults },
+            results = { this@ComparePage.cmpSearchResults },
+            left = 0f,
+            width = this@ComparePage.viewportWidth(),
+            topInset = this@ComparePage.safeTopInset(),
+            compact = this@ComparePage.isCompact(),
+            onQueryChange = { this@ComparePage.cmpSearchQuery = it; this@ComparePage.refreshCmpSearch() },
+            onPick = { q -> this@ComparePage.applySidePick(q.symbol) },
+            onClose = { this@ComparePage.cmpSearchVisible = false },
+        )
     }
 }
 
@@ -148,13 +210,31 @@ private fun ViewContainer<*, *>.compareContent(host: ComparePage) {
                 }
             }
             View { attr { height(4f) } }
-            Text {
-                attr {
-                    fontSize(AppTypography.fs12)
-                    color(colors.c(colors.textSecondary))
-                    text(host.sourceLabel + " · 点击任意一侧进个股详情")
-                    animate(ANIM_THEME, value = AppTheme.isDark)
+            View {
+                attr { flexDirectionRow(); alignItemsCenter() }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs12)
+                        color(colors.c(colors.textSecondary))
+                        text(host.sourceLabel + " · 点击任意一侧进个股详情")
+                        animate(ANIM_THEME, value = AppTheme.isDark)
+                    }
                 }
+                View { attr { flex(1f) } }
+                // 非实时（本地快照）时提供重试入口
+                vif({ !host.sourceLabel.startsWith("实时") }) {
+                    SecondaryButton("重试", height = 26f) { host.refresh() }
+                }
+            }
+            View { attr { height(10f) } }
+            // 换股操作行：交换 A/B / 换 A / 换 B
+            View {
+                attr { flexDirectionRow(); alignItemsCenter() }
+                SecondaryButton("交换 A/B", height = 28f) { host.swapPair() }
+                View { attr { width(8f) } }
+                SecondaryButton("换 A", height = 28f) { host.openSideSearch("A") }
+                View { attr { width(8f) } }
+                SecondaryButton("换 B", height = 28f) { host.openSideSearch("B") }
             }
             View { attr { height(16f) } }
             vif({ host.sideA.isNotEmpty() && host.sideB.isNotEmpty() }) {

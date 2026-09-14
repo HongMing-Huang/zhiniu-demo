@@ -68,7 +68,14 @@ struct Index {
   private prepareCommonAssets(): string {
     const context = getContext(this);
     const root = `${context.filesDir}/kuikly-assets`;
-    ['brand', 'icons', 'fonts'].forEach((dir: string) => fs.mkdirSync(`${root}/common/${dir}`, true));
+    // mkdirSync 在目录已存在时可能抛 File exists（新 API 版本行为）——二次进入必须容错
+    ['brand', 'icons', 'fonts'].forEach((dir: string) => {
+      try {
+        fs.mkdirSync(`${root}/common/${dir}`, true);
+      } catch (e) {
+        // 目录已存在：继续
+      }
+    });
     this.commonAssetList(context).forEach((relativePath: string) => {
       try {
         const content = context.resourceManager.getRawFileContentSync(`common/${relativePath}`);

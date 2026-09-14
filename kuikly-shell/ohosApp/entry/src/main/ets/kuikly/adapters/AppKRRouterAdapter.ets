@@ -9,17 +9,24 @@ export class AppKRRouterAdapter implements IKRRouterAdapter {
   openPage(context: common.UIAbilityContext, pageName: string, pageData: KRRecord): void {
     // 底部 Tab 级切换（__tab=1）：replaceUrl 不堆栈（返回键不倒退遍历 Tab）
     const isTab = pageData['__tab'] === '1';
-    const target = {
-      url: 'pages/Index',
-      params: {
-        pageName,
-        pageData
-      }
-    };
     if (isTab) {
-      router.replaceUrl(target);
+      const replaceOpt: router.RouterOptions = {
+        url: 'pages/Index',
+        params: {
+          pageName,
+          pageData
+        }
+      };
+      router.replaceUrl(replaceOpt);
     } else {
-      router.pushUrl(target);
+      const pushOpt: router.RouterOptions = {
+        url: 'pages/Index',
+        params: {
+          pageName,
+          pageData
+        }
+      };
+      router.pushUrl(pushOpt);
     }
   }
 
