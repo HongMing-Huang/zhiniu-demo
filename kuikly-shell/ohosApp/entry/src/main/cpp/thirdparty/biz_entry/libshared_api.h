@@ -131,12 +131,6 @@ typedef struct {
 } libshared_kref_com_zhiniu_domain_model_StockQuote;
 typedef struct {
   libshared_KNativePtr pinned;
-} libshared_kref_com_zhiniu_data_mock_MockMarketDefaults;
-typedef struct {
-  libshared_KNativePtr pinned;
-} libshared_kref_kotlin_Pair;
-typedef struct {
-  libshared_KNativePtr pinned;
 } libshared_kref_com_zhiniu_data_remote_MarketNewsItem;
 typedef struct {
   libshared_KNativePtr pinned;
@@ -255,6 +249,9 @@ typedef struct {
 typedef struct {
   libshared_KNativePtr pinned;
 } libshared_kref_com_zhiniu_domain_model_KLineChart;
+typedef struct {
+  libshared_KNativePtr pinned;
+} libshared_kref_kotlin_Pair;
 typedef struct {
   libshared_KNativePtr pinned;
 } libshared_kref_com_zhiniu_domain_model_SseParser;
@@ -735,12 +732,6 @@ typedef struct {
                 libshared_kref_kotlin_collections_List (*spark)(libshared_kref_com_zhiniu_data_mock_MockMarketRepository thiz, const char* symbol);
                 libshared_kref_kotlin_collections_List (*stockQuotes)(libshared_kref_com_zhiniu_data_mock_MockMarketRepository thiz);
               } MockMarketRepository;
-              struct {
-                libshared_KType* (*_type)(void);
-                libshared_kref_com_zhiniu_data_mock_MockMarketDefaults (*_instance)();
-                libshared_kref_kotlin_Pair (*get_comparePair)(libshared_kref_com_zhiniu_data_mock_MockMarketDefaults thiz);
-                libshared_kref_kotlin_collections_List (*get_watchlist)(libshared_kref_com_zhiniu_data_mock_MockMarketDefaults thiz);
-              } MockMarketDefaults;
             } mock;
             struct {
               struct {

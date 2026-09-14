@@ -143,7 +143,7 @@ internal fun ViewContainer<*, *>.detailContent(host: StockDetailPage, q: com.zhi
                     accessibilityRole(AccessibilityRole.BUTTON)
                     animate(ANIM_THEME, value = AppTheme.isDark)
                 }
-                event { click { host.isAiPanelVisible = !host.isAiPanelVisible } }
+                event { click { host.toggleAiPanel() } }
                 Icon(IconKind.AI, 16f)
                 View { attr { width(8f) } }
                 Text {
@@ -210,7 +210,7 @@ internal fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.
                     accessibility("打开 AI 分析")
                     accessibilityRole(AccessibilityRole.BUTTON)
                 }
-                event { click { host.isAiPanelVisible = !host.isAiPanelVisible } }
+                event { click { host.toggleAiPanel() } }
                 Icon(IconKind.AI, 16f)
             }
         }

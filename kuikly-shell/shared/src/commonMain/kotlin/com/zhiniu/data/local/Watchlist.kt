@@ -7,7 +7,7 @@ package com.zhiniu.data.local
 
 object Watchlist {
     // 默认自选来自离线兜底数据文件（mock_market.json defaults.watchlist），不硬编码标的
-    private val symbols = linkedSetOf(*com.zhiniu.data.mock.MockMarketDefaults.watchlist.toTypedArray())
+    private val symbols = linkedSetOf(*com.zhiniu.data.mock.mockMarketFile.defaults.watchlist.toTypedArray())
 
     fun symbols(): List<String> = symbols.toList()
 

@@ -83,6 +83,13 @@ internal class StockDetailPage : AppBasePage() {
     internal var crossY by observable(-1f)
     internal var detailLoading by observable(true)
     internal var isAiPanelVisible by observable(false)
+
+    /** 切换 AI 面板并输出诊断（真机排查：点击后行情区回退 Mock 的问题定位）。 */
+    internal fun toggleAiPanel() {
+        isAiPanelVisible = !isAiPanelVisible
+        val q = quote()
+        println("zn-detail: toggle → visible=$isAiPanelVisible | liveQuote=${liveQuote?.price} | quotePrice=${q?.price} | src=${q?.source} | stale=${q?.isStale}")
+    }
     internal var railTab by observable("盘口")
     internal var aiDraft by observable("")
     /** 自选状态（响应式，点击后按钮即反馈）。 */
@@ -285,11 +292,13 @@ internal class StockDetailPage : AppBasePage() {
             lifecycleScope.launch {
                 runCatching { GatewayMarketClient.quotes(listOf(symbol)).firstOrNull() }
                     .onSuccess {
+                        println("zn-detail: quotes fetch → ${it?.price}/${it?.source}")
                         if (it != null) {
                             MarketStore.applyLiveQuotes(listOf(it))
                             liveQuote = it
                         }
                     }
+                    .onFailure { println("zn-detail: quotes fetch FAIL $it") }
             }
             lifecycleScope.launch {
                 runCatching { GatewayMarketClient.news(symbol) }
@@ -322,7 +331,11 @@ internal class StockDetailPage : AppBasePage() {
                 backgroundColor(AppTheme.colors.c(AppTheme.colors.pageBg))
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
-            vif({ this@StockDetailPage.detailLoading || this@StockDetailPage.quote() == null }) { detailSkeleton(this@StockDetailPage) }
+            // 响应式注意：q 必须在渲染分支内通过 host.quote() 求值（内部读取 liveQuote observable），
+            // 让 liveQuote 到达/变化驱动本分支重渲染；快照传参曾导致顶部行情停留在 Mock。
+            vif({ this@StockDetailPage.detailLoading || this@StockDetailPage.liveQuote == null && this@StockDetailPage.repo.quoteOf(this@StockDetailPage.selectedSymbol().orEmpty()) == null }) {
+                detailSkeleton(this@StockDetailPage)
+            }
             velse { detailContent(this@StockDetailPage, this@StockDetailPage.quote()!!) }
             View { attr { height(32f) } }
         }
