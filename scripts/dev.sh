@@ -10,7 +10,8 @@ cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 
 echo "==> [1/2] 启动后端网关 :8000"
-(cd "$ROOT/backend" && source .venv/bin/activate 2>/dev/null; nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/zhiniu_backend.log 2>&1 &)
+# 剥离代理环境变量：新浪/东财/DeepSeek 均为国内直连；本机代理挂掉会拖垮全部出站请求
+(cd "$ROOT/backend" && source .venv/bin/activate 2>/dev/null; nohup env -u https_proxy -u http_proxy -u all_proxy -u HTTPS_PROXY -u HTTP_PROXY -u ALL_PROXY uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/zhiniu_backend.log 2>&1 &)
 echo "    后端日志: /tmp/zhiniu_backend.log"
 
 echo "==> [2/2] 启动 H5 主入口 :8082（bundle 同源，单端口完整可跑）"
