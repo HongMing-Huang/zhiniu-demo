@@ -1,6 +1,6 @@
 # 知牛 ZhiNiu · 交付物清单与评分标准自查
 
-> 版本：v1.0（2026-09-11）。对照课题《实战总览 / 验收标准 / 评分维度详解 / 交付物清单》逐项自查。
+> 版本：v1.3（2026-09-14）。对照课题《实战总览 / 验收标准 / 评分维度详解 / 交付物清单》逐项自查。
 > 状态口径：✅ 已完成且有验证证据 · 🔶 部分完成 / 待外部输入 · ⬜ 未做。
 > 结论：**四维均已有对应实现与证据；当前无 P0 缺口。剩余项为录屏视频（待录制）与两处外部素材。**
 
@@ -62,7 +62,7 @@
 | 命名规范 | ✅ | AGENTS §5 业务命名白名单 + 禁用 `data2/tmp/flag` 类命名 |
 | 注释到位 | ✅ | 只解释非显然逻辑（K线坐标换算、SSE 状态机、Mock→Real 替换点），禁止废话注释（AGENTS §6） |
 | 模块化复用组件 | ✅ | AppButton/StockRow/MarketPulse/KLine/Level2Panel/AiBlocks/MarkdownView 等跨页复用 |
-| 健壮性 | ✅ | 六态状态机；网络失败保留快照；LLM 失败明确规则降级（不伪装）；后端 53 项单测 |
+| 健壮性 | ✅ | 六态状态机；网络失败保留快照；LLM 失败明确规则降级（不伪装）；后端 **106 项 pytest**（含工具协议/流式抑制/K线缓存回归/别名归一）+ commonTest 纯逻辑单测（AlertStore/Markdown/ChatArchive） |
 | 已知工具链问题 | 🔶 | `:shared:jsNodeTest` 受 Kuikly/Kotlin 工具链 `IrSimpleFunctionSymbolImpl is already bound` 内部错误阻断（clean 复现，与业务代码无关）；单测逻辑改以纯函数隔离 + 构建冒烟验证 |
 
 ## 4. AI 场景设计能力（权重 25%）
@@ -80,7 +80,7 @@
 
 | 评分点 | 状态 | 证据 |
 |:--|:--:|:--|
-| 平台覆盖 | ✅/🔶 | H5 ✅ + Android ✅ 模拟器端到端（移动布局/底部 Tab/持久化/深色/离线降级，2026-09-13）+ iOS ✅ 模拟器端到端（同上，2026-09-13）；**鸿蒙 🔶→重大进展（2026-09-13）**：网络层 GatewayTransport expect/actual 桥接完成（commonMain 去 Ktor），`:shared:compileKotlinOhosArm64` 编译通过、`linkDebugSharedOhosArm64` 产出 libshared.so/libshared_api.h 并回填 ohosApp（scripts/ohos-backfill.sh）；剩余仅 DevEco Studio 内 ohpm install + hvigor 构建（本机无 DevEco 环境） |
+| 平台覆盖 | ✅ | **四端端到端**：H5 ✅（390/1280 双视口响应式回归）+ Android ✅ 模拟器实测（移动 4 Tab/实时行情/0 崩溃，2026-09-14）+ iOS ✅ 模拟器五页走查（市场/自选/AI/我的/对比，价格列完整，2026-09-14）+ **鸿蒙 ✅ DevEco 模拟器实测**（真实数据全链路：上证 3888.11 与后端一致、LLM 诊股 POST 200、25 枚图标全渲染，2026-09-13）；h5App 响应式重排链路修复（转屏/窗口缩放实时断点，2026-09-14） |
 | 真实 AI 接入 | ✅ | FastAPI LLM 网关（OpenAI 兼容协议，多厂商可选）+ 真实新浪/东财数据 |
 | 体验优化 | ✅ | 深/浅色 180ms 切换、骨架屏、Hover/按压微交互、响应式四断点、安全区避让、无障碍语义、等宽数字对齐 |
 
@@ -96,8 +96,15 @@
 
 ---
 
-### 本次自查验证记录（2026-09-11）
+### 本次自查验证记录（2026-09-14）
 
-- 后端：`.venv/bin/python -m unittest discover -s tests` → **53/53 通过**
+- 后端：`backend/.venv/bin/python -m pytest tests/ -q` → **106/106 通过**
+- 前端：`scripts/build.sh` → BUILD SUCCESSFUL；`:shared:compileKotlinIosSimulatorArm64` / Android `assembleDebug` / ohos `linkDebugSharedOhosArm64` + hvigor `assembleHap` 全通过
+- 移动端实机：Android 模拟器重装 0 崩溃 + 实时行情；iOS 五页走查（价格列完整/行距正常/会话历史面板闭环）；鸿蒙模拟器真实数据+图标全渲染
+- 已知工具链限制：`jsNodeTest` clean 态 IR 内部错误（历史提交同样复现，主源集四端编译与运行不受影响）
+
+### 历史自查验证记录（2026-09-11）
+
+- 后端：`.venv/bin/python -m unittest discover -s tests` → 53/53 通过（当时口径）
 - 前端：`scripts/build.sh`（图标+字体同步 → jsBrowserProductionWebpack → 部署）→ **BUILD SUCCESSFUL**
 - 浏览器实测（Playwright，1440×900）：行情页真实报价 1292.83 渲染正常；`document.fonts.check('16px "JetBrainsMono-Regular"') === true`，数字计算样式 = JetBrainsMono-Regular；AI 研究发送「分析贵州茅台」返回真实证据（12 条东方财富资讯、RSI/MA20）且 Markdown 归纳（标题/来源/表格）渲染正确；控制台 0 error
