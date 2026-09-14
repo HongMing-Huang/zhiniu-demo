@@ -175,6 +175,7 @@ zhiniu-demo/
 - [外部 API 接入与降级链](docs/api-matrix.md)
 - [LLM 网关设计](docs/backend-llm-gateway-design.md)
 - [课题组对标调研](docs/sairen-benchmark.md)
+- [已知问题与风险清单](docs/known-issues.md)
 - [变更日志](docs/WORKLOG.md)
 
 ## 致谢与参考

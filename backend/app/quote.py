@@ -36,7 +36,7 @@ _POPULARITY_URL = "https://emappdata.eastmoney.com/stockrank/getAllCurrentList"
 # 目录（相对本文件定位到 shared/data/mock，避免硬编码绝对路径依赖 jpy/外挂）
 _MOCK_DIR = (
     Path(__file__).resolve().parent.parent.parent
-    / "shared/src/commonMain/kotlin/com/zhiniu/data/mock"
+    / "kuikly-shell/shared/src/commonMain/kotlin/com/zhiniu/data/mock"
 )
 
 _rt_cache: Dict[str, dict] = {}          # codes key → (ts, data)
