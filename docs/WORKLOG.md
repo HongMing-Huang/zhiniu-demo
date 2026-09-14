@@ -6,6 +6,16 @@
 
 ***
 
+| 时间 | 类别 | 改动 | 验证 |
+| ---- | ---- | ---- | ---- |
+| 09:35 | agent/ux | **会话取消/重试状态机（对标 Study0915 ChatSession + KuiklyStock）**：①「停止生成」按钮（生成中可见）——取消在途请求（Kuikly Job.cancel 挂起点不再恢复 + isPending 双保险防串扰），保留已流出内容并追加「已停止生成」+「重新生成」胶囊；②**原位重试**：retryMessage 取该条 AI 消息前最近一条用户提问，beginPlaceholder(atIndex) 原位替换占位后按原路由（研究管线/通用问答）重新生成，不追加重复消息；③answer() 路由抽取（send 与 retry 共用）；isGenerating 以 activeToken 归属熄灭（并行生成不误灭）；cancelled 消息归档为部分正文 | H5 真实 E2E（Playwright + 本地网关真实 LLM）：快捷问句发送 → stop 按钮 34ms 出现即点 → 「已停止生成+重新生成」51ms 出现 → 点重新生成 → 新回复原位替换（通用问答消息头保持 2 条无重复）→ 刷新页面归档恢复（会话+消息齐全、无残留停止标记）；`:shared:testDebugUnitTest` + `jsBrowserProductionWebpack` 通过，产物同步 web-host/web-8083 |
+| 02:55 | fix/network | **iOS 网络层彻底重写——真实数据端到端打通（此前 iOS 全量跑 mock 硬编码）**：诊断链＝后端访问日志证明请求到达但 Kotlin continuation 永不恢复 → 定位 Ktor Darwin 引擎死锁类已知问题（ktor#678/KTOR-5502：Worker+runBlocking 内回调恢复路径被阻塞，HttpTimeout 亦不生效）。**最终方案：原生壳桥**——①KRBridgeModule.m 新增 httpRequest（异步）与 httpRequestSync（syncCallNative 短请求直返，25s 信号量上限）双通道，NSURLSession completion 经 KuiklyRenderThreadManager performOnContextQueueWithBlock 编组回 Context 线程再回调；②BridgeModule.kt 增 httpRequest/httpRequestSync/httpRequestAwaitVia（CallbackFn=JSONObject? 解析 result/error/statusCode）；③GatewayTransport.ios 改 BridgeGatewayTransport（GET=同步桥、POST=异步桥），OffThread.ios 直执行；④Mac 侧曾试 Kotlin/Native 直接 cinterop NSURLConnection（API 名解析成本高）与 GCD hop（crash 于 UIScheduler assert，KR_ASSERT_CONTEXT_HTREAD 已对齐 Release tolerated）均弃用 | **iOS 模拟器实测**：市场页绿点「实时行情」+ 6 大真实指数（上证 3888.11/-1.18%、沪深300、中证500、科创50）+ 真实 spark 走势 + 茅台 1275.16/-9.97；自选页「实时行情」标签；后端日志全 200 |
+| 02:50 | fix/data+ux | **指数平线/溢出 + 人气榜诚实化 + 搜索热门保价**：①后端 /quote/indices 并发补 spark（5分钟K×24点，60s缓存）+ 客户端解析与 O-L-H-P 兜底（修平线）；②compact 指数卡 take(3)（6 张溢出截断）；③人气榜接口此前 mock 兜底伪造价格——现网关重启后已返回东财真实排名+新浪实价（超声电子 20.57 等）；④AppBasePage.refreshHotQuotes：实时行情到达后刷新搜索热门价（此前永久展示 mock 1292.83）；⑤行情列表补**涨跌额**（compact 价格下方同色小字「-9.97 -0.78%」，东财移动端样式；课题 Task1 硬性字段） | curl spark_len=24×3；iOS/H5/Android 列表均显示涨跌额 |
+| 02:45 | agent | **research_stock 工具指令**：问股票池外个股时 LLM 无上下文空谈 → 新增白名单指令（名称经东财解析），App 收到即自动转入多 Agent 研究管线并回执可跳详情 | curl：「隆基绿能走势」→ research_stock sh601012（3.9s） |
+| 02:40 | feature | **「我的」浏览历史**：ViewHistory store（去重置顶/上限12/SP 双写）+ 详情页进页记录 + 我的页胶囊流（名称+价，可清空） | iOS 实测：茅台胶囊+清空按钮 |
+| 02:30 | ⚠️known-issue | **H5/Android 市场页头部（数据源 chip/指数卡数值）卡首帧**——探针证明回调全通（indices n=6/quotes n=12/marketSource 已赋值）且列表 vfor 实时更新，但 List 外普通 View 文本不重渲染；头部移出 List 仍复现；iOS 同代码正常。判定为 Kuikly H5/Android 渲染层对非 vfor 子树文本更新的怪癖，与「184f857 H5 响应式重排链路」同题，待续查（方向：pulse 改 vfor 驱动 / 升级 core） | 三端对照截图留档 docs/img/qa*；h5deep.js 探针脚本 /tmp |
+| 03:00 | ⚠️coordination | **并行会话协调**：检测到另一会话同仓并发开发（预警/会话归档/NetworkModule-ohos/列表容器统一/后端网关重启），期间互修编译错误 3 处；本轮未提交文件：KRBridgeModule.m(+httpRequest/Sync)、BridgeModule.kt(+HTTP)、GatewayTransport.ios.kt(桥传输)、MarketPage.kt(头部拆分+涨跌额+SourceChip)、web-host bundle——请合并时保留；MarketPage 头部已拆出 List（结构变更较大），如与其「列表容器统一」冲突以保留头部普通容器为准 | git status 可见 |
+
 ## 2026-09-14
 
 | 时间 | 类别 | 改动 | 验证 |
