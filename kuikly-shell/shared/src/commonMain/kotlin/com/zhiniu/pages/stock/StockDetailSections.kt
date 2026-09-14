@@ -180,6 +180,7 @@ internal fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.
                     attr {
                         fontSize(AppTypography.fs12)
                         color(colors.c(colors.textTertiary))
+                        lines(1); textOverFlowClip()
                         text(fmtSymbol(q.symbol) + " · " + marketName(q.symbol))
                         animate(ANIM_THEME, value = AppTheme.isDark)
                     }
