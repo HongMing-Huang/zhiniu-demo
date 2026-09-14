@@ -82,7 +82,8 @@ class KuiklyRenderActivity : AppCompatActivity(), KuiklyRenderViewBaseDelegatorD
 
     private fun argsToMap(): MutableMap<String, Any> {
         val jsonStr = intent.getStringExtra(KEY_PAGE_DATA) ?: return mutableMapOf()
-        return JSONObject(jsonStr).toMap()
+        // 容错：adb/am 传参时 JSON 引号可能被 shell 剥离导致解析失败，降级为空参数而非崩溃
+        return runCatching { JSONObject(jsonStr).toMap() }.getOrDefault(mutableMapOf())
     }
 
     private fun setupImmersiveMode() {

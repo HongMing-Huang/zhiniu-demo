@@ -54,10 +54,12 @@ internal class OhosGatewayTransport : GatewayTransport {
                     module.httpRequest(url, isPost, param, headers, null, 60) { data, success, errorMsg, _ ->
                         if (settled) return@httpRequest
                         settled = true
+                        println("[zhiniu-net] ${if (success) "ok" else "fail"} url=$url err=$errorMsg")
                         if (success) cont.resume(data.toString())
                         else cont.resumeWithException(RuntimeException("网关请求失败: $errorMsg"))
                     }
                 } catch (t: Throwable) {
+                    println("[zhiniu-net] throw url=$url err=${t.message}")
                     fail(t)
                 }
             }

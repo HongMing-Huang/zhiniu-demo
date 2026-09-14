@@ -1133,10 +1133,11 @@ typedef struct {
             struct {
               struct {
                 libshared_KType* (*_type)(void);
-                libshared_kref_com_zhiniu_domain_model_AiInsight (*AiInsight)(const char* symbol, const char* verdict, const char* trend, const char* volume, const char* indicator, const char* risk, const char* valuation, const char* earnings, libshared_kref_kotlin_collections_List followUps, const char* source, libshared_kref_kotlin_collections_List signals, const char* buyZone, const char* sellZone, const char* riskLabel, const char* riskRationale);
+                libshared_kref_com_zhiniu_domain_model_AiInsight (*AiInsight)(const char* symbol, const char* verdict, const char* trend, const char* volume, const char* indicator, const char* risk, const char* valuation, const char* earnings, libshared_kref_kotlin_collections_List followUps, const char* source, libshared_kref_kotlin_collections_List signals, const char* buyZone, const char* sellZone, const char* riskLabel, const char* riskRationale, const char* generatedAt);
                 const char* (*get_buyZone)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*get_earnings)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 libshared_kref_kotlin_collections_List (*get_followUps)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
+                const char* (*get_generatedAt)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*get_indicator)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*get_risk)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*get_riskLabel)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
@@ -1156,6 +1157,7 @@ typedef struct {
                 const char* (*component13)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*component14)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*component15)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
+                const char* (*component16)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*component2)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*component3)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*component4)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
@@ -1164,7 +1166,7 @@ typedef struct {
                 const char* (*component7)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*component8)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 libshared_kref_kotlin_collections_List (*component9)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
-                libshared_kref_com_zhiniu_domain_model_AiInsight (*copy)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz, const char* symbol, const char* verdict, const char* trend, const char* volume, const char* indicator, const char* risk, const char* valuation, const char* earnings, libshared_kref_kotlin_collections_List followUps, const char* source, libshared_kref_kotlin_collections_List signals, const char* buyZone, const char* sellZone, const char* riskLabel, const char* riskRationale);
+                libshared_kref_com_zhiniu_domain_model_AiInsight (*copy)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz, const char* symbol, const char* verdict, const char* trend, const char* volume, const char* indicator, const char* risk, const char* valuation, const char* earnings, libshared_kref_kotlin_collections_List followUps, const char* source, libshared_kref_kotlin_collections_List signals, const char* buyZone, const char* sellZone, const char* riskLabel, const char* riskRationale, const char* generatedAt);
                 libshared_KBoolean (*equals)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz, libshared_kref_kotlin_Any other);
                 libshared_KInt (*hashCode)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
                 const char* (*toString)(libshared_kref_com_zhiniu_domain_model_AiInsight thiz);
@@ -2151,6 +2153,7 @@ typedef struct {
               struct {
                 libshared_KType* (*_type)(void);
                 libshared_kref_com_zhiniu_pages_components_AppRadius (*_instance)();
+                libshared_KFloat (*get_radius12)(libshared_kref_com_zhiniu_pages_components_AppRadius thiz);
                 libshared_KFloat (*get_radius5)(libshared_kref_com_zhiniu_pages_components_AppRadius thiz);
                 libshared_KFloat (*get_radius6)(libshared_kref_com_zhiniu_pages_components_AppRadius thiz);
                 libshared_KFloat (*get_radius8)(libshared_kref_com_zhiniu_pages_components_AppRadius thiz);
