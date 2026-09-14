@@ -87,24 +87,28 @@ internal fun ViewContainer<*, *>.detailContent(host: StockDetailPage, q: com.zhi
         val sidePad: Float = pad + extra
     View {
         attr { padding(left = sidePad, right = sidePad) }
-        // ---- 返回 ----
-        View { attr { marginTop(20f) } }
-        View {
-            attr {
-                height(32f); flexDirectionRow(); alignItemsCenter()
-                borderRadius(6f); padding(left = 6f, right = 6f)
-                cssClass("zn-click")
-            }
-            event { click { host.goBack() } }
-            Icon(IconKind.BACK, 14f)
-            View { attr { width(6f) } }
-            Text {
+        // ---- 返回（桌面：独立返回行；手机：返回并入标题行圆钮，见 QuoteHeaderBlock） ----
+        if (!host.isCompact()) {
+            View { attr { marginTop(20f) } }
+            View {
                 attr {
-                    fontSize(AppTypography.fs13)
-                    color(colors.c(colors.textSecondary))
-                    text("市场")
+                    height(32f); flexDirectionRow(); alignItemsCenter()
+                    borderRadius(6f); padding(left = 6f, right = 6f)
+                    cssClass("zn-click")
+                }
+                event { click { host.goBack() } }
+                Icon(IconKind.BACK, 14f)
+                View { attr { width(6f) } }
+                Text {
+                    attr {
+                        fontSize(AppTypography.fs13)
+                        color(colors.c(colors.textSecondary))
+                        text("市场")
+                    }
                 }
             }
+        } else {
+            View { attr { height(16f) } }
         }
         // ---- Quote Header（132~148） ----
         View { attr { height(12f) } }
@@ -162,9 +166,22 @@ internal fun ViewContainer<*, *>.detailContent(host: StockDetailPage, q: com.zhi
 internal fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.zhiniu.domain.model.StockQuote) {
     val colors = AppTheme.colors
     if (host.isCompact()) {
-        // ---- 手机布局（欧易式）：名称/副行两行 + 右侧星标/AI 图标钮；大价格块；两列数据网格 ----
+        // ---- 手机布局（欧易式）：返回圆钮 + 名称/副行 + 右侧星标/AI 图标钮；大价格块；两列数据网格 ----
         View {
             attr { flexDirectionRow(); alignItemsCenter() }
+            // 返回圆钮（原独立「← 市场」行并入：少一层突兀的过道行）
+            View {
+                attr {
+                    width(32f); height(32f); borderRadius(16f); allCenter()
+                    backgroundColor(colors.c(colors.surfaceSecondary))
+                    cssClass("zn-click")
+                    accessibility("返回市场")
+                    accessibilityRole(AccessibilityRole.BUTTON)
+                }
+                event { click { host.goBack() } }
+                Icon(IconKind.BACK, 14f)
+            }
+            View { attr { width(10f) } }
             View {
                 attr { flex(1f); flexDirectionColumn() }
                 Text {
@@ -181,7 +198,8 @@ internal fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.
                         fontSize(AppTypography.fs12)
                         color(colors.c(colors.textTertiary))
                         lines(1); textOverFlowClip()
-                        text(fmtSymbol(q.symbol) + " · " + marketName(q.symbol))
+                        cssClass("zn-nowrap")
+                        text(fmtSymbol(q.symbol))
                         animate(ANIM_THEME, value = AppTheme.isDark)
                     }
                 }
@@ -200,19 +218,18 @@ internal fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.
                 Icon(if (host.watchlisted) IconKind.STAR_FILLED else IconKind.STAR, 16f)
             }
             View { attr { width(8f) } }
-            // AI 分析（图标钮，打开抽屉）
+            // AI 分析（图标钮，打开抽屉）：与星标同底色，图标 accent 点缀（去花哨描边）
             View {
                 attr {
                     width(36f); height(36f); borderRadius(18f); allCenter()
-                    backgroundColor(colors.ca(colors.aiAccent, 12))
-                    border(Border(1f, BorderStyle.SOLID, colors.c(colors.aiAccent)))
+                    backgroundColor(colors.c(colors.surfaceSecondary))
                     cssClass("zn-click")
                     animate(ANIM_THEME, value = AppTheme.isDark)
                     accessibility("打开 AI 分析")
                     accessibilityRole(AccessibilityRole.BUTTON)
                 }
                 event { click { host.toggleAiPanel() } }
-                Icon(IconKind.AI, 16f)
+                Icon(IconKind.AI, 16f, tint = colors.aiAccent)
             }
         }
         View { attr { height(10f) } }
@@ -271,16 +288,16 @@ internal fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.
         )
         View {
             attr {
-                borderRadius(AppRadius.radius8)
+                borderRadius(AppRadius.radius12)
                 backgroundColor(colors.c(colors.surfaceSecondary))
-                padding(top = 4f, bottom = 4f, left = 14f, right = 14f)
+                padding(top = 6f, bottom = 6f, left = 14f, right = 14f)
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
             rows.forEach { rowItems ->
             View {
                 attr {
                     flexDirectionRow(); alignItemsCenter()
-                    padding(top = 6f, bottom = 6f)
+                    padding(top = 7f, bottom = 7f)
                 }
                 rowItems.forEachIndexed { mi, m ->
                     View {
@@ -290,7 +307,7 @@ internal fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.
                         }
                         Text {
                             attr {
-                                fontSize(AppTypography.fs12)
+                                fontSize(AppTypography.fs11)
                                 color(colors.c(colors.textTertiary))
                                 text(m.label)
                             }
@@ -298,7 +315,7 @@ internal fun ViewContainer<*, *>.QuoteHeaderBlock(host: StockDetailPage, q: com.
                         View { attr { flex(1f) } }
                         Text {
                             attr {
-                                fontSize(AppTypography.fs13); fontWeightMedium()
+                                fontSize(AppTypography.fs14); fontWeightSemiBold()
                                 fontFamily(NUM_FONT)
                                 color(colors.c(colors.textPrimary))
                                 text(m.value)
