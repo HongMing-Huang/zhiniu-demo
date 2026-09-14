@@ -2,7 +2,7 @@
 
 > 版本：v1.3（2026-09-14）。对照课题《实战总览 / 验收标准 / 评分维度详解 / 交付物清单》逐项自查。
 > 状态口径：✅ 已完成且有验证证据 · 🔶 部分完成 / 待外部输入 · ⬜ 未做。
-> 结论：**四维均已有对应实现与证据；当前无 P0 缺口。剩余项为录屏视频（待录制）与两处外部素材。**
+> 结论：**四维均已有对应实现与证据；原型演示视频已入库可在线播放，当前无 P0 缺口。剩余项为两处外部素材（品牌 Logo / release 签名包）。**
 
 ---
 
@@ -19,8 +19,8 @@
 | 说明文档 | README：项目简介、技术栈 | ✅ | 根 `README.md` + `docs/tech-stack.md`（按实态修订，无未用依赖声明） |
 | | 构建运行说明、目录说明 | ✅ | `docs/getting-started.md`（真实命令，含 JDK17/NODE_OPTIONS 坑位）+ README §项目结构 |
 | | 项目亮点 / 卖点说明 | ✅ | README §特性；`docs/deliverables.md`（本文） |
-| 原型演示视频 | 覆盖全部功能演示 | 🔶 | 分镜脚本就绪：`docs/demo-script.md`（需按脚本录制，见 §4 待办） |
-| | 突出 AI 相关能力表现 | 🔶 | 脚本含 AI 研究四阶段进度 / Markdown 归纳 / 多空对抗 / 风控视角 |
+| 原型演示视频 | 覆盖全部功能演示 | ✅ | [docs/video/demo.mp4](video/demo.mp4)（1 分 20 秒，H5+iOS+Android 三端真实运行录制，README 在线播放；分镜见 `docs/demo-script.md`） |
+| | 突出 AI 相关能力表现 | ✅ | 视频含 AI 四维解读 / 多 Agent 研究归纳（来源可溯）/ 多空对抗 / 风控视角 / 规则降级明示 |
 
 ## 2. 功能实现完整性（权重 40%）
 
@@ -96,7 +96,7 @@
 
 | # | 待办 | Issue |
 |:--|:--|:--|
-| 1 | 🔶 录制原型演示视频（交付物硬性项）：按 `docs/demo-script.md` 分镜录制 | [#1](https://github.com/HongMing-Huang/zhiniu-demo/issues/1) |
+| 1 | ✅ 录制原型演示视频（交付物硬性项）：已按 `docs/demo-script.md` 分镜录制并入库 `docs/video/demo.mp4`（H5+iOS+Android 三端真实运行） | [#1](https://github.com/HongMing-Huang/zhiniu-demo/issues/1) |
 | 2 | 🔶 品牌 Logo 素材替换（Header / README / favicon，当前文字占位） | [#2](https://github.com/HongMing-Huang/zhiniu-demo/issues/2) |
 | 3 | ✅ 鸿蒙端装机验证（Pura 90 CLI 拉起 + OKX UI + 逐 Tab 点击，2026-09-14） | [#4](https://github.com/HongMing-Huang/zhiniu-demo/issues/4) |
 | 4 | ⬜ 重跑 Mimosa 完整安全扫描（提交钩子 scanner_enobufs 未出结论） | [#5](https://github.com/HongMing-Huang/zhiniu-demo/issues/5) |
