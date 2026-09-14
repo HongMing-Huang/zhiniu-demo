@@ -66,8 +66,9 @@
 
 - **现象**：gemai 免费池高峰偶发挂起；`/agent/chat` 最坏约 90s（45s 超时+1 次重试），`/agent/research` 为 7 次串行调用、实测 139s 正常 / 抖动窗口更长。
 - **缓解**：网关有超时+重试；全部链路失败时诚实降级 rule-engine（显式标注，实测生效）；前端有「停止生成」与降级文案。
-- **实测（2026-09-14 12:06）**：gemai 直连探测 `APIConnectionError`（0.3s 即失败，非慢而是断）——中转站整体宕机时所有 LLM 链路诚实降级，功能不白屏、数据不带假标注。
-- **建议**：**换 DeepSeek 官方直连**（用户已确认计划）：`backend/.env` 加 `DEEPSEEK_API_KEY=sk-…`、注释 `GEMAI_API_KEY`、重启即生效（零代码，回归测试已锁定该路径）；演示/录屏前预热一次请求确认通道质量。
+- **实测（2026-09-14 12:06，根因已修正）**：所谓「gemai 宕机」实为**本机 socks 代理（127.0.0.1:1082）死亡**——curl/httpx 默认走该代理，出站请求 0.3s 即失败；绕过代理后 gemai 与 DeepSeek 官方均正常。
+- **状态**：✅ 已切换 DeepSeek 官方直连（2026-09-14）——`.env` 配 `DEEPSEEK_API_KEY` + 停用 gemai + 注册 `deepseek-flash` 默认模型 + deepseek 厂商级 `thinking: disabled`（该模型默认开思维链，曾把诊股 max_tokens=600 全部耗在推理导致正文为空，已关）。全链路实测：问答/流式/诊股（5 信号+买卖区间）/对比（评级 A）均为 llm 模式。
+- **运维注意**：后端启动需剥离代理环境变量直连国内源（`env -u https_proxy -u http_proxy … `），或保证代理存活；`backend/.env` 含 Key 已被 gitignore，不入库。
 
 ### N2. H5 页内整页跳转丢失 `?gateway=` 覆盖参数
 

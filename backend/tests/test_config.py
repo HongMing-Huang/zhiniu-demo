@@ -79,7 +79,7 @@ class TestResolveCandidates(unittest.TestCase):
             self.assertTrue(usable, "配置了 DEEPSEEK_API_KEY 却无可用的首选厂商")
             self.assertEqual(usable[0].provider, "deepseek")
             self.assertEqual(usable[0].base_url, "https://api.deepseek.com")
-            self.assertEqual(usable[0].model, "deepseek-chat")
+            self.assertEqual(usable[0].model, "deepseek-flash")  # 官方直连默认模型（用户提供）
         finally:
             os.environ.pop("DEEPSEEK_API_KEY", None)
 
@@ -123,7 +123,7 @@ class TestProvidersJson(unittest.TestCase):
     def test_config_validation_default_model_required(self):
         # 配置校验：缺 defaultModel / routes 应在加载时抛错（A1 加载校验）
         self.assertIn("deepseek", _FALLBACK_MODEL)
-        self.assertIn("deepseek-chat", _FALLBACK_MODEL["deepseek"])
+        self.assertIn("deepseek-flash", _FALLBACK_MODEL["deepseek"])
         routes = get_routes()
         self.assertIn("zhiniu/think", routes)
         self.assertIn("want", routes["zhiniu/think"])
