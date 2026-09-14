@@ -56,6 +56,7 @@ object AppRadius {
     const val radius5 = 5f
     const val radius6 = 6f
     const val radius8 = 8f
+    const val radius12 = 12f
 }
 
 /** 内容最大宽度 / 水平留白。 */

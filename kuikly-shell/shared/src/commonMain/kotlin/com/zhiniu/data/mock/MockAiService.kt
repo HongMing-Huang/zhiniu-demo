@@ -93,11 +93,10 @@ class MockAiService(
         val cap = q.amount * (9 + (h % 40))
         val capText = if (cap >= 1e12) fmt2(cap / 1e12) + "T" else fmt2(cap / 1e8) + "亿"
         return listOf(
-            // Markdown 演示（Task2 渲染评分点）：标题 / 来源 / 列表 / 代码块，离线态同样可演示
+            // Markdown 演示（Task2 渲染评分点）：标题 / 列表 / 代码块 / 来源，离线态同样可演示
             AiBlock.Text(
                 buildString {
                     appendLine("### ${q.name}（${q.code}.${q.marketSuffix}）研究快照")
-                    appendLine("> 来源：本地确定性快照 · 离线演示模式")
                     appendLine()
                     appendLine("当前报 **${fmt2(q.price)} 元**，涨跌 ${fmt1(q.changePercent)}%。")
                     appendLine("从日 K 与成交量看，处于震荡整理结构，短线情绪中性。")
@@ -111,6 +110,9 @@ class MockAiService(
                     appendLine("```text")
                     appendLine("RSI14 = 100 - 100 / (1 + avg_gain_14 / avg_loss_14)")
                     appendLine("```")
+                    // 来源标注放末尾：诚实性保留，视觉不再抢占首屏
+                    appendLine()
+                    appendLine("> 来源：本地确定性快照 · 离线演示模式")
                 },
             ),
             AiBlock.StockCard(

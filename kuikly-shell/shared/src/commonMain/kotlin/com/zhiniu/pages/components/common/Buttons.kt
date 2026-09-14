@@ -177,8 +177,9 @@ fun ViewContainer<*, *>.RoundIconButton(
             width(box); height(box)
             borderRadius(box / 2f)
             allCenter()
-            backgroundColor(colors.c(colors.textPrimary))
-            opacity(if (enabled) 1f else 0.4f)
+            // 主操作用 AI accent 底（品牌识别点）；禁用态降不透明度
+            backgroundColor(colors.c(if (enabled) colors.aiAccent else colors.surfaceSecondary))
+            opacity(if (enabled) 1f else 0.6f)
             highlightBackgroundColor(colors.ca(colors.textSecondary, 18))
             accessibility(if (enabled) accessibilityLabel else "$accessibilityLabel（不可用）")
             accessibilityRole(AccessibilityRole.BUTTON)

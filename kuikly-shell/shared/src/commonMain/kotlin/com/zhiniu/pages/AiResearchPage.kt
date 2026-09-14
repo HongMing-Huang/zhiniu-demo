@@ -989,21 +989,21 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
                 View {
                     attr { padding(top = 14f, left = host.chatSidePad(), right = host.chatSidePad()) }
                     if (msg.role == "user") {
-                        // 用户气泡：前景/背景反转（浅色主题深底白字，深色反之），与 AI 卡形成强对比
+                        // 用户气泡：accent 浅底右对齐（对标豆包/ChatGPT 用户气泡），与 AI 卡形成左右层次
                         View {
                             attr {
                                 alignSelfFlexEnd()
                                 maxWidth(560f)
-                                borderRadius(18f)
-                                backgroundColor(colors.c(colors.textPrimary))
+                                borderRadius(16f)
+                                backgroundColor(colors.ca(colors.aiAccent, 22))
                                 animate(ANIM_THEME, value = AppTheme.isDark)
                             }
                             View {
-                                attr { padding(top = 8f, left = 14f, right = 14f, bottom = 8f) }
+                                attr { padding(top = 9f, left = 14f, right = 14f, bottom = 9f) }
                                 Text {
                                     attr {
                                         fontSize(AppTypography.fs14); lineHeight(21f)
-                                        color(colors.c(colors.pageBg))
+                                        color(colors.c(colors.textPrimary))
                                         text(msg.text)
                                     }
                                 }
@@ -1016,14 +1016,13 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
                             vif({ msg.streaming && msg.blocks.isEmpty() }) {
                                 AgentProgressRow(msg.progress)
                             }
-                            // 消息卡：内容收敛进 surface 容器，与页面底形成层次
+                            // 消息卡：无边框柔和底色（豆包式），层次靠底色差而非描边
                             View {
                                 attr {
                                     alignSelfStretch()
-                                    borderRadius(AppRadius.radius8)
-                                    border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
-                                    backgroundColor(colors.c(colors.surface))
-                                    padding(top = 12f, bottom = 12f, left = 14f, right = 14f)
+                                    borderRadius(AppRadius.radius12)
+                                    backgroundColor(colors.c(colors.surfaceSecondary))
+                                    padding(top = 14f, bottom = 14f, left = 14f, right = 14f)
                                     animate(ANIM_THEME, value = AppTheme.isDark)
                                 }
                                 msg.blocks.forEachIndexed { i, block ->

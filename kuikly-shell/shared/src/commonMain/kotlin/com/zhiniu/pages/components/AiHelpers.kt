@@ -4,19 +4,25 @@ package com.zhiniu.pages.components
 import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
-import com.zhiniu.pages.components.c
 
-/** AI 消息气泡头部（AI 图标 + 标签；AI 区域用 aiAccent 强调，少量点缀）。 */
+/** AI 消息头部（豆包/ChatGPT 式）：accent 实心圆头像 + 主色加粗标签，消息身份锚点。 */
 fun ViewContainer<*, *>.AiMessageHeader(label: String) {
     val colors = AppTheme.colors
     View {
         attr { flexDirectionRow(); alignItemsCenter() }
-        Icon(IconKind.AI, 13f)
+        View {
+            attr {
+                width(24f); height(24f); borderRadius(12f); allCenter()
+                backgroundColor(colors.c(colors.aiAccent))
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+            Icon(IconKind.AI, 14f)
+        }
         Text {
             attr {
-                marginLeft(6f)
-                fontSize(AppTypography.fs12); fontWeightSemiBold()
-                color(colors.c(colors.textSecondary))
+                marginLeft(8f)
+                fontSize(AppTypography.fs13); fontWeightSemiBold()
+                color(colors.c(colors.textPrimary))
                 text(label)
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
