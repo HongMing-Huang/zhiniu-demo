@@ -68,6 +68,21 @@ class TestResolveCandidates(unittest.TestCase):
         self.assertEqual(glm_vision[0].provider, "glm")
         self.assertEqual(glm_vision[0].model, "vision")
 
+    def test_quick_switch_to_deepseek_when_gemai_disabled(self):
+        """用户计划的切换路径：停用 gemai、仅配 DEEPSEEK_API_KEY →
+        zhiniu/quick 首个「有 Key 可用」厂商应为 deepseek（gateway 会跳过无 Key 候选）。"""
+        os.environ.pop("GEMAI_API_KEY", None)
+        os.environ["DEEPSEEK_API_KEY"] = "sk-test"
+        try:
+            candidates = resolve_candidates("zhiniu/quick")
+            usable = [c for c in candidates if c.api_key]
+            self.assertTrue(usable, "配置了 DEEPSEEK_API_KEY 却无可用的首选厂商")
+            self.assertEqual(usable[0].provider, "deepseek")
+            self.assertEqual(usable[0].base_url, "https://api.deepseek.com")
+            self.assertEqual(usable[0].model, "deepseek-chat")
+        finally:
+            os.environ.pop("DEEPSEEK_API_KEY", None)
+
     def test_provider_order_stable(self):
         # 新增厂商/别名应复用全局顺序，首厂商恒为 deepseek
         self.assertEqual(PROVIDER_ORDER, ["gemai", "deepseek", "glm", "hunyuan"])
