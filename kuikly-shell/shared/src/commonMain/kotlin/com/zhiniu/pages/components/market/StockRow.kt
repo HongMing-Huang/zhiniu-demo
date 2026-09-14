@@ -72,9 +72,15 @@ fun ViewContainer<*, *>.StockTableHeader(
             if (compact) { paddingLeft(16f); paddingRight(16f) }
         }
         View { attr { flex(2.4f) }; ThLabel("股票", alignLeft = true) }
-        View { attr { width(if (compact) 78f else 120f) }; ThLabel("最新价", alignLeft = false) }
-        if (!compact && StockColumns.CHANGE in columns) View { attr { width(110f) }; ThLabel("涨跌额", alignLeft = false) }
-        View { attr { width(if (compact) 84f else 110f) }; ThLabel("涨跌幅", alignLeft = false) }
+        if (compact) {
+            // OKX 三列：股票 | 最新价 | 实心涨跌幅块
+            View { attr { width(96f) }; ThLabel("最新价", alignLeft = false) }
+            View { attr { width(76f) }; ThLabel("涨跌幅", alignLeft = false) }
+        } else {
+            View { attr { width(120f) }; ThLabel("最新价", alignLeft = false) }
+            if (StockColumns.CHANGE in columns) View { attr { width(110f) }; ThLabel("涨跌额", alignLeft = false) }
+            View { attr { width(110f) }; ThLabel("涨跌幅", alignLeft = false) }
+        }
         if (!compact && StockColumns.MARKET_CAP in columns) View { attr { width(110f) }; ThLabel("总市值", alignLeft = false) }
         if (!compact && StockColumns.VOLUME in columns) View { attr { width(110f) }; ThLabel("成交量", alignLeft = false) }
         if (!compact && StockColumns.SPARK in columns) View { attr { width(if (compact) 82f else 170f) }; ThLabel("走势", alignLeft = false) }
@@ -187,10 +193,10 @@ fun ViewContainer<*, *>.StockRow(
                 }
             }
         }
-        // 最新价（compact：OKX 式大号价格锚 + 下方「涨跌额 涨跌幅」同色小字，课题 Task1 要求涨跌额）
+        // 最新价（compact：OKX 三列——大号价格锚 + 涨跌额小字 | 实心涨跌幅色块）
         if (compact) {
             View {
-                attr { width(136f); flexDirectionColumn(); alignItemsFlexEnd() }
+                attr { width(96f); flexDirectionColumn(); alignItemsFlexEnd() }
                 Text {
                     attr {
                         fontSize(AppTypography.fs20); fontWeightSemiBold()
@@ -203,11 +209,38 @@ fun ViewContainer<*, *>.StockRow(
                 Text {
                     attr {
                         marginTop(3f)
-                        fontSize(AppTypography.fs12); fontWeightMedium()
+                        fontSize(AppTypography.fs11); fontWeightMedium()
                         fontFamily(NUM_FONT); lines(1); cssClass("zn-nowrap")
                         color(colors.c(if (q.isUp) colors.up else colors.down))
-                        text(fmtChangeSigned(q.change) + "  " + fmtPct(q.changePercent))
+                        text(fmtChangeSigned(q.change))
                         animate(ANIM_THEME, value = AppTheme.isDark)
+                    }
+                }
+            }
+            // OKX 标志性实心涨跌幅色块（红/绿实心圆角 + 白字；0% 灰块）
+            View {
+                attr { width(76f); allCenter() }
+                View {
+                    attr {
+                        height(30f); width(68f); allCenter()
+                        borderRadius(6f)
+                        backgroundColor(
+                            colors.c(
+                                when {
+                                    q.changePercent > 0.0001 -> colors.up
+                                    q.changePercent < -0.0001 -> colors.down
+                                    else -> colors.textTertiary
+                                }
+                            )
+                        )
+                    }
+                    Text {
+                        attr {
+                            fontSize(AppTypography.fs13); fontWeightSemiBold()
+                            fontFamily(NUM_FONT); lines(1); textOverFlowClip()
+                            color(com.tencent.kuikly.core.base.Color.WHITE)
+                            text(fmtPct(q.changePercent))
+                        }
                     }
                 }
             }
@@ -335,9 +368,11 @@ fun ViewContainer<*, *>.SectorTable(
             }
             NumCell(
                 fmtPct(row.changePercent),
-                if (compact) 64f else 90f,
+                if (compact) 72f else 90f,
                 { if (row.isUp) colors.up else colors.down },
                 semibold = true,
+                // compact：OKX 式实心涨跌幅色块（白字）
+                chipBg = { if (compact) (if (row.isUp) colors.up else colors.down) else null },
             )
             View {
                 attr { width(if (compact) 110f else 180f); flexDirectionColumn(); alignItemsFlexEnd() }
@@ -377,7 +412,7 @@ fun ViewContainer<*, *>.RankTable(
         View { attr { width(36f) }; ThLabel("#", alignLeft = true) }
         View { attr { flex(1f) }; ThLabel("股票", alignLeft = true) }
         View { attr { width(if (compact) 78f else 120f) }; ThLabel("最新价", alignLeft = false) }
-        View { attr { width(if (compact) 68f else 110f) }; ThLabel("涨跌幅", alignLeft = false) }
+        View { attr { width(if (compact) 72f else 110f) }; ThLabel("涨跌幅", alignLeft = false) }
     }
     View {
         attr {
@@ -433,9 +468,11 @@ fun ViewContainer<*, *>.RankTable(
             NumCell(if (row.price > 0.0) fmt2(row.price) else "—", if (compact) 78f else 120f, { colors.textPrimary }, semibold = true)
             NumCell(
                 if (row.price > 0.0) fmtPct(row.changePercent) else "—",
-                if (compact) 68f else 110f,
+                if (compact) 72f else 110f,
                 { if (row.isUp) colors.up else colors.down },
                 semibold = true,
+                // compact：OKX 式实心涨跌幅色块（白字）
+                chipBg = { if (compact) (if (row.isUp) colors.up else colors.down) else null },
             )
             View {
                 attr {

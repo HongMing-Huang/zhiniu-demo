@@ -51,8 +51,56 @@ fun ViewContainer<*, *>.BottomTabBar(
         }
         BottomTab("行情", IconKind.CHART, activeNav == "市场") { onNavMarket() }
         BottomTab("自选", IconKind.STAR, activeNav == "自选") { onNavWatchlist() }
-        BottomTab("AI研究", IconKind.CHAT, activeNav == "AI研究") { onNavAiResearch() }
+        // OKX「交易」同款：中央圆形主按钮（AI 生态位，AI accent 底 + 白图标）
+        CenterAiButton(active = activeNav == "AI研究", label = "AI研究") { onNavAiResearch() }
         BottomTab("我的", IconKind.USER, activeNav == "我的") { onNavProfile() }
+    }
+}
+
+/** 中央圆形 AI 主按钮（OKX 参照）：accent 实心圆 + 白图标 + 下方小字；选中态外圈高亮。 */
+private fun ViewContainer<*, *>.CenterAiButton(active: Boolean, label: String, onClick: () -> Unit) {
+    val colors = AppTheme.colors
+    View {
+        attr {
+            flex(1f)
+            flexDirectionColumn()
+            alignItemsCenter()
+            justifyContentCenter()
+            paddingTop(5f)
+            accessibility(if (active) "当前在 $label 页" else "切换到 $label")
+            accessibilityRole(AccessibilityRole.BUTTON)
+            accessibilityInfo(clickable = true, longClickable = false)
+            cssClass("zn-click")
+            highlightBackgroundColor(colors.ca(colors.textSecondary, 6))
+        }
+        event { click { onClick() } }
+        View {
+            attr {
+                width(34f); height(34f); borderRadius(17f); allCenter()
+                // 图标资源为中性灰 PNG：底色用亮色保证灰图标深浅两态对比度
+                backgroundColor(colors.c(if (active) colors.aiAccent else colors.surfaceSecondary))
+                border(
+                    com.tencent.kuikly.core.base.Border(
+                        if (active) 2f else 0f,
+                        com.tencent.kuikly.core.base.BorderStyle.SOLID,
+                        colors.c(colors.aiAccent),
+                    )
+                )
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+            Icon(IconKind.AI, 18f)
+        }
+        View { attr { height(3f) } }
+        Text {
+            attr {
+                fontSize(AppTypography.fs11)
+                if (active) fontWeightSemiBold()
+                lines(1)
+                color(colors.c(if (active) colors.textPrimary else colors.textSecondary))
+                text(label)
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+        }
     }
 }
 
