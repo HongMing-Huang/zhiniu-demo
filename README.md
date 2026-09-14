@@ -18,7 +18,7 @@
 
 ### 📺 演示视频（1 分 20 秒 · 三端真实运行录制）
 
-> 分镜脚本见 [docs/demo-script.md](docs/demo-script.md)；素材均来自真实运行的 **H5 + iOS 模拟器 + Android 模拟器**，三端价格一致（同一套 `commonMain` 代码）。
+> 素材均来自真实运行的 **H5 + iOS 模拟器 + Android 模拟器**，三端价格一致（同一套 `commonMain` 代码）。
 
 <video src="docs/video/demo.mp4" controls="controls" width="100%" poster="docs/img/pages_preview.png" preload="metadata"></video>
 
@@ -35,7 +35,7 @@
 | **Android 直接安装** | [zhiniu-debug.apk](zhiniu-debug.apk)（约 8 MB） | 下载即装；默认连 `10.0.2.2:8000`（模拟器）/ 本机网关，见 [运行说明](docs/getting-started.md) |
 | **H5 秒开** | 起后端 + `python3 -m http.server 8082`（web-host 目录） | 浏览器打开即为 390 移动布局 |
 | **iOS / 鸿蒙** | 见 [docs/getting-started.md](docs/getting-started.md) | iOS 需 Xcode Run；鸿蒙需 DevEco 构建 HAP |
-| **演示视频** | [在线播放（MP4）](docs/video/demo.mp4) · 分镜脚本 [docs/demo-script.md](docs/demo-script.md) | 1 分 20 秒三端真实运行演示（已入库） |
+| **演示视频** | [在线播放（MP4）](docs/video/demo.mp4) | 1 分 20 秒三端真实运行演示（已入库） |
 
 > 行情来自公开免费接口（新浪/东财），AI 结论由大模型生成，两者都可能出错；本作品仅用于课程学习与产品原型演示，**不构成任何投资建议**，也不提供真实证券交易。
 
@@ -193,7 +193,7 @@ zhiniu-demo/
 
 - **项目代码**：`kuikly-shell/` + `backend/`，拉起即运行（§快速开始），分层 / 命名 / 注释规范见 [kuikly-shell/AGENTS.md](kuikly-shell/AGENTS.md)
 - **说明文档**：本 README + [docs/](docs)（架构 C4+ADR、技术栈、字体规范、API 矩阵、快速开始）
-- **演示视频**：分镜脚本 [docs/demo-script.md](docs/demo-script.md)，按脚本录制覆盖全部功能点
+- **演示视频**：[docs/video/demo.mp4](docs/video/demo.mp4)（1 分 20 秒，H5 / iOS / Android 三端真实运行，README 顶部可在线播放）
 
 ## 文档
 
