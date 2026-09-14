@@ -797,7 +797,7 @@ internal fun ViewContainer<*, *>.overviewTab(host: StockDetailPage, q: com.zhini
                 marginTop(3f)
                 fontSize(AppTypography.fs12)
                 color(colors.c(colors.textSecondary))
-                text(if (q.symbol.startsWith("sh600519") || q.symbol.startsWith("sz000858")) "食品饮料 · 白酒" else "沪深 A 股 · 主板")
+                text(host.liveFundamentals?.industry?.ifBlank { null } ?: "沪深 A 股 · 主板")
             }
         }
         View { attr { height(14f) } }

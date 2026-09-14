@@ -7,13 +7,20 @@ import { common } from '@kit.AbilityKit';
 
 export class AppKRRouterAdapter implements IKRRouterAdapter {
   openPage(context: common.UIAbilityContext, pageName: string, pageData: KRRecord): void {
-    router.pushUrl({
+    // 底部 Tab 级切换（__tab=1）：replaceUrl 不堆栈（返回键不倒退遍历 Tab）
+    const isTab = pageData['__tab'] === '1';
+    const target = {
       url: 'pages/Index',
       params: {
         pageName,
         pageData
       }
-    });
+    };
+    if (isTab) {
+      router.replaceUrl(target);
+    } else {
+      router.pushUrl(target);
+    }
   }
 
   closePage(context: common.UIAbilityContext): void {

@@ -38,7 +38,7 @@ import com.zhiniu.pages.components.fmtPct
 import com.zhiniu.pages.components.fmtVolHand
 import com.zhiniu.pages.components.common.SectionHeader
 
-private val DEFAULT_PAIR = "sh600519" to "sz300750"
+private val DEFAULT_PAIR: Pair<String, String> get() = com.zhiniu.data.mock.MockMarketDefaults.comparePair
 
 @Page("Compare", supportInLocal = true)
 internal class ComparePage : AppBasePage() {

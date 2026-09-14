@@ -199,6 +199,49 @@ def _parse_sina(code: str, raw: str) -> Optional[dict]:
     }
 
 
+def _parse_tencent_quote(code: str, raw: str) -> Optional[dict]:
+    """解析腾讯 qt.gtimg.cn `v_<code>="~分隔 88 字段"` 为结构化 quote（与 _parse_sina 同构）。
+
+    关键索引：1 名称 / 3 现价 / 4 昨收 / 5 今开 / 6 成交量(手) / 9-28 买五档、卖五档(价,量交替)
+    / 30 时间 / 31 涨跌 / 32 涨跌% / 33 最高 / 34 最低 / 36 成交额(万)。
+    """
+    key = f'v_{code}="'
+    if key not in raw:
+        return None
+    body = raw.split(key, 1)[1].split('"', 1)[0]
+    f = body.split("~")
+    if len(f) < 40:
+        return None
+    price, prev = _num(f[3]), _num(f[4])
+    # 9-18 买五档价、量交替；19-28 卖五档价、量交替 → 统一为 [价, 量]
+    bids = [[_num(f[9 + i * 2]), _num(f[10 + i * 2])] for i in range(5)]
+    asks = [[_num(f[19 + i * 2]), _num(f[20 + i * 2])] for i in range(5)]
+    amount_wan = _num(f[36])  # 万元
+    date_time = str(f[30] or "")
+    day, _, tick = date_time.partition(" ")
+    return {
+        "symbol": code,
+        "name": f[1],
+        "open": _num(f[5]),
+        "prevClose": prev,
+        "price": price,
+        "changePct": _optional_num(f[32]),
+        "high": _num(f[33]),
+        "low": _num(f[34]),
+        "buy1": _num(f[9]),
+        "sell1": _num(f[19]),
+        "bids": bids,
+        "asks": asks,
+        "volume": _num(f[6]),                    # 手
+        "amount": amount_wan * 10_000.0,          # 万 → 元
+        "date": day,
+        "time": tick,
+        "source": "腾讯行情",
+        "provider": "tencent-realtime",
+        "isStale": False,
+    }
+
+
 def _mock_realtime(codes: list) -> dict:
     """离线 Mock 兜底：返回前端 mock_quotes.json 对齐结构。"""
     out: dict = {}
@@ -222,10 +265,10 @@ async def quote_realtime(codes: list) -> dict:
     need = [c for c in codes if c not in result]
     if need:
         cache_hit = False
+        fresh: Dict[str, dict] = {}
         try:
             url = "https://hq.sinajs.cn/list=" + ",".join(need)
             raw = _http_get(url, decode="gbk")
-            fresh: Dict[str, dict] = {}
             for c in need:
                 parsed = _parse_sina(c, raw)
                 if parsed:
@@ -242,7 +285,27 @@ async def quote_realtime(codes: list) -> dict:
                 _rt_cache.pop(old, None)
             result.update(fresh)
         except Exception:
-            pass  # 网络/超时 → 走 stale 或 mock
+            pass  # 新浪失败 → 腾讯备用
+        # 数据源扩展：新浪不可达/解析为空时改走腾讯 gtimg（双真实源，均失败才 stale/mock）
+        missing = [c for c in need if c not in result]
+        if missing:
+            try:
+                raw = await asyncio.to_thread(
+                    _http_get, _guard_external_url("https://qt.gtimg.cn/q=" + ",".join(missing)),
+                    "gbk", _TENCENT_HEADERS,
+                )
+                for c in missing:
+                    parsed = _parse_tencent_quote(c, raw)
+                    if parsed:
+                        fresh[c] = parsed
+                        _rt_cache[c] = (now, parsed)
+                        if c not in _rt_order:
+                            _rt_order.append(c)
+                while len(_rt_order) > 100:
+                    _rt_order.pop(0)
+                result.update({c: fresh[c] for c in missing if c in fresh})
+            except Exception:
+                pass  # 腾讯也失败 → stale / mock
 
     # stale 兜底：有最近成功数据优先
     was_stale = False
@@ -315,6 +378,40 @@ async def quote_kline(symbol: str, scale: int = 240, datalen: int = 120) -> dict
             }
     except Exception:
         pass
+
+    # 数据源扩展：新浪 K 线不可达时改走东财 push2delay 日 K（仍失败才离线快照）
+    if result is None and is_daily:
+        secid = _eastmoney_secid(symbol)
+        if secid:
+            try:
+                em_url = (
+                    "https://push2delay.eastmoney.com/api/qt/stock/kline/get?secid=" + secid
+                    + f"&klt=101&fqt=0&lmt={min(datalen, 1023)}&end=20500101"
+                    + "&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57"
+                )
+                payload = await _eastmoney_json(em_url)
+                klines = ((payload.get("data") or {}).get("klines")) or []
+                bars = []
+                for row in klines:
+                    cols = str(row).split(",")
+                    if len(cols) < 6:
+                        continue
+                    bars.append({
+                        "day": cols[0], "open": cols[1], "close": cols[2],
+                        "high": cols[3], "low": cols[4], "volume": cols[5],
+                    })
+                if bars:
+                    result = {
+                        "symbol": symbol,
+                        "name": str((payload.get("data") or {}).get("name") or ""),
+                        "data": bars,
+                        "scale": scale,
+                        "source": "东方财富",
+                        "provider": "eastmoney-kline",
+                        "isStale": False,
+                    }
+            except Exception:
+                pass  # 东财也失败 → 离线快照
 
     if result is None:
         mock = _load_kline()

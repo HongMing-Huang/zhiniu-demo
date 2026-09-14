@@ -1166,36 +1166,36 @@ private fun ViewContainer<*, *>.AgentProgressRow(steps: List<String>) {
     }
 }
 
-/** 角色视图 Tab：手机 = 胶囊（触控友好），桌面 = 文字 + 2px 底部指示器；active 在 attr 内读取保持响应式。 */
+/** 角色视图 Tab：手机 = OKX/雪球式文字 Tab（选中加粗 + accent 短下划线），桌面 = 文字 + 2px 底部指示器。 */
 private fun ViewContainer<*, *>.RoleTab(label: String, active: () -> Boolean, compact: Boolean, onClick: () -> Unit) {
     val colors = AppTheme.colors
     if (compact) {
         View {
             attr {
-                height(30f); paddingLeft(12f); paddingRight(12f); marginRight(8f)
-                allCenter()
-                borderRadius(15f)
-                backgroundColor(colors.c(if (active()) colors.surfaceHover else colors.pageBg))
-                border(
-                    Border(
-                        1f, BorderStyle.SOLID,
-                        colors.c(if (active()) colors.borderStrong else colors.border),
-                    )
-                )
+                height(36f); paddingLeft(2f); paddingRight(2f); marginRight(18f)
+                flexDirectionColumn(); alignItemsCenter(); justifyContentCenter()
                 accessibility(label)
                 accessibilityRole(AccessibilityRole.BUTTON)
                 accessibilityInfo(clickable = true, longClickable = false)
                 cssClass("zn-click")
-                highlightBackgroundColor(colors.ca(colors.textSecondary, 6))
-                animate(ANIM_THEME, value = AppTheme.isDark)
             }
             event { click { onClick() } }
             Text {
                 attr {
-                    fontSize(AppTypography.fs13)
-                    fontWeight600(); lines(1)
+                    fontSize(if (active()) AppTypography.fs15 else AppTypography.fs14)
                     color(colors.c(if (active()) colors.textPrimary else colors.textSecondary))
+                    if (active()) fontWeightSemiBold()
+                    lines(1)
                     text(label)
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+            }
+            View { attr { height(4f) } }
+            View {
+                attr {
+                    width(18f); height(2.5f); borderRadius(2f)
+                    backgroundColor(colors.c(colors.aiAccent))
+                    opacity(if (active()) 1f else 0f)
                     animate(ANIM_THEME, value = AppTheme.isDark)
                 }
             }

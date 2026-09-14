@@ -7,6 +7,7 @@ package com.zhiniu.pages.components
 import com.tencent.kuikly.core.base.attr.ImageUri
 import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.views.Image
+import com.zhiniu.pages.components.AppTheme
 
 /** 图标枚举（asset 字段为 TDesign 官方 svg 目录真实文件名的 PNG 映射）。 */
 enum class IconKind(val asset: String) {
@@ -40,16 +41,19 @@ enum class IconKind(val asset: String) {
 /**
  * 渲染线性图标。
  * 图标资源统一使用可跨明暗主题辨识的中性灰；交互状态由按钮背景与文案表达。
+ * @param tint 可选着色（如底栏选中态）：原生端 tintColor 生效；不传保持中性灰。
  */
 fun ViewContainer<*, *>.Icon(
     kind: IconKind,
     size: Float = 18f,
+    tint: String? = null,
 ) {
     Image({
         attr {
             width(size)
             height(size)
             src(ImageUri.commonAssets(kind.asset))
+            tint?.let { tintColor(com.zhiniu.pages.components.AppTheme.colors.c(it)) }
         }
     })
 }

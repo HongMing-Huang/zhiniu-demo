@@ -31,7 +31,7 @@ class KuiklyRenderActivity : AppCompatActivity(), KuiklyRenderViewBaseDelegatorD
 
     private val kuiklyRenderViewDelegator = KuiklyRenderViewBaseDelegator(this)
 
-    private val pageName: String
+    internal val pageName: String
         get() {
             val pn = intent.getStringExtra(KEY_PAGE_NAME) ?: ""
             return if (pn.isNotEmpty()) pn else "MarketList"

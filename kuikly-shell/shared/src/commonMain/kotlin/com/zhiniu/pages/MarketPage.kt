@@ -78,6 +78,10 @@ internal class MarketPage : AppBasePage() {
     // 指数条（新浪真实指数；网关不可用回退 repo 本地快照）
     internal val liveIndices by observableList<MarketIndex>()
 
+    // 自动刷新（实时状态保障）：15s 链式 setTimeout 拉真实行情；页面销毁即停
+    private var autoRefreshAlive = true
+    private var liveRefreshSeq = 0
+
     override fun created() {
         super.created()
         marketUniverse.diffUpdate(repo.stockQuotes())
@@ -86,6 +90,34 @@ internal class MarketPage : AppBasePage() {
             refreshRows()
         }
         refreshLiveQuotes()
+        scheduleAutoRefresh()
+    }
+
+    /** 15s 周期拉实时行情（后端 TTL 3s，数据始终为最新快照）；离开页面自动停止。 */
+    private fun scheduleAutoRefresh() {
+        if (!autoRefreshAlive) return
+        setTimeout(15_000) {
+            if (!autoRefreshAlive) return@setTimeout
+            val seq = ++liveRefreshSeq
+            lifecycleScope.launch {
+                runCatching { GatewayMarketClient.quotes(marketUniverse.map { it.symbol }) }
+                    .onSuccess { live ->
+                        if (!autoRefreshAlive || seq != liveRefreshSeq) return@onSuccess
+                        if (live.isNotEmpty()) {
+                            com.zhiniu.data.mock.MarketStore.applyLiveQuotes(live)
+                            marketSource = live.firstOrNull()?.source ?: marketSource
+                            refreshRows()
+                            refreshHotQuotes()
+                        }
+                    }
+            }
+            scheduleAutoRefresh()
+        }
+    }
+
+    override fun pageWillDestroy() {
+        autoRefreshAlive = false
+        super.pageWillDestroy()
     }
 
     internal fun isRankTab(): Boolean = selectedMarket == TAB_POPULAR || selectedMarket == TAB_GAINERS
@@ -549,27 +581,35 @@ private fun ViewContainer<*, *>.stockTable(host: MarketPage) {
 
 private fun ViewContainer<*, *>.MarketTab(label: String, active: () -> Boolean, compact: Boolean, onClick: () -> Unit) {
     val colors = AppTheme.colors
-    // 手机布局：胶囊选中态（欧易式），占位小、触控友好；桌面保留下划线
+    // 手机布局：OKX/雪球式文字 Tab——无胶囊底，选中加粗 + 短下划线
     if (compact) {
         View {
             attr {
-                height(32f); padding(left = 12f, right = 12f); marginRight(8f)
-                borderRadius(16f)
-                backgroundColor(colors.c(if (active()) colors.surfaceHover else colors.surface))
-                animate(ANIM_THEME, value = AppTheme.isDark)
+                height(36f); marginRight(20f)
+                flexDirectionColumn(); alignItemsCenter(); justifyContentCenter()
                 accessibility(label)
                 accessibilityRole(AccessibilityRole.BUTTON)
                 accessibilityInfo(clickable = true, longClickable = false)
                 cssClass("zn-click")
-                highlightBackgroundColor(colors.ca(colors.textSecondary, 6))
             }
             event { click { onClick() } }
             Text {
                 attr {
-                    fontSize(AppTypography.fs13)
+                    fontSize(if (active()) AppTypography.fs15 else AppTypography.fs14)
                     color(colors.c(if (active()) colors.textPrimary else colors.textSecondary))
-                    fontWeight600(); lines(1)
+                    if (active()) fontWeightSemiBold()
+                    lines(1)
                     text(label)
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+            }
+            View { attr { height(4f) } }
+            // 选中态短下划线（2.5f 圆角，主文字色）
+            View {
+                attr {
+                    width(18f); height(2.5f); borderRadius(2f)
+                    backgroundColor(colors.c(colors.textPrimary))
+                    opacity(if (active()) 1f else 0f)
                     animate(ANIM_THEME, value = AppTheme.isDark)
                 }
             }

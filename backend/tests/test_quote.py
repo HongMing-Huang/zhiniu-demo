@@ -5,6 +5,7 @@
 保证结果确定性；真实响应形状用 2026-09-11 抓包样本做纯解析测试。
 """
 import asyncio
+import json
 import unittest
 from unittest import mock
 
@@ -361,6 +362,77 @@ class TestKlineCacheIntegrity(unittest.IsolatedAsyncioTestCase):
             result = await quote_module.quote_kline("sz000004", 240, 5)
         self.assertEqual(result.get("data"), [])
         self.assertNotIn("sz000004|240|5", quote_module._kline_cache)
+
+
+_TENCENT_RAW = (
+    'v_sh600519="1~贵州茅台~600519~1276.92~1275.16~1277.27~50179~1200~800~'
+    + "~".join(["1276.92", "600", "1276.61", "200", "1276.60", "100", "1276.59", "100", "1276.58", "300"])  # 买五档
+    + "~"
+    + "~".join(["1277.00", "2100", "1277.01", "100", "1277.07", "300", "1277.10", "100", "1277.42", "100"])  # 卖五档
+    + '~~20260914100123~1.76~0.14~1285.53~1276.30~~641889~~~~0.04~~~~~15963~~~";'
+)
+
+_EM_KLINE_PAYLOAD = json.dumps({
+    "data": {
+        "name": "贵州茅台",
+        "klines": [
+            "2026-09-10,1291.00,1285.13,1294.99,1283.00,32000000,41000000000.00",
+            "2026-09-11,1283.00,1275.16,1286.00,1270.01,50179100,64188900000.00",
+        ],
+    }
+})
+
+
+class TestDataSourcesExpansion(unittest.IsolatedAsyncioTestCase):
+    """数据源扩展：新浪失败时 realtime 走腾讯、日K 走东财（均真实源，不落离线快照）。"""
+
+    def setUp(self):
+        quote_module._kline_cache.clear()
+        quote_module._rt_cache.clear()
+        quote_module._rt_last_ok.clear()
+
+    tearDown = setUp
+
+    def test_parse_tencent_quote_same_shape_as_sina(self):
+        q = quote_module._parse_tencent_quote("sh600519", _TENCENT_RAW)
+        self.assertIsNotNone(q)
+        self.assertEqual(q["name"], "贵州茅台")
+        self.assertEqual(q["price"], 1276.92)
+        self.assertEqual(q["prevClose"], 1275.16)
+        self.assertEqual(q["changePct"], 0.14)
+        self.assertEqual(q["source"], "腾讯行情")
+        self.assertEqual(q["bids"][0], [1276.92, 600.0])   # 价,量
+        self.assertEqual(q["asks"][0], [1277.00, 2100.0])
+        self.assertAlmostEqual(q["amount"], 641889 * 10_000.0)  # 万 → 元
+
+    async def test_realtime_falls_back_to_tencent_when_sina_down(self):
+        def fake_get(url, decode=None, headers=None):
+            if url.startswith("https://hq.sinajs.cn"):
+                raise OSError("sina down")
+            if url.startswith("https://qt.gtimg.cn"):
+                return _TENCENT_RAW
+            raise OSError("unexpected " + url)
+
+        with mock.patch.object(quote_module, "_http_get", side_effect=fake_get):
+            result, stale = await quote_module.quote_realtime(["sh600519"])
+        self.assertFalse(stale)
+        self.assertEqual(result["sh600519"]["source"], "腾讯行情")
+        self.assertEqual(result["sh600519"]["price"], 1276.92)
+
+    async def test_daily_kline_falls_back_to_eastmoney_when_sina_down(self):
+        def fake_get(url, decode=None, headers=None):
+            if "push2delay.eastmoney.com" in url:
+                return _EM_KLINE_PAYLOAD
+            raise OSError("sina down")
+
+        with mock.patch.object(quote_module, "_http_get", side_effect=fake_get):
+            result = await quote_module.quote_kline("sh600519", 240, 5)
+        self.assertEqual(result["source"], "东方财富")
+        self.assertEqual(result["provider"], "eastmoney-kline")
+        self.assertFalse(result["isStale"])
+        self.assertEqual(result["data"][-1]["day"], "2026-09-11")
+        # 备用源结果为真实数据 → 允许入缓存（与离线快照策略相反）
+        self.assertIn("sh600519|240|5", quote_module._kline_cache)
 
 
 if __name__ == "__main__":

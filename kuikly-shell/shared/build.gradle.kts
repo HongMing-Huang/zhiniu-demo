@@ -11,6 +11,32 @@ plugins {
 
 val KEY_PAGE_NAME = "pageName"
 
+// 知牛 · 离线兜底数据代码生成：mock_market.json（数据文件，单一事实源）→ MockMarketData.kt
+// Kuikly 无跨端同步读文本资产的 API，故编译期把 JSON 内嵌为常量；改数据只需改 JSON 后重新构建。
+val generateMockMarketData = tasks.register("generateMockMarketData") {
+    val srcFile = file("src/commonMain/data/mock_market.json")
+    val outFile = layout.buildDirectory.file("generated/mock/kotlin/com/zhiniu/data/mock/MockMarketData.kt")
+    outputs.file(outFile)
+    inputs.file(srcFile)
+    doLast {
+        val json = srcFile.readText(Charsets.UTF_8).trim()
+        val target = outFile.get().asFile
+        target.parentFile.mkdirs()
+        target.writeText(
+            buildString {
+                appendLine("// 本文件由 gradle 任务 generateMockMarketData 从 src/commonMain/data/mock_market.json 生成，请勿手改。")
+                appendLine("package com.zhiniu.data.mock")
+                appendLine()
+                appendLine("/** 离线兜底数据（股票池/指数/宽度/默认值）的 JSON 原文；解析见 MockMarketFile。 */")
+                appendLine("internal val MOCK_MARKET_JSON: String = \"\"\"")
+                appendLine(json)
+                appendLine("\"\"\".trimIndent()")
+            },
+            Charsets.UTF_8,
+        )
+    }
+}
+
 kotlin {
     androidTarget {
         compilations.all {
@@ -56,6 +82,8 @@ kotlin {
 
     sourceSets {
         val commonMain by getting {
+            // 离线兜底数据代码生成：src/commonMain/data/mock_market.json（单一事实源）→ MockMarketData.kt
+            kotlin.srcDir(generateMockMarketData.map { it.outputs.files.first().parentFile })
             dependencies {
                 implementation("com.tencent.kuikly-open:core:${Version.getKuiklyVersion()}")
                 implementation("com.tencent.kuikly-open:core-annotations:${Version.getKuiklyVersion()}")

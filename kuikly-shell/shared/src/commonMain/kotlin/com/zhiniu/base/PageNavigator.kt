@@ -11,21 +11,31 @@ internal fun Pager.openZhiniuPage(pageName: String, params: Map<String, String> 
     acquireModule<RouterModule>(RouterModule.MODULE_NAME).openPage(pageName, pageData)
 }
 
-internal fun Pager.openMarketPage() = openZhiniuPage("MarketList")
+/**
+ * 底部 Tab 级切换：标记 __tab=1，各端壳据此关闭转场动画且不堆栈（正常 App 的 Tab 行为）。
+ * 二级页（详情/对比）仍走 openZhiniuPage 保留 push 动画。
+ */
+internal fun Pager.openTabPage(pageName: String) {
+    val pageData = JSONObject()
+    pageData.put("__tab", "1")
+    acquireModule<RouterModule>(RouterModule.MODULE_NAME).openPage(pageName, pageData)
+}
+
+internal fun Pager.openMarketPage() = openTabPage("MarketList")
 
 internal fun Pager.openStockDetail(symbol: String) =
     openZhiniuPage("StockDetail", mapOf("symbol" to symbol))
 
-internal fun Pager.openAiResearchPage() = openZhiniuPage("AiResearch")
+internal fun Pager.openAiResearchPage() = openTabPage("AiResearch")
 
 /** 携带初始问题跳转 AI 研究（图表选点追问 / 详情页深聊入口）。 */
 internal fun Pager.openAiResearchPage(question: String) =
     openZhiniuPage("AiResearch", mapOf("question" to question))
 
-internal fun Pager.openWatchlistPage() = openZhiniuPage("Watchlist")
+internal fun Pager.openWatchlistPage() = openTabPage("Watchlist")
 
 /** 「我的」页（用户卡 / 外观偏好 / 服务状态 / 关于）。 */
-internal fun Pager.openProfilePage() = openZhiniuPage("Profile")
+internal fun Pager.openProfilePage() = openTabPage("Profile")
 
 /** 拉起双股对比页（AI 工具指令 open_compare / 快捷入口）。 */
 internal fun Pager.openComparePage(symbolA: String, symbolB: String) =

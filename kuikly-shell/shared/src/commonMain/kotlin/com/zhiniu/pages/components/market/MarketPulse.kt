@@ -45,7 +45,16 @@ fun ViewContainer<*, *>.MarketPulse(
             View {
                 attr { flexDirectionRow(); alignItemsStretch() }
                 indices.forEachIndexed { i, idx ->
-                    if (i > 0) View { attr { width(8f) } }
+                    if (i > 0) {
+                        // 细竖线分隔（同花顺式扁平三列）
+                        View {
+                            attr {
+                                width(1f)
+                                backgroundColor(colors.c(colors.border))
+                                animate(ANIM_THEME, value = AppTheme.isDark)
+                            }
+                        }
+                    }
                     IndexCard(idx)
                 }
             }
@@ -79,16 +88,14 @@ fun ViewContainer<*, *>.MarketPulse(
     }
 }
 
-/** 手机指数卡：白底描边小卡（名称 / 大价格 / 涨跌 chip / 迷你走势）。 */
+/** 手机指数列（同花顺/雪球式扁平三列，细竖线分隔；无卡片边框）：名称 / 价格 / 涨跌幅 / 迷你走势。 */
 private fun ViewContainer<*, *>.IndexCard(idx: MarketIndex) {
     val colors = AppTheme.colors
     View {
         attr {
             flex(1f)
-            borderRadius(8f)
-            border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
-            backgroundColor(colors.c(colors.surface))
-            padding(top = 10f, bottom = 10f, left = 10f, right = 10f)
+            flexDirectionColumn()
+            padding(left = 8f, right = 8f)
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
         Text {
@@ -98,10 +105,10 @@ private fun ViewContainer<*, *>.IndexCard(idx: MarketIndex) {
                 animate(ANIM_THEME, value = AppTheme.isDark)
             }
         }
-        View { attr { height(3f) } }
+        View { attr { height(4f) } }
         Text {
             attr {
-                fontSize(AppTypography.fs14); fontWeightSemiBold(); fontFamily(NUM_FONT)
+                fontSize(AppTypography.fs16); fontWeightSemiBold(); fontFamily(NUM_FONT)
                 lines(1); textOverFlowClip()
                 color(colors.c(if (idx.isUp) colors.up else colors.down)); text(fmt2(idx.price))
                 animate(ANIM_THEME, value = AppTheme.isDark)
@@ -121,16 +128,13 @@ private fun ViewContainer<*, *>.IndexCard(idx: MarketIndex) {
     }
 }
 
-/** 手机市场宽度摘要卡：上涨/下跌/成交，卡片容器与指数卡同语言。 */
+/** 手机市场宽度摘要行：扁平一行（上涨/下跌/成交），与指数列同底色。 */
 private fun ViewContainer<*, *>.CompactBreadthCard(breadth: MarketBreadth) {
     val colors = AppTheme.colors
     View {
         attr {
             flexDirectionRow(); alignItemsCenter()
-            borderRadius(8f)
-            border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
-            backgroundColor(colors.c(colors.surface))
-            padding(top = 10f, bottom = 10f, left = 12f, right = 12f)
+            padding(top = 8f, bottom = 2f, left = 8f, right = 8f)
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
         Text { attr { fontSize(AppTypography.fs11); lines(1); color(colors.c(colors.textSecondary)); text("市场宽度") } }

@@ -1,0 +1,28 @@
+{
+  "_comment": "知牛 · 前端离线兜底数据（单一事实源）。构建期由 shared/build.gradle.kts 的 generateMockMarketData 任务生成 MockMarketData.kt；后端离线兜底另读同目录 mock_quotes.json。修改数据请改本文件后重新构建。",
+  "stocks": [
+    { "symbol": "sh600519", "name": "贵州茅台", "pinyin": "maotai", "price": 1292.83, "prevClose": 1291.50, "open": 1289.40, "high": 1295.00, "low": 1270.01, "volume": 715000, "amount": 43100000000 },
+    { "symbol": "sz300750", "name": "宁德时代", "pinyin": "ningde", "price": 196.80, "prevClose": 193.50, "open": 195.00, "high": 198.00, "low": 193.10, "volume": 882000, "amount": 17300000000 },
+    { "symbol": "sz000001", "name": "平安银行", "pinyin": "pinganyinhang", "price": 11.30, "prevClose": 11.15, "open": 11.20, "high": 11.38, "low": 11.12, "volume": 1120000, "amount": 1260000000 },
+    { "symbol": "sh600036", "name": "招商银行", "pinyin": "zhaoshang", "price": 36.28, "prevClose": 35.80, "open": 36.10, "high": 36.45, "low": 35.90, "volume": 1050000, "amount": 3810000000 },
+    { "symbol": "sh601318", "name": "中国平安", "pinyin": "zhongguopingan", "price": 48.35, "prevClose": 47.90, "open": 48.20, "high": 48.66, "low": 47.80, "volume": 760000, "amount": 3670000000 },
+    { "symbol": "sz000858", "name": "五粮液", "pinyin": "wuliangye", "price": 127.60, "prevClose": 129.10, "open": 128.00, "high": 130.00, "low": 126.80, "volume": 410000, "amount": 5260000000 },
+    { "symbol": "sh601398", "name": "工商银行", "pinyin": "gongshang", "price": 5.64, "prevClose": 5.58, "open": 5.60, "high": 5.65, "low": 5.57, "volume": 2360000, "amount": 1330000000 },
+    { "symbol": "sh600276", "name": "恒瑞医药", "pinyin": "hengrui", "price": 45.20, "prevClose": 44.60, "open": 44.80, "high": 45.60, "low": 44.50, "volume": 580000, "amount": 2620000000 },
+    { "symbol": "sz300059", "name": "东方财富", "pinyin": "dongfangcaifu", "price": 14.02, "prevClose": 13.70, "open": 13.80, "high": 14.15, "low": 13.72, "volume": 2140000, "amount": 3000000000 },
+    { "symbol": "sh688981", "name": "中芯国际", "pinyin": "zhongxin", "price": 78.40, "prevClose": 77.10, "open": 77.60, "high": 79.20, "low": 76.90, "volume": 690000, "amount": 5410000000 },
+    { "symbol": "sz002594", "name": "比亚迪", "pinyin": "biyadi", "price": 245.60, "prevClose": 242.10, "open": 243.00, "high": 247.90, "low": 241.20, "volume": 430000, "amount": 10600000000 },
+    { "symbol": "sh601012", "name": "隆基绿能", "pinyin": "longji", "price": 17.84, "prevClose": 18.20, "open": 18.05, "high": 18.30, "low": 17.72, "volume": 1380000, "amount": 2460000000 }
+  ],
+  "indices": [
+    { "symbol": "sh000001", "name": "上证指数", "price": 3245.13, "changePercent": 0.39 },
+    { "symbol": "sz399001", "name": "深证成指", "price": 10420.31, "changePercent": 0.58 },
+    { "symbol": "sz399006", "name": "创业板指", "price": 2080.45, "changePercent": 0.91 }
+  ],
+  "breadth": { "upCount": 3128, "downCount": 1932, "amountYi": 9864, "status": "偏强" },
+  "defaults": {
+    "watchlist": ["sh600519", "sz300750"],
+    "compareA": "sh600519",
+    "compareB": "sz300750"
+  }
+}

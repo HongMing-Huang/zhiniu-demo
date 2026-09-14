@@ -38,6 +38,7 @@ object AppTypography {
     const val fs13 = 13f
     const val fs12 = 12f
     const val fs11 = 11f
+    const val fs10 = 10f
 }
 
 object AppSpacing {

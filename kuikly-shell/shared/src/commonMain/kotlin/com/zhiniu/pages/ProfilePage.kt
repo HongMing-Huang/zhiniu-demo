@@ -314,8 +314,8 @@ private fun ViewContainer<*, *>.profileContent(host: ProfilePage) {
             SettingRow(IconKind.CHART, "双股对比", "AI 对比两只股票强弱", colors) {
                 val quotes = host.repo.stockQuotes()
                 host.openComparePage(
-                    quotes.getOrNull(0)?.symbol ?: "sh600519",
-                    quotes.getOrNull(1)?.symbol ?: "sz300750",
+                    quotes.getOrNull(0)?.symbol ?: com.zhiniu.data.mock.MockMarketDefaults.comparePair.first,
+                    quotes.getOrNull(1)?.symbol ?: com.zhiniu.data.mock.MockMarketDefaults.comparePair.second,
                 )
             }
         }

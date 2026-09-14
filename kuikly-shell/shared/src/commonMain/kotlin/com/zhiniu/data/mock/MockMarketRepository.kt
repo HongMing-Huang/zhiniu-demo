@@ -18,40 +18,35 @@ class MockMarketRepository : MarketRepository {
 
     /** 将网关返回的最新报价合并进同步仓储，让搜索、详情与 AI 共用同一份价格。 */
     fun applyLiveQuotes(quotes: List<StockQuote>) {
-        val base = baseStockQuotes().associateBy { it.symbol }
+        val base = marketFile.stocks.associateBy({ it.symbol }, { it.pinyin })
         quotes.forEach { q ->
-            liveQuoteOverrides[q.symbol] = if (q.pinyin.isBlank()) q.copy(pinyin = base[q.symbol]?.pinyin.orEmpty()) else q
+            liveQuoteOverrides[q.symbol] = if (q.pinyin.isBlank()) q.copy(pinyin = base[q.symbol].orEmpty()) else q
         }
     }
 
-    // ---------------- 股票池（12 只，覆盖 沪市/深市/创业板/科创板） ----------------
-    override fun stockQuotes(): List<StockQuote> = baseStockQuotes().map { liveQuoteOverrides[it.symbol] ?: it }
+    // ---------------- 股票池 / 指数 / 宽度：全部由 mock_market.json 数据文件驱动 ----------------
+    private val marketFile: MockMarketFile by lazy { mockMarketFile }
 
-    private fun baseStockQuotes(): List<StockQuote> = listOf(
-        q("sh600519", "贵州茅台", "maotai", 1292.83, 1291.50, 1289.40, 1295.00, 1270.01, 715_000L, 431.0e8),
-        q("sz300750", "宁德时代", "ningde", 196.80, 193.50, 195.00, 198.00, 193.10, 882_000L, 173.0e8),
-        q("sz000001", "平安银行", "pinganyinhang", 11.30, 11.15, 11.20, 11.38, 11.12, 1_120_000L, 12.6e8),
-        q("sh600036", "招商银行", "zhaoshang", 36.28, 35.80, 36.10, 36.45, 35.90, 1_050_000L, 38.1e8),
-        q("sh601318", "中国平安", "zhongguopingan", 48.35, 47.90, 48.20, 48.66, 47.80, 760_000L, 36.7e8),
-        q("sz000858", "五粮液", "wuliangye", 127.60, 129.10, 128.00, 130.00, 126.80, 410_000L, 52.6e8),
-        q("sh601398", "工商银行", "gongshang", 5.64, 5.58, 5.60, 5.65, 5.57, 2_360_000L, 13.3e8),
-        q("sh600276", "恒瑞医药", "hengrui", 45.20, 44.60, 44.80, 45.60, 44.50, 580_000L, 26.2e8),
-        q("sz300059", "东方财富", "dongfangcaifu", 14.02, 13.70, 13.80, 14.15, 13.72, 2_140_000L, 30.0e8),
-        q("sh688981", "中芯国际", "zhongxin", 78.40, 77.10, 77.60, 79.20, 76.90, 690_000L, 54.1e8),
-        q("sz002594", "比亚迪", "biyadi", 245.60, 242.10, 243.00, 247.90, 241.20, 430_000L, 106.0e8),
-        q("sh601012", "隆基绿能", "longji", 17.84, 18.20, 18.05, 18.30, 17.72, 1_380_000L, 24.6e8),
+    override fun stockQuotes(): List<StockQuote> = marketFile.stocks.map { it.toQuote() }
+
+    private fun MockStock.toQuote() = StockQuote(
+        symbol = symbol, name = name, pinyin = pinyin,
+        open = open, prevClose = prevClose, price = price, high = high, low = low,
+        buy1 = price, sell1 = price + 0.01,
+        volume = volume, amount = amount,
+        date = "2026-08-21", time = "15:00:00",
     )
 
-    // ---------------- 指数与宽度 ----------------
-    override fun indices(): List<MarketIndex> = listOf(
-        MarketIndex("sh000001", "上证指数", 3245.13, 0.39, sparkOf("sh000001")),
-        MarketIndex("sz399001", "深证成指", 10420.31, 0.58, sparkOf("sz399001")),
-        MarketIndex("sz399006", "创业板指", 2080.45, 0.91, sparkOf("sz399006")),
-    )
+    override fun indices(): List<MarketIndex> = marketFile.indices.map {
+        MarketIndex(it.symbol, it.name, it.price, it.changePercent, sparkOf(it.symbol))
+    }
 
-    override fun breadth(): MarketBreadth = MarketBreadth(
-        upCount = 3128, downCount = 1932, amountYi = 9864, status = "偏强",
-    )
+    override fun breadth(): MarketBreadth = marketFile.breadth.let {
+        MarketBreadth(
+            upCount = it.upCount.toLong(), downCount = it.downCount.toLong(),
+            amountYi = it.amountYi.toLong(), status = it.status,
+        )
+    }
 
     override fun quoteOf(symbol: String): StockQuote? =
         stockQuotes().firstOrNull { it.symbol == symbol || it.code == symbol }
@@ -227,14 +222,4 @@ class MockMarketRepository : MarketRepository {
         return out
     }
 
-    private fun q(
-        symbol: String, name: String, pinyin: String, price: Double, prev: Double,
-        open: Double, high: Double, low: Double, volume: Long, amount: Double,
-    ) = StockQuote(
-        symbol = symbol, name = name, pinyin = pinyin,
-        open = open, prevClose = prev, price = price, high = high, low = low,
-        buy1 = price, sell1 = price + 0.01,
-        volume = volume, amount = amount,
-        date = "2026-08-21", time = "15:00:00",
-    )
 }
