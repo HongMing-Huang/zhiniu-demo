@@ -6,47 +6,93 @@
 
 **从问一句，到看懂一只股票。** 基于 [Kuikly](https://github.com/Tencent-TDS/KuiklyUI) 的 AI 股票多端应用——一套 `commonMain` 代码，跑通 **H5 / Android / iOS / 鸿蒙**：看行情、问 AI、让 AI 直接帮你操作。
 
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF.svg)](https://kotlinlang.org)
-[![Kuikly](https://img.shields.io/badge/Kuikly-Tencent%20TDS-0052D9.svg)](https://github.com/Tencent-TDS/KuiklyUI)
-[![Backend](https://img.shields.io/badge/Backend-FastAPI-009688.svg)](backend)
-[![CI](https://github.com/HongMing-Huang/zhiniu-demo/actions/workflows/ci.yml/badge.svg)](https://github.com/HongMing-Huang/zhiniu-demo/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[Kotlin 2.1](https://kotlinlang.org) · [Kuikly 2.25.0](https://github.com/Tencent-TDS/KuiklyUI) · [FastAPI](backend) · [CI](https://github.com/HongMing-Huang/zhiniu-demo/actions/workflows/ci.yml) · [MIT](LICENSE)
 
----
+</div>
 
-### 📺 演示视频（1 分 20 秒 · 三端真实运行）
+<div align="center">
 
-> 素材均来自真实运行的 **H5 + iOS 模拟器 + Android 模拟器**，三端价格一致（同一套 `commonMain` 代码）。
-
-<video src="docs/video/demo.mp4" controls="controls" width="100%" poster="docs/img/pages_preview.png" preload="metadata"></video>
-
-**三端同屏**：同一只股票（宁德时代 · 337.11）在 H5 / iOS / Android 三端同时渲染，价格与 K 线完全一致。
-
-![三端同屏](docs/img/cover-three-platform.png)
+[一分钟体验路径](#一分钟体验路径) · [四端同屏](#四端同时运行的真实样貌) · [演示视频](#-演示视频) · [立即下载](#立即下载) · [项目亮点](#项目亮点) · [快速开始](#快速开始) · [架构](#架构) · [文档](#文档)
 
 </div>
 
 ---
 
-## 先看演示
+## 一分钟体验路径
 
-| 方式 | 链接 / 命令 | 说明 |
-|:--|:--|:--|
-| **Android 直接安装** | [zhiniu-debug.apk](zhiniu-debug.apk)（约 8 MB） | 下载即装；默认连 `10.0.2.2:8000`（模拟器）/ 本机网关，见 [运行说明](docs/getting-started.md) |
-| **H5 秒开** | 起后端 + `python3 -m http.server 8082`（web-host 目录） | 浏览器打开即为 390 移动布局 |
-| **iOS / 鸿蒙** | 见 [docs/getting-started.md](docs/getting-started.md) | iOS 需 Xcode Run；鸿蒙需 DevEco 构建 HAP |
+1. **先看演示**：播放下方演示视频（或直接跳到 [§ 四端同屏](#四端同时运行的真实样貌) 看真实运行截图），了解「行情 → 个股详情 → AI 研究 → 三端同屏」主链路。
+2. **Android 用户直接装**：下载 [§ 立即下载](#立即下载) 里的 APK，安装即可体验；其他平台按 [§ 快速开始](#快速开始) 自行构建。
+3. **起后端（可选，推荐）**：`uvicorn app.main:app --port 8000` 后行情与 AI 走**真实数据**；不起后端则自动使用**确定性离线快照**，功能一样完整。
+4. **提一个问题**：在 AI 研究页输入「分析贵州茅台」，看多 Agent 研究从四阶段进度到 Markdown + 证据卡混排的完整流程。
+
+---
+
+## 四端同时运行的真实样貌
+
+> 同一份 Kuikly `commonMain` 代码，在 **H5 浏览器 · Android 手机 · iOS · 鸿蒙** 四种设备上的真实运行截图（2026-09-15 录制，行情为实时数据）。
+
+<div align="center">
+
+| H5（Web） | Android | iOS | 鸿蒙 OpenHarmony |
+| :---: | :---: | :---: | :---: |
+| <img src="docs/img/mobile-asset/h5-market.png" width="236" /> | <img src="docs/img/mobile-asset/android-market.png" width="196" /> | <img src="docs/img/mobile-asset/ios-market.png" width="196" /> | <img src="docs/img/mobile-asset/ohos-market.png" width="196" /> |
+| <sub>官方渲染宿主 · SPA 路由</sub> | <sub>API 34 模拟器实测</sub> | <sub>iPhone 17 Pro 模拟器</sub> | <sub>Pura 90 装机验证</sub> |
+
+**个股详情 · AI 研究（H5 / Android / iOS）**
+
+| 个股详情 | AI 研究 |
+| :---: | :---: |
+| <img src="docs/img/mobile-asset/h5-detail.png" width="236" /> <img src="docs/img/mobile-asset/android-detail.png" width="196" /> <img src="docs/img/mobile-asset/ios-detail.png" width="196" /> | <img src="docs/img/mobile-asset/h5-ai.png" width="236" /> <img src="docs/img/mobile-asset/android-ai.png" width="196" /> <img src="docs/img/mobile-asset/ios-ai.png" width="196" /> |
+
+</div>
+
+---
+
+## 📺 演示视频
+
+> 素材均来自真实运行的 **H5 + iOS 模拟器 + Android 模拟器**，三端价格一致（宁德时代 · 337.11，同一套 `commonMain` 代码）。
+
+<video src="docs/video/demo.mp4" controls="controls" width="100%" poster="docs/img/pages_preview.png" preload="metadata"></video>
+
+**看点**：市场首屏（实时行情 · 指数脉冲）→ 排序 / 筛选 / 自选 → 搜索联想直达详情 → 详情页分时 / 日K / 盘口 / MA·MACD·RSI → AI 四维解读 → 多 Agent 研究归纳（来源可溯 · 结论速览）→ 多空对抗 / 风控视角 → 规则降级（未伪装模型）→ Light/Dark 180ms · 响应式窄屏 → **Android / iOS / H5 三端同屏**。
+
+![三端同屏](docs/img/cover-three-platform.png)
+
+---
+
+## 立即下载
+
+| 产物 | 下载 | 说明 |
+| :--- | :---: | :--- |
+| **Android Debug 包** | [📥 `zhiniu-debug.apk`](zhiniu-debug.apk) | 约 8 MB · 下载即装；默认连 `10.0.2.2:8000`（模拟器）/ 本机网关 |
+
+SHA-256：`f972541a970408efca1c1a6d9dd40b8d2f7476611749814a7801dac142182973`
 
 > 行情来自公开免费接口（新浪/东财），AI 结论由大模型生成，两者都可能出错；本作品仅用于课程学习与产品原型演示，**不构成任何投资建议**，也不提供真实证券交易。
 
-## 这是什么
+---
 
-知牛（ZhiNiu）是一个基于 [KuiklyUI](https://github.com/Tencent-TDS/KuiklyUI)（腾讯开源 KMP 跨端框架）的 AI 股票应用，对应课题 **Task 1 · AI 股票行情原型** 与 **Task 2 · AI 股票问答应用**：
+## 项目亮点
 
-- **看行情（Task 1）**：市场列表（自选 / 排序 / 筛选 / 搜索 / 人气榜）→ 个股详情（五档盘口、日K/分时缩放、十字线、MA/MACD/RSI、资金/财务/新闻、加自选），行情为**真实新浪财经数据**
-- **问 AI（Task 2）**：多 Agent 研究会话（分析 / 多空对抗 / 风控三视角），回复用 **Markdown + 结构化证据卡**混排渲染，来源可追溯，点击卡片跳回个股详情形成闭环
-- **一套代码**：业务代码 100% 位于 `commonMain`，H5 / Android / iOS / 鸿蒙四端壳就绪；页面流转、状态机、主题切换跨端一致
+### 可信的 AI 股票解释
 
-> 命名寓意：「知牛」双关「知道牛股 / 识得牛熊」。
+- **真实行情**：新浪实时报价 + 日K/分时 + 东方财富资讯，经 FastAPI 网关统一归一化（含来源、TTL、stale 标记）；断网自动回退本地快照并打 stale——**从不伪装在线结果**。
+- **防幻觉协议**：证券代码必须来自本轮搜索工具；行情/财报/K 线数值由服务端回填卡片，模型不得填写或修改数字；工具失败明示失败项。
+- **诚实降级**：LLM 不可用时输出规则引擎结论并标注「规则降级 · 未伪装模型」；行情断网保留最近快照。
+
+### 不止是行情
+
+- **多 Agent 研究管线**：行情 → 技术面 → 财务 → 资讯 → 风险 → 多空辩论 → 研究经理 → 交易员 → 风控 → 归纳，四阶段进度实时可见；结论、依据、来源逐段可追溯。
+- **结构化 AI 渲染**：Markdown（标题/列表/表格/代码块）与结构化卡片（股票卡 / 关键指标 / 买卖观察区间 / 风险分级五档 / 迷你走势）混排，自研解析器纯函数实现并带单测。
+- **AI Agent 工具指令**：对知牛说「把比亚迪加到自选」「宁德时代跌破 300 提醒我」「对比茅台和宁德」「换成深色」——模型按 ⟦TOOL⟧ 协议输出 6 类指令（加自选 / 双股对比 / 价格预警 / 转入研究 / 切外观 / 切涨跌配色），名称→代码经东财搜索**真实解析（拒绝编造）**，客户端执行并回执反馈卡。
+- **会话本地归档**：会话与聊天消息 SharedPreferences 持久化，刷新 / 冷启动不丢记录。
+
+### 真正的跨端工程
+
+- **一套共享业务与 UI**：业务代码 100% 位于 `commonMain`，H5 / Android / iOS / 鸿蒙四端壳就绪；页面流转、状态机、主题切换跨端一致。
+- **commonMain 自绘图表**：Kuikly Canvas 蜡烛图 / 量柱 / MACD / RSI，按钮 + 滚轮 + 拖拽 + 捏合缩放，十字线 OHLCV 联动。
+- **体验细节**：Light/Dark/System 180ms 切换、六态状态机（Idle/Loading/Success/Empty/Error/Stale）、等宽数字、安全区避让、无障碍语义。
+- **离线可跑**：内置确定性 Mock，断网 / 无 Key 均可完整演示。
 
 ## 任务对照
 
@@ -57,16 +103,7 @@
 
 逐项自查详见 [docs/deliverables.md](docs/deliverables.md)。
 
-## 核心亮点
-
-- **真实行情**：新浪实时报价 + 日K/分时 + 东方财富资讯，经 FastAPI 网关统一归一化（含来源、TTL、stale 标记），断网自动回退本地快照
-- **多 Agent 研究**：行情 → 技术面 → 财务 → 资讯 → 风险 → 多空辩论 → 研究经理 → 交易员 → 风控 → 归纳，四阶段进度实时可见；对同一标的的结论、依据、来源逐段可追溯
-- **AI Agent 工具指令**：对知牛说「把比亚迪加到自选」「宁德时代跌破 300 提醒我」「对比茅台和宁德」「换成深色」——模型按 ⟦TOOL⟧ 协议输出 6 类指令（加自选 / 双股对比 / 价格预警 / 转入研究 / 切外观 / 切涨跌配色），名称→代码经东财搜索**真实解析（拒绝编造）**，客户端执行并回执反馈卡
-- **结构化 AI 渲染**：Markdown（标题/列表/表格/代码块）与结构化卡片（股票卡 / 关键指标 / 买卖观察区间 / 风险分级五档 / 迷你走势）混排，自研解析器纯函数实现并带单测
-- **诚实降级**：LLM 不可用时输出规则引擎结论并标注「规则降级 · 未伪装模型」；行情断网保留最近快照并打 stale 标记——从不伪装
-- **防幻觉协议**：证券代码必须来自本轮搜索工具；行情/财报/K 线数值由服务端回填卡片，模型不得填写或修改数字；工具失败明示失败项
-- **体验细节**：Light/Dark/System 180ms 切换、完整状态机（Idle/Loading/Success/Empty/Error/Stale）、等宽数字、安全区避让、无障碍语义
-- **离线可跑**：内置确定性 Mock，断网 / 无 Key 均可完整演示
+---
 
 ## 快速开始
 
