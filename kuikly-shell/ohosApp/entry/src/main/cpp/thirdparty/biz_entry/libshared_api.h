@@ -131,6 +131,12 @@ typedef struct {
 } libshared_kref_com_zhiniu_domain_model_StockQuote;
 typedef struct {
   libshared_KNativePtr pinned;
+} libshared_kref_com_zhiniu_data_mock_MockMarketDefaults;
+typedef struct {
+  libshared_KNativePtr pinned;
+} libshared_kref_kotlin_Pair;
+typedef struct {
+  libshared_KNativePtr pinned;
 } libshared_kref_com_zhiniu_data_remote_MarketNewsItem;
 typedef struct {
   libshared_KNativePtr pinned;
@@ -249,9 +255,6 @@ typedef struct {
 typedef struct {
   libshared_KNativePtr pinned;
 } libshared_kref_com_zhiniu_domain_model_KLineChart;
-typedef struct {
-  libshared_KNativePtr pinned;
-} libshared_kref_kotlin_Pair;
 typedef struct {
   libshared_KNativePtr pinned;
 } libshared_kref_com_zhiniu_domain_model_SseParser;
@@ -732,6 +735,12 @@ typedef struct {
                 libshared_kref_kotlin_collections_List (*spark)(libshared_kref_com_zhiniu_data_mock_MockMarketRepository thiz, const char* symbol);
                 libshared_kref_kotlin_collections_List (*stockQuotes)(libshared_kref_com_zhiniu_data_mock_MockMarketRepository thiz);
               } MockMarketRepository;
+              struct {
+                libshared_KType* (*_type)(void);
+                libshared_kref_com_zhiniu_data_mock_MockMarketDefaults (*_instance)();
+                libshared_kref_kotlin_Pair (*get_comparePair)(libshared_kref_com_zhiniu_data_mock_MockMarketDefaults thiz);
+                libshared_kref_kotlin_collections_List (*get_watchlist)(libshared_kref_com_zhiniu_data_mock_MockMarketDefaults thiz);
+              } MockMarketDefaults;
             } mock;
             struct {
               struct {
@@ -2108,6 +2117,7 @@ typedef struct {
               struct {
                 libshared_KType* (*_type)(void);
                 libshared_kref_com_zhiniu_pages_components_AppTypography (*_instance)();
+                libshared_KFloat (*get_fs10)(libshared_kref_com_zhiniu_pages_components_AppTypography thiz);
                 libshared_KFloat (*get_fs11)(libshared_kref_com_zhiniu_pages_components_AppTypography thiz);
                 libshared_KFloat (*get_fs12)(libshared_kref_com_zhiniu_pages_components_AppTypography thiz);
                 libshared_KFloat (*get_fs13)(libshared_kref_com_zhiniu_pages_components_AppTypography thiz);
@@ -2217,7 +2227,7 @@ typedef struct {
               const char* (*fmtSymbol)(const char* sym);
               const char* (*fmtVolHand)(libshared_KLong v);
               const char* (*marketLabelOf)(const char* sym);
-              void (*Icon)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, libshared_kref_com_zhiniu_pages_components_IconKind kind, libshared_KFloat size);
+              void (*Icon)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, libshared_kref_com_zhiniu_pages_components_IconKind kind, libshared_KFloat size, const char* tint);
               libshared_kref_com_zhiniu_pages_components_StockFacts (*factsOf)(libshared_kref_com_zhiniu_domain_model_StockFundamentals fundamentals);
               libshared_kref_com_zhiniu_pages_components_StockFacts (*factsOf_)(libshared_kref_com_zhiniu_domain_model_StockQuote quote, libshared_kref_com_zhiniu_domain_model_StockFundamentals fundamentals);
               const char* (*fmtOptional)(libshared_kref_kotlin_Double value, const char* suffix);
