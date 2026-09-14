@@ -162,12 +162,13 @@ fun ViewContainer<*, *>.IconButton(
     }
 }
 
-/** 圆形主色图标按钮（Composer 发送 / 移动端主操作），禁用态降不透明度。 */
+/** 圆形图标按钮（Composer 发送 / 移动端主操作）；tone=primary accent 实心，quiet 浅底灰图标。 */
 fun ViewContainer<*, *>.RoundIconButton(
     kind: IconKind,
     size: Float = 17f,
     box: Float = 38f,
     enabled: Boolean = true,
+    tone: String = "primary",
     accessibilityLabel: String = kind.name,
     onClick: () -> Unit,
 ) {
@@ -177,9 +178,21 @@ fun ViewContainer<*, *>.RoundIconButton(
             width(box); height(box)
             borderRadius(box / 2f)
             allCenter()
-            // 主操作用 AI accent 底（品牌识别点）；禁用态降不透明度
-            backgroundColor(colors.c(if (enabled) colors.aiAccent else colors.surfaceSecondary))
-            opacity(if (enabled) 1f else 0.6f)
+            // 启用：primary=AI accent 实心 / quiet=浅底；禁用：幽灵描边（无灰实心块的笨重感）
+            backgroundColor(
+                colors.c(
+                    when {
+                        !enabled -> colors.surface
+                        tone == "quiet" -> colors.surfaceSecondary
+                        else -> colors.aiAccent
+                    }
+                )
+            )
+            border(
+                if (!enabled) com.tencent.kuikly.core.base.Border(1f, com.tencent.kuikly.core.base.BorderStyle.SOLID, colors.c(colors.borderStrong))
+                else com.tencent.kuikly.core.base.Border(0f, com.tencent.kuikly.core.base.BorderStyle.SOLID, com.tencent.kuikly.core.base.Color.TRANSPARENT)
+            )
+            opacity(if (enabled) 1f else 0.7f)
             highlightBackgroundColor(colors.ca(colors.textSecondary, 18))
             accessibility(if (enabled) accessibilityLabel else "$accessibilityLabel（不可用）")
             accessibilityRole(AccessibilityRole.BUTTON)
@@ -188,7 +201,7 @@ fun ViewContainer<*, *>.RoundIconButton(
             animate(ANIM_THEME, value = AppTheme.isDark)
         }
         event { click { if (enabled) onClick() } }
-        Icon(kind, size)
+        Icon(kind, size, tint = if (tone == "quiet" || !enabled) colors.textSecondary else null)
     }
 }
 

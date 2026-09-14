@@ -899,7 +899,7 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
                     View {
                         attr { flexDirectionRow(); alignItemsCenter() }
                         RoundIconButton(
-                            IconKind.DATA, size = 15f, box = 30f,
+                            IconKind.DATA, size = 15f, box = 30f, tone = "quiet",
                             accessibilityLabel = "历史会话",
                         ) { host.sessionSheetVisible = true }
                     }
@@ -907,7 +907,7 @@ private fun ViewContainer<*, *>.chatColumn(host: AiResearchPage) {
                     View {
                         attr { flexDirectionRow(); alignItemsCenter() }
                         RoundIconButton(
-                            IconKind.CHAT, size = 15f, box = 30f,
+                            IconKind.CHAT, size = 15f, box = 30f, tone = "quiet",
                             accessibilityLabel = "新建会话",
                         ) { host.newSession() }
                     }

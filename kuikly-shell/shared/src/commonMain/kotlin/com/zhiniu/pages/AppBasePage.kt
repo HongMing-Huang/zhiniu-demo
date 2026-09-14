@@ -134,6 +134,13 @@ internal abstract class AppBasePage : BasePager() {
                 com.tencent.kuikly.core.module.SharedPreferencesModule.MODULE_NAME,
             ).setString(com.zhiniu.pages.components.THEME_MODE_SP_KEY, mode.name)
         }
+        // 网关地址优先级：用户在「我的」页保存的地址 > pageData 联调参数 > 平台默认
+        // （真机 10.0.2.2 无效，必须用电脑局域网 IP——无用户设置时靠联调参数兜底）
+        acquireModule<com.tencent.kuikly.core.module.SharedPreferencesModule>(
+            com.tencent.kuikly.core.module.SharedPreferencesModule.MODULE_NAME,
+        ).getString(com.zhiniu.data.remote.GatewayMarketClient.GATEWAY_SP_KEY)
+            .takeIf { it.isNotBlank() }
+            ?.let { GatewayMarketClient.baseUrl = it }
         // 真机/局域网联调：?gateway=http://192.168.x.x:8000 覆盖默认本机网关（非法值忽略）
         pageData.params.optString("gateway", "").takeIf { it.isNotBlank() }?.let { GatewayMarketClient.baseUrl = it }
         lifecycleScope.launch {

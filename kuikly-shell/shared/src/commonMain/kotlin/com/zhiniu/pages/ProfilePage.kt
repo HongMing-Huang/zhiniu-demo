@@ -6,10 +6,12 @@ package com.zhiniu.pages
 
 import com.tencent.kuikly.core.annotations.Page
 import com.tencent.kuikly.core.base.Border
+import com.tencent.kuikly.core.coroutines.launch
 import com.tencent.kuikly.core.base.BorderStyle
 import com.tencent.kuikly.core.base.ViewBuilder
 import com.tencent.kuikly.core.base.ViewContainer
 import com.tencent.kuikly.core.base.attr.AccessibilityRole
+import com.tencent.kuikly.core.coroutines.launch
 import com.tencent.kuikly.core.base.attr.ImageUri
 import com.tencent.kuikly.core.directives.vif
 import com.tencent.kuikly.core.reactive.handler.observable
@@ -20,6 +22,7 @@ import com.tencent.kuikly.core.views.Text
 import com.tencent.kuikly.core.views.View
 import com.zhiniu.data.local.AlertStore
 import com.zhiniu.data.local.Watchlist
+import com.zhiniu.data.remote.GatewayMarketClient
 import com.zhiniu.base.openComparePage
 import com.zhiniu.pages.components.ANIM_THEME
 import com.zhiniu.pages.components.AppRadius
@@ -33,6 +36,8 @@ import com.zhiniu.pages.components.UPDOWN_SP_KEY
 import com.zhiniu.pages.components.c
 import com.zhiniu.pages.components.ca
 import com.zhiniu.pages.components.cssClass
+import com.zhiniu.pages.components.common.AppInput
+import com.zhiniu.pages.components.common.SecondaryButton
 
 private val APP_VERSION = "v1.0.0"
 private const val HISTORY_SP_KEY = "zhiniu.history.items.v1"
@@ -42,6 +47,9 @@ internal class ProfilePage : AppBasePage() {
 
     internal var watchCount by observable(0)
     internal var alertCount by observable(0)
+    // 服务器地址设置（真机联调：填电脑局域网 IP；模拟器默认 10.0.2.2:8000 无需改动）
+    internal var gatewayDraft by observable("")
+    internal var gatewayTip by observable("")
     internal var aboutExpanded by observable(false)
     internal var disclaimerExpanded by observable(false)
     internal val historyItems by observableList<com.zhiniu.data.local.HistoryItem>()
@@ -65,6 +73,43 @@ internal class ProfilePage : AppBasePage() {
         // 浏览历史恢复 + 用本地快照补价格（拿不到价格的只显示名称）
         com.zhiniu.data.local.ViewHistory.deserialize(sp.getString(HISTORY_SP_KEY))
         historyItems.diffUpdate(com.zhiniu.data.local.ViewHistory.withPrices { repo.quoteOf(it) })
+    }
+
+    /** 保存服务器地址：http(s) 校验 → 全局生效 + SP 持久化（重启后仍生效）。 */
+    internal fun saveGateway() {
+        val url = gatewayDraft.trim()
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            gatewayTip = "地址需以 http:// 或 https:// 开头"
+            return
+        }
+        GatewayMarketClient.baseUrl = url
+        acquireModule<com.tencent.kuikly.core.module.SharedPreferencesModule>(
+            com.tencent.kuikly.core.module.SharedPreferencesModule.MODULE_NAME,
+        ).setString(GatewayMarketClient.GATEWAY_SP_KEY, url)
+        gatewayTip = "已保存并连接 $url"
+        refreshServiceStatus()
+    }
+
+    /** 恢复平台默认网关（模拟器 10.0.2.2:8000 / H5 同源 127.0.0.1:8000）。 */
+    internal fun resetGateway() {
+        gatewayDraft = GatewayMarketClient.DEFAULT_BASE_URL
+        GatewayMarketClient.baseUrl = GatewayMarketClient.DEFAULT_BASE_URL
+        acquireModule<com.tencent.kuikly.core.module.SharedPreferencesModule>(
+            com.tencent.kuikly.core.module.SharedPreferencesModule.MODULE_NAME,
+        ).setString(GatewayMarketClient.GATEWAY_SP_KEY, "")
+        gatewayTip = "已恢复默认 " + GatewayMarketClient.DEFAULT_BASE_URL
+        refreshServiceStatus()
+    }
+
+    /** 保存后重探服务状态（绿点即时反馈）。 */
+    private fun refreshServiceStatus() {
+        lifecycleScope.launch {
+            runCatching { GatewayMarketClient.health() }
+                .onSuccess { status ->
+                    gatewayOnline = status.online
+                    agentReady = status.agentReady
+                }
+        }
     }
 
     internal fun toggleSwapUpDon() {
@@ -334,6 +379,50 @@ private fun ViewContainer<*, *>.profileContent(host: ProfilePage) {
             ServiceStatus(IconKind.DATA, "行情与资讯", host.gatewayOnline, if (host.gatewayOnline) "实时网关已连接" else "网关未连接 · 本地快照", colors)
             RowDivider()
             ServiceStatus(IconKind.AI, "研究 Agent", host.agentReady, if (host.agentReady) "LLM 已配置 · 多 Agent 辩论" else "规则降级 · 未伪装模型", colors)
+        }
+
+        // ---- 服务器地址（真机联调：填电脑局域网 IP；模拟器默认 10.0.2.2:8000 无需改动） ----
+        View { attr { height(20f) } }
+        GroupLabel("服务器地址")
+        View {
+            attr {
+                flexDirectionColumn()
+                borderRadius(AppRadius.radius8)
+                backgroundColor(colors.c(colors.surface))
+                border(Border(1f, BorderStyle.SOLID, colors.c(colors.border)))
+                padding(all = 12f)
+                animate(ANIM_THEME, value = AppTheme.isDark)
+            }
+            Text {
+                attr {
+                    fontSize(AppTypography.fs11)
+                    color(colors.c(colors.textTertiary)); marginBottom(8f)
+                    text("当前：${com.zhiniu.data.remote.GatewayMarketClient.baseUrl}")
+                    animate(ANIM_THEME, value = AppTheme.isDark)
+                }
+            }
+            AppInput(
+                placeholder = "http://192.168.1.100:8000（真机填电脑 IP）",
+                text = host.gatewayDraft, height = 36f,
+                onTextChange = { host.gatewayDraft = it },
+            )
+            View { attr { height(8f) } }
+            View {
+                attr { flexDirectionRow(); alignItemsCenter() }
+                SecondaryButton("保存并连接", height = 28f) { host.saveGateway() }
+                View { attr { width(8f) } }
+                SecondaryButton("恢复默认", height = 28f) { host.resetGateway() }
+                View { attr { flex(1f) } }
+                vif({ host.gatewayTip.isNotBlank() }) {
+                    Text {
+                        attr {
+                            fontSize(AppTypography.fs11)
+                            color(colors.c(colors.textTertiary)); text(host.gatewayTip)
+                            animate(ANIM_THEME, value = AppTheme.isDark)
+                        }
+                    }
+                }
+            }
         }
 
         // ---- 关于 / 免责声明 ----

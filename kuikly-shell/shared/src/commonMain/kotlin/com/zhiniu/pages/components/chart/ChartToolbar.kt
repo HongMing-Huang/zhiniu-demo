@@ -147,7 +147,7 @@ private fun ViewContainer<*, *>.IndicatorToggle(label: String, active: Boolean, 
     View {
         attr {
             height(28f); padding(left = if (compact) 6f else 10f, right = if (compact) 6f else 10f)
-            borderRadius(AppRadius.radius5)
+            borderRadius(14f)
             backgroundColor(colors.c(if (active) colors.textPrimary else colors.surfaceSecondary))
             marginRight(6f)
             alignItemsCenter(); allCenter()

@@ -212,6 +212,9 @@ data class AgentCompareResult(
 object GatewayMarketClient {
     const val DEFAULT_BASE_URL = "http://127.0.0.1:8000"
 
+    /** 用户自定网关地址的 SharedPreferences 键（真机联调：填电脑局域网 IP，如 http://192.168.1.100:8000）。 */
+    const val GATEWAY_SP_KEY = "zhiniu.gateway.base.v1"
+
     /** 网关地址：平台默认（Android 模拟器 10.0.2.2）→ H5 可通过 URL 参数 gateway= 覆盖（真机联调指向电脑 IP）。 */
     var baseUrl: String = com.zhiniu.platform.platformDefaultGateway() ?: DEFAULT_BASE_URL
         set(value) {

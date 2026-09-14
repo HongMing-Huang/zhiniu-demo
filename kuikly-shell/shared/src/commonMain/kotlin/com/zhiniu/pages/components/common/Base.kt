@@ -119,14 +119,14 @@ fun ViewContainer<*, *>.EmptyState(
     }
 }
 
-/** 指标格：标签在上、数值在下（用于指标网格）。 */
+/** 指标格：标签在上（fs10）、数值在下（fs14 semibold 等宽），OKX 式排版。 */
 fun ViewContainer<*, *>.QuoteMetric(label: String, value: String) {
     val colors = AppTheme.colors
     View {
         attr { width(152f) }
         Text {
             attr {
-                fontSize(AppTypography.fs11)
+                fontSize(AppTypography.fs10)
                 color(colors.c(colors.textTertiary))
                 text(label)
             }
@@ -134,7 +134,7 @@ fun ViewContainer<*, *>.QuoteMetric(label: String, value: String) {
         Text {
             attr {
                 marginTop(4f)
-                fontSize(AppTypography.fs13); fontWeightMedium()
+                fontSize(AppTypography.fs14); fontWeightSemiBold()
                 fontFamily(com.zhiniu.pages.components.NUM_FONT)
                 color(colors.c(colors.textPrimary))
                 text(value)
