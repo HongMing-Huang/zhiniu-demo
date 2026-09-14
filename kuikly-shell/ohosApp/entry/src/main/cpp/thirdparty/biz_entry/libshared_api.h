@@ -1115,6 +1115,7 @@ typedef struct {
                 libshared_KType* (*_type)(void);
                 libshared_kref_com_zhiniu_data_remote_GatewayMarketClient (*_instance)();
                 const char* (*get_DEFAULT_BASE_URL)(libshared_kref_com_zhiniu_data_remote_GatewayMarketClient thiz);
+                const char* (*get_GATEWAY_SP_KEY)(libshared_kref_com_zhiniu_data_remote_GatewayMarketClient thiz);
                 const char* (*get_baseUrl)(libshared_kref_com_zhiniu_data_remote_GatewayMarketClient thiz);
                 void (*set_baseUrl)(libshared_kref_com_zhiniu_data_remote_GatewayMarketClient thiz, const char* value);
               } GatewayMarketClient;
@@ -1948,7 +1949,7 @@ typedef struct {
                 void (*GhostButton)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, const char* label, libshared_KFloat height, libshared_kref_com_zhiniu_pages_components_IconKind icon, libshared_kref_kotlin_Function0 onClick);
                 void (*IconButton)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, libshared_kref_com_zhiniu_pages_components_IconKind kind, libshared_KFloat size, libshared_KFloat box, libshared_KBoolean active, const char* accessibilityLabel, libshared_kref_kotlin_Function0 onClick);
                 void (*PrimaryButton)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, const char* label, libshared_KFloat height, libshared_kref_com_zhiniu_pages_components_IconKind icon, libshared_kref_kotlin_Function0 onClick);
-                void (*RoundIconButton)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, libshared_kref_com_zhiniu_pages_components_IconKind kind, libshared_KFloat size, libshared_KFloat box, libshared_KBoolean enabled, const char* accessibilityLabel, libshared_kref_kotlin_Function0 onClick);
+                void (*RoundIconButton)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, libshared_kref_com_zhiniu_pages_components_IconKind kind, libshared_KFloat size, libshared_KFloat box, libshared_KBoolean enabled, const char* tone, const char* accessibilityLabel, libshared_kref_kotlin_Function0 onClick);
                 void (*SecondaryButton)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, const char* label, libshared_KFloat height, libshared_kref_com_zhiniu_pages_components_IconKind icon, libshared_kref_kotlin_Function0 onClick);
                 void (*AppHeader)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, const char* activeNav, libshared_KFloat contentWidth, libshared_KFloat topInset, libshared_kref_kotlin_Function0 onNavMarket, libshared_kref_kotlin_Function0 onNavAiResearch, libshared_kref_kotlin_Function0 onNavWatchlist, libshared_kref_kotlin_Function0 onNavProfile, libshared_kref_kotlin_Function0 onSearch, libshared_kref_kotlin_Function0 onBack);
                 void (*AppInput)(libshared_kref_com_tencent_kuikly_core_base_ViewContainer thiz, const char* placeholder, const char* text, libshared_KFloat height, libshared_kref_kotlin_Function1 onTextChange, libshared_kref_kotlin_Function0 onReturn, libshared_kref_kotlin_Function1 onRef);

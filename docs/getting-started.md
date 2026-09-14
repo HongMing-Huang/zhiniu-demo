@@ -4,6 +4,18 @@
 
 ---
 
+## 0. 一键构建（推荐入口）
+
+| 端 | 一键命令 | 产物 |
+|:--|:--|:--|
+| Android | `bash scripts/build-android.sh` | `kuikly-shell/androidApp/build/outputs/apk/debug/androidApp-debug.apk` |
+| iOS（模拟器） | `bash scripts/build-ios.sh` | DerivedData `iosApp.app`（命令尾部给出 simctl 运行命令） |
+| 鸿蒙 | `bash scripts/build-ohos.sh` | `kuikly-shell/ohosApp/entry/build/.../entry-default-unsigned.hap` |
+| H5 | `bash scripts/build.sh` | `web-host/`（`python3 -m http.server 8082` 起服） |
+
+> iOS / 鸿蒙脚本内部仍需 Xcode / DevEco 工具链（见下文各端小节）；脚本只负责串起
+> Kotlin 编译 → 回填 → 原构建 三步。视频演示见 `docs/demo/`。
+
 ## 0. 环境要求
 
 | 工具 | 版本 | 用途 |

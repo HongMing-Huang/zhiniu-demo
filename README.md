@@ -54,7 +54,7 @@
 
 <video src="docs/video/demo.mp4" controls="controls" width="100%" poster="docs/img/pages_preview.png" preload="metadata"></video>
 
-**看点**：市场首屏（实时行情 · 指数脉冲）→ 排序 / 筛选 / 自选 → 搜索联想直达详情 → 详情页分时 / 日K / 盘口 / MA·MACD·RSI → AI 四维解读 → 多 Agent 研究归纳（来源可溯 · 结论速览）→ 多空对抗 / 风控视角 → 规则降级（未伪装模型）→ Light/Dark 180ms · 响应式窄屏 → **Android / iOS / H5 三端同屏**。
+**看点（本版为 H5 页面走查录制）**：市场首屏（实时行情 · OKX 式列表 · 实心涨跌块）→ 个股详情（大价格锚 · 两列指标 · MA/MACD/RSI 全圆角胶囊）→ 自选页 → AI 研究（会话历史面板 · 快捷问句 · 真 LLM 流式）→ 「我的」（外观 / 涨跌配色 / 服务状态）。真机操作录屏（Android/iOS/鸿蒙）随后补录入库。
 
 ![三端同屏](docs/img/cover-three-platform.png)
 
