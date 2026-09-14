@@ -82,7 +82,15 @@ fun ViewContainer<*, *>.AiInsightPanel(
                         marginTop(1f)
                         fontSize(AppTypography.fs11)
                         color(colors.c(colors.textTertiary))
-                        text(insight()?.source ?: "本地规则生成 · 非模型输出 · 追问走研究管线")
+                        text(run {
+                            val src = insight()?.source.orEmpty()
+                            val genAt = insight()?.generatedAt.orEmpty()
+                            when {
+                                genAt.isNotBlank() -> "$src · 生成于 $genAt"
+                                src.isNotBlank() -> src
+                                else -> "本地规则生成 · 非模型输出 · 追问走研究管线"
+                            }
+                        })
                     }
                 }
             }

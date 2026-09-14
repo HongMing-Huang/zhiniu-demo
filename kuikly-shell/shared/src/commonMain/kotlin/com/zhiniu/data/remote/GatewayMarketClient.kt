@@ -676,6 +676,7 @@ object GatewayMarketClient {
                     listOf("为什么说量能不足？", "解释 RSI 指标", "结合日K分析", "关键支撑位在哪")
                 },
                 source = "LLM 诊股 · ${root.string("provider")}/${root.string("model")}",
+                generatedAt = root.string("generatedAt"),
                 signals = signals,
                 buyZone = zoneText("buyZone"),
                 sellZone = zoneText("sellZone"),
@@ -698,6 +699,7 @@ object GatewayMarketClient {
                 earnings = "",
                 followUps = emptyList(),
                 source = "服务端规则降级 · 非模型输出",
+                generatedAt = root.string("generatedAt"),
                 signals = emptyList(),
                 buyZone = advice.string("buyRange"),
                 sellZone = advice.string("sellRange"),

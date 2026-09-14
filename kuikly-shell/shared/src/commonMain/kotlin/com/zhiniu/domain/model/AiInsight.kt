@@ -22,4 +22,5 @@ data class AiInsight(
     val sellZone: String = "",      // 卖出观察区间
     val riskLabel: String = "",     // 风险五档中文（低/中低/中/中高/高）
     val riskRationale: String = "", // 风险分级依据
+    val generatedAt: String = "",   // 诊股生成时间（后端缓存最长 1h，用户需能辨别新鲜度）
 )
