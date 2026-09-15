@@ -14,7 +14,7 @@
 | H5 | `bash scripts/build.sh` | `web-host/`（`python3 -m http.server 8082` 起服） |
 
 > iOS / 鸿蒙脚本内部仍需 Xcode / DevEco 工具链（见下文各端小节）；脚本只负责串起
-> Kotlin 编译 → 回填 → 原构建 三步。视频演示见 `docs/demo/`。
+> Kotlin 编译 → 回填 → 原构建 三步。演示视频见 `docs/video/demo.mp4`（README 📺 演示视频区）。
 
 ## 0. 环境要求
 
