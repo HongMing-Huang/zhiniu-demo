@@ -52,7 +52,7 @@
 
 <video src="docs/video/demo.mp4" controls="controls" width="100%" preload="metadata"></video>
 
-**看点**：市场首屏（实时行情 · OKX 式列表 · 实心涨跌块）→ 个股详情（大价格锚 · 两列指标 · MA/MACD/RSI 全圆角胶囊）→ 自选页 → AI 研究（会话历史面板 · 快捷问句 · 真 LLM 流式）→ 「我的」（外观 / 涨跌配色 / 服务状态）。素材来自真实运行的 H5 页面；三端真机操作录屏随后补录入库。也可在 [GitHub 文件页在线播放](https://github.com/HongMing-Huang/zhiniu-demo/blob/main/docs/video/demo.mp4) 或本地起 H5 后打开 [demo.html](http://127.0.0.1:8082/demo.html)。
+**看点**：市场首屏（实时行情 · OKX 式列表 · 实心涨跌块）→ 个股详情（大价格锚 · 两列指标 · MA/MACD/RSI 全圆角胶囊）→ 自选页 → AI 研究（会话历史面板 · 快捷问句 · 真 LLM 流式）→ 「我的」（外观 / 涨跌配色 / 服务状态）。素材来自真实运行的 H5 页面；三端真机操作录屏随后补录入库。GitHub 文件页可[在线播放](https://github.com/HongMing-Huang/zhiniu-demo/blob/main/docs/video/demo.mp4)。
 
 ---
 
