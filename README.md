@@ -50,6 +50,11 @@
 
 ## 📺 演示视频
 
+> **在线播放**：起 H5 服务后打开 [http://127.0.0.1:8082/demo.html](http://127.0.0.1:8082/demo.html)；
+> GitHub 网页端直达：[docs/video/demo.mp4（在线播放器）](https://github.com/HongMing-Huang/zhiniu-demo/blob/main/docs/video/demo.mp4)。
+
+## 📺 演示视频
+
 > 素材均来自真实运行的 **H5 + iOS 模拟器 + Android 模拟器**，三端价格一致（宁德时代 · 337.11，同一套 `commonMain` 代码）。
 
 <video src="docs/video/demo.mp4" controls="controls" width="100%" poster="docs/img/pages_preview.png" preload="metadata"></video>
