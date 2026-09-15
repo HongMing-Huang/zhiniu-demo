@@ -50,18 +50,9 @@
 
 ## 📺 演示视频
 
-> **在线播放**：起 H5 服务后打开 [http://127.0.0.1:8082/demo.html](http://127.0.0.1:8082/demo.html)；
-> GitHub 网页端直达：[docs/video/demo.mp4（在线播放器）](https://github.com/HongMing-Huang/zhiniu-demo/blob/main/docs/video/demo.mp4)。
+<video src="docs/video/demo.mp4" controls="controls" width="100%" preload="metadata"></video>
 
-## 📺 演示视频
-
-> 素材均来自真实运行的 **H5 + iOS 模拟器 + Android 模拟器**，三端价格一致（宁德时代 · 337.11，同一套 `commonMain` 代码）。
-
-<video src="docs/video/demo.mp4" controls="controls" width="100%" poster="docs/img/pages_preview.png" preload="metadata"></video>
-
-**看点（本版为 H5 页面走查录制）**：市场首屏（实时行情 · OKX 式列表 · 实心涨跌块）→ 个股详情（大价格锚 · 两列指标 · MA/MACD/RSI 全圆角胶囊）→ 自选页 → AI 研究（会话历史面板 · 快捷问句 · 真 LLM 流式）→ 「我的」（外观 / 涨跌配色 / 服务状态）。真机操作录屏（Android/iOS/鸿蒙）随后补录入库。
-
-![三端同屏](docs/img/cover-three-platform.png)
+**看点**：市场首屏（实时行情 · OKX 式列表 · 实心涨跌块）→ 个股详情（大价格锚 · 两列指标 · MA/MACD/RSI 全圆角胶囊）→ 自选页 → AI 研究（会话历史面板 · 快捷问句 · 真 LLM 流式）→ 「我的」（外观 / 涨跌配色 / 服务状态）。素材来自真实运行的 H5 页面；三端真机操作录屏随后补录入库。也可在 [GitHub 文件页在线播放](https://github.com/HongMing-Huang/zhiniu-demo/blob/main/docs/video/demo.mp4) 或本地起 H5 后打开 [demo.html](http://127.0.0.1:8082/demo.html)。
 
 ---
 
@@ -70,8 +61,15 @@
 | 产物 | 下载 | 说明 |
 | :--- | :---: | :--- |
 | **Android Debug 包** | [📥 `zhiniu-debug.apk`](zhiniu-debug.apk) | 约 8 MB · 下载即装；默认连 `10.0.2.2:8000`（模拟器）/ 本机网关 |
+| **鸿蒙 HAP** | [📥 `zhiniu-debug.hap`](zhiniu-debug.hap) | 约 28 MB · `hdc install -r` 安装；网关默认 `10.0.2.2:8000` |
+| **H5 离线包** | [📥 `zhiniu-h5-web.zip`](zhiniu-h5-web.zip) | 约 1.7 MB · 解压后 `python3 -m http.server 8082` 即起 |
 
-SHA-256：`f972541a970408efca1c1a6d9dd40b8d2f7476611749814a7801dac142182973`
+SHA-256：
+`APK  f972541a970408efca1c1a6d9dd40b8d2f7476611749814a7801dac142182973`
+`HAP  4887e63408c3b7b6283f1c7c554165f00489b6202d3bb577a42c94bf632a7305`
+`H5   034f7c1f922e5172d0d35147e118fd5c4f2e5ca9b0c43b0476962f5be69a949d`
+
+各端从源码构建：`bash scripts/build-android.sh` · `bash scripts/build-ios.sh` · `bash scripts/build-ohos.sh` · `bash scripts/build.sh`（H5），详见 [docs/getting-started.md](docs/getting-started.md)。
 
 > 行情来自公开免费接口（新浪/东财），AI 结论由大模型生成，两者都可能出错；本作品仅用于课程学习与产品原型演示，**不构成任何投资建议**，也不提供真实证券交易。
 
